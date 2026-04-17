@@ -2,7 +2,7 @@
 
 ## Repository root
 
-Run documented commands with the **repository root** as the current working directory (the folder that contains `main.py`). Set `PYTHONPATH` to the **parent** of that folder so `import astro_content_agent` resolves (e.g. on Windows PowerShell: `$env:PYTHONPATH = (Resolve-Path ..).Path` when the repo folder is named `astro_content_agent`).
+Run documented commands with the **repository root** as the current working directory (the folder that contains `astro_content_agent/` and `scripts/`). With that as the working directory, `import astro_content_agent` resolves without extra `PYTHONPATH` settings. Start the API with `python -m uvicorn astro_content_agent.main:app` (or equivalent).
 
 ## Artifact policy
 
