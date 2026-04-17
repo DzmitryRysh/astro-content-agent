@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+.env
+*.db
+
+# Operator/script outputs — see scripts/aca/README.md
+scripts/aca/out/
+scripts/aca/weekly_venus/
