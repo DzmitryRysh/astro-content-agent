@@ -24,6 +24,15 @@ class DiagnosticsReport(BaseModel):
     checks: list[CheckResult]
 
 
+class PublishSimulationPreview(BaseModel):
+    """What would be sent to Instagram container creation (no network)."""
+
+    image_url: str
+    caption_excerpt: str
+    storage_key: str
+    ig_user_id: str | None = None
+
+
 class PublishReadinessReport(BaseModel):
     """Dry-run publish readiness report for a specific draft."""
 
@@ -31,3 +40,5 @@ class PublishReadinessReport(BaseModel):
     ready: bool
     checks: list[CheckResult]
     checked_at: datetime
+    instagram_account_id: str | None = None
+    simulation: PublishSimulationPreview | None = None

@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Operator Review Console — Astro Content Agent</title>
+  <link rel="stylesheet" href="/operator/review/static/console.css" />
+</head>
+<body>
+  <header>
+    <h1>Operator Review Console</h1>
+    <p>Inspect drafts, readiness, and dry-run preview. Approve or reject without extra API tools.</p>
+  </header>
+  <main>
+    <section class="panel">
+      <h2>Load draft</h2>
+      <div class="row">
+        <div>
+          <label for="draftId">Draft ID</label>
+          <input type="text" id="draftId" placeholder="uuid" autocomplete="off" />
+        </div>
+        <div>
+          <label for="igAccountId">Instagram account ID (optional)</label>
+          <input type="text" id="igAccountId" placeholder="for account + dry-run checks" autocomplete="off" />
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label for="adminKey">X-Admin-Key (if ADMIN_API_KEY is set on server)</label>
+          <input type="password" id="adminKey" placeholder="optional" autocomplete="off" />
+        </div>
+        <div>
+          <button type="button" class="primary" id="btnLoad">Load review</button>
+        </div>
+      </div>
+      <div id="loadMsg" class="msg" hidden></div>
+      <input type="hidden" id="lastDraftId" value="" />
+    </section>
+
+    <section class="panel">
+      <h2>Content</h2>
+      <p><strong>Status:</strong> <span id="outStatus">—</span></p>
+      <p><strong>Title</strong></p>
+      <div class="field-copy" id="outTitle">—</div>
+      <p><strong>Hook</strong></p>
+      <div class="field-copy" id="outHook">—</div>
+      <p><strong>Caption</strong></p>
+      <div class="field-copy" id="outCaption">—</div>
+      <p><strong>CTA</strong></p>
+      <div class="field-copy" id="outCta">—</div>
+      <p><strong>Hashtags</strong></p>
+      <div class="field-copy" id="outHashtags">—</div>
+      <p><strong>Primary image URL</strong></p>
+      <div class="field-copy" id="outImageUrl">—</div>
+      <p><strong>Storage key</strong></p>
+      <div class="field-copy" id="outStorageKey">—</div>
+      <p><strong>Text fallback</strong></p>
+      <div class="field-copy" id="outTextFallback">—</div>
+    </section>
+
+    <section class="panel">
+      <h2>Publish readiness</h2>
+      <p><span id="readinessPill" class="status-pill not-ready">—</span> <span id="readinessSummary" style="color:var(--muted);font-size:0.85rem"></span></p>
+      <div id="readinessChecks"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Dry-run preview (JSON)</h2>
+      <pre class="dry" id="dryRunPre">—</pre>
+    </section>
+
+    <section class="panel">
+      <h2>Actions</h2>
+      <p style="color:var(--muted);font-size:0.85rem">Uses existing API routes on this host. Reload after approve/reject.</p>
+      <div class="row">
+        <button type="button" class="success" id="btnApprove">Approve draft</button>
+        <button type="button" class="danger" id="btnReject">Reject draft</button>
+      </div>
+      <div style="margin-top:0.75rem">
+        <label for="rejectReason">Rejection reason (required for reject)</label>
+        <textarea id="rejectReason" placeholder="Why reject?"></textarea>
+      </div>
+      <div id="actionMsg" class="msg" hidden></div>
+    </section>
+  </main>
+  <script src="/operator/review/static/console.js"></script>
+</body>
+</html>

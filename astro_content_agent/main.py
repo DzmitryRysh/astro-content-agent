@@ -5,6 +5,7 @@ from collections.abc import AsyncGenerator
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from astro_content_agent.api.router import api_router
@@ -49,6 +50,19 @@ def create_app() -> FastAPI:
         assets_path = Path(settings.assets_dir)
         assets_path.mkdir(parents=True, exist_ok=True)
         app.mount("/media", StaticFiles(directory=str(assets_path)), name="media")
+
+    # Minimal operator UI: static review console (uses existing admin + drafts APIs).
+    _console_dir = Path(__file__).resolve().parent / "static" / "operator_review"
+
+    @app.get("/operator/review", include_in_schema=False)
+    def operator_review_console() -> FileResponse:
+        return FileResponse(_console_dir / "index.html", media_type="text/html")
+
+    app.mount(
+        "/operator/review/static",
+        StaticFiles(directory=str(_console_dir)),
+        name="operator_review_static",
+    )
 
     return app
 

@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from astro_content_agent.db.session import get_db
 from astro_content_agent.repositories.publish_jobs import PublishJobRepository
 from astro_content_agent.repositories.published_posts import PublishedPostRepository
+from astro_content_agent.schemas.diagnostics import PublishReadinessReport
 from astro_content_agent.schemas.publish import (
     PublishJobListResponse,
     PublishJobResponse,
@@ -17,6 +18,7 @@ from astro_content_agent.schemas.publish import (
     PublishedPostResponse,
     SchedulePublishRequest,
 )
+from astro_content_agent.services.diagnostics.checker import DiagnosticsService
 from astro_content_agent.services.instagram.client import InstagramClientProtocol
 from astro_content_agent.services.instagram.publisher import PublisherService
 from astro_content_agent.services.media.storage import LocalFileStorage
@@ -46,7 +48,9 @@ def get_ig_client(
             status_code=503,
             detail=(
                 "Instagram publishing is not configured. "
-                "Set INSTAGRAM_ACCESS_TOKEN in .env and restart the server."
+                "Set INSTAGRAM_ACCESS_TOKEN in .env and restart the server. "
+                "Validate drafts without a token: POST /api/v1/publish/<draft_id>/dry-run with JSON "
+                '{"instagram_account_id": "<uuid>"}.'
             ),
         )
     return MetaInstagramClient(access_token=token)
@@ -55,6 +59,27 @@ def get_ig_client(
 def get_storage() -> LocalFileStorage:
     """FastAPI dependency: returns a LocalFileStorage configured from app settings."""
     return get_local_storage(get_settings())
+
+
+@router.post("/{draft_id}/dry-run", response_model=PublishReadinessReport)
+def publish_dry_run(
+    draft_id: str,
+    body: PublishRequest,
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> PublishReadinessReport:
+    """Validate publish preconditions and return IG payload preview without Meta API calls.
+
+    Does not require INSTAGRAM_ACCESS_TOKEN. Use the same instagram_account_id as for real publish.
+    """
+    svc = DiagnosticsService()
+    return svc.run_publish_readiness(
+        db,
+        draft_id=draft_id,
+        settings=settings,
+        instagram_account_id=body.instagram_account_id,
+        include_simulation=True,
+    )
 
 
 @router.post("/{draft_id}", response_model=PublishResponse)

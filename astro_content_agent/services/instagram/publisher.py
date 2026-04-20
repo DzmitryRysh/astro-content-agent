@@ -120,13 +120,22 @@ class PublisherService:
         if job is None:
             raise ValueError(f"publish_job not found: {job_id}")
 
-        draft = self._deps.draft_repo.get_by_id(db, job.draft_id)
         account = db.get(InstagramAccount, job.instagram_account_id)
 
         self._deps.job_repo.mark_running(db, job)
         db.commit()
 
         try:
+            if account is None:
+                raise ValueError(f"instagram account not found: {job.instagram_account_id}")
+            if not account.ig_user_id:
+                raise ValueError(
+                    "Instagram account has no ig_user_id — Meta Graph API cannot create media. "
+                    "Set instagram_accounts.ig_user_id (numeric id from Meta). "
+                    "Dry-run: POST /api/v1/publish/<draft_id>/dry-run or GET /api/v1/admin/publish-readiness/<draft_id>."
+                )
+
+            draft = self._deps.draft_repo.get_by_id(db, job.draft_id)
             # Step 1: create media container (skip if already done on a prior attempt)
             container_id = job.external_container_id
             if container_id is None:

@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from astro_content_agent.api.routes import publish as publish_routes
 from astro_content_agent.db.models import Asset, Draft, InstagramAccount
+from astro_content_agent.core.config import Settings, get_settings
 from astro_content_agent.db.session import get_db
 from astro_content_agent.main import create_app
 from astro_content_agent.repositories.assets import AssetRepository
@@ -121,6 +122,25 @@ def client_p5(db_session: Session, ig_client: FakeInstagramClient, tmp_path: Pat
     return TestClient(app)
 
 
+@pytest.fixture()
+def client_publish_dry_run(db_session: Session, tmp_path: Path) -> TestClient:
+    """App client without INSTAGRAM_ACCESS_TOKEN — for dry-run endpoint tests."""
+    app = create_app()
+    app.dependency_overrides[get_db] = lambda: db_session
+    fake = Settings(
+        _env_file=None,
+        SCHEDULER_ENABLED=False,
+        APP_ENV="local",
+        OPENAI_API_KEY="sk-test",
+        PUBLIC_BASE_URL="http://testserver",
+        STORAGE_MODE="local",
+        ASSETS_DIR=str(tmp_path / "assets"),
+        INSTAGRAM_ACCESS_TOKEN=None,
+    )
+    app.dependency_overrides[get_settings] = lambda: fake
+    return TestClient(app)
+
+
 # ---------------------------------------------------------------------------
 # Unit-level: PublisherService
 # ---------------------------------------------------------------------------
@@ -141,6 +161,28 @@ def test_create_job_rejects_missing_account(db_session: Session, brand_profile, 
 
     with pytest.raises(PublisherService.AccountNotFoundError):
         svc.create_job(db_session, draft_id=draft.id, instagram_account_id="missing")
+
+
+def test_execute_job_fails_when_ig_user_id_missing(
+    db_session: Session, brand_profile, ig_client: FakeInstagramClient
+) -> None:
+    acc = InstagramAccount(
+        id=str(uuid.uuid4()),
+        account_name="No IG id",
+        ig_user_id=None,
+        access_token="tok",
+        is_active=1,
+    )
+    db_session.add(acc)
+    db_session.commit()
+    draft = _make_approved_draft(db_session, brand_profile.id)
+    _make_asset(db_session, draft)
+    svc = PublisherService(ig_client=ig_client)
+    job = svc.create_job(db_session, draft_id=draft.id, instagram_account_id=acc.id)
+    result = svc.execute_job(db_session, job_id=job.id)
+    assert result.succeeded is False
+    assert result.error is not None
+    assert "ig_user_id" in result.error.lower()
 
 
 def test_successful_publish_flow(db_session: Session, brand_profile, ig_client) -> None:
@@ -291,6 +333,51 @@ def test_list_publish_jobs(client_p5: TestClient, brand_profile, db_session: Ses
     resp = client_p5.get("/api/v1/publish/jobs")
     assert resp.status_code == 200
     assert resp.json()["total"] >= 1
+
+
+def test_publish_dry_run_returns_simulation_without_meta_token(
+    client_publish_dry_run: TestClient, brand_profile, db_session: Session
+) -> None:
+    draft = _make_approved_draft(db_session, brand_profile.id)
+    account = _make_account(db_session)
+    _make_asset(db_session, draft, storage_path="brand/draft/image.png")
+
+    resp = client_publish_dry_run.post(
+        f"/api/v1/publish/{draft.id}/dry-run",
+        json={"instagram_account_id": account.id},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["simulation"] is not None
+    assert body["simulation"]["image_url"].startswith("http://testserver/media/")
+    assert body["instagram_account_id"] == account.id
+    names = {c["name"] for c in body["checks"]}
+    assert "publish_instagram_token" in names
+
+
+def test_publish_dry_run_errors_when_account_missing_ig_user_id(
+    client_publish_dry_run: TestClient, brand_profile, db_session: Session
+) -> None:
+    acc = InstagramAccount(
+        id=str(uuid.uuid4()),
+        account_name="X",
+        ig_user_id=None,
+        access_token="t",
+        is_active=1,
+    )
+    db_session.add(acc)
+    db_session.commit()
+    draft = _make_approved_draft(db_session, brand_profile.id)
+    _make_asset(db_session, draft)
+
+    resp = client_publish_dry_run.post(
+        f"/api/v1/publish/{draft.id}/dry-run",
+        json={"instagram_account_id": acc.id},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["ready"] is False
+    assert any(c["name"] == "instagram_account_ig_user_id" and c["status"] == "error" for c in body["checks"])
 
 
 def test_publish_history(client_p5: TestClient, brand_profile, db_session: Session) -> None:

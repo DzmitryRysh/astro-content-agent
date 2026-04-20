@@ -34,6 +34,7 @@ def _settings(**overrides) -> Settings:
         PUBLIC_BASE_URL="http://localhost:8000",
         STORAGE_MODE="local",
         ADMIN_API_KEY="",
+        INSTAGRAM_ACCESS_TOKEN="dummy-token",
     )
     base.update(overrides)
     return Settings(**base)  # type: ignore[call-arg]
@@ -219,6 +220,35 @@ def test_ig_account_with_token_is_ok(svc: DiagnosticsService, db_session: Sessio
     assert check.status == "ok"
 
 
+def test_instagram_access_token_missing_local_warns(svc: DiagnosticsService, db_session: Session) -> None:
+    settings = _settings(INSTAGRAM_ACCESS_TOKEN=None)
+    report = svc.run_config_checks(settings, db_session)
+    check = next(c for c in report.checks if c.name == "instagram_access_token")
+    assert check.status == "warning"
+
+
+def test_instagram_access_token_missing_staging_errors(svc: DiagnosticsService, db_session: Session) -> None:
+    _make_ig_account(db_session, with_token=True)
+    settings = _settings(
+        APP_ENV="staging",
+        INSTAGRAM_ACCESS_TOKEN=None,
+        OPENAI_API_KEY="sk-x",
+        PUBLIC_BASE_URL="https://example.com",
+    )
+    report = svc.run_config_checks(settings, db_session)
+    check = next(c for c in report.checks if c.name == "instagram_access_token")
+    assert check.status == "error"
+
+
+def test_assets_dir_exists_ok(svc: DiagnosticsService, db_session: Session, tmp_path: Path) -> None:
+    assets = tmp_path / "assets"
+    assets.mkdir()
+    settings = _settings(ASSETS_DIR=str(assets))
+    report = svc.run_config_checks(settings, db_session)
+    check = next(c for c in report.checks if c.name == "assets_dir")
+    assert check.status == "ok"
+
+
 # ---------------------------------------------------------------------------
 # Unit: overall report status
 # ---------------------------------------------------------------------------
@@ -308,7 +338,10 @@ def test_publish_readiness_fully_ready(
 ) -> None:
     draft = _make_draft(db_session, brand_profile.id, status="approved")
     _make_asset(db_session, draft)
-    settings = _settings(PUBLIC_BASE_URL="https://real.example.com")
+    settings = _settings(
+        PUBLIC_BASE_URL="https://real.example.com",
+        INSTAGRAM_ACCESS_TOKEN="tok",
+    )
     report = svc.run_publish_readiness(db_session, draft_id=draft.id, settings=settings)
     assert report.ready is True
     assert all(c.status == "ok" for c in report.checks)
@@ -345,7 +378,10 @@ def test_diagnostics_endpoint_check_names_present(diag_client: TestClient) -> No
     assert "openai_api_key" in names
     assert "public_base_url" in names
     assert "storage_mode" in names
+    assert "assets_dir" in names
     assert "asset_url_generation" in names
+    assert "instagram_access_token" in names
+    assert "instagram_ig_user_id" in names
     assert "instagram_accounts" in names
 
 
@@ -404,3 +440,52 @@ def test_publish_readiness_endpoint_unapproved_draft(
     by_name = {c["name"]: c for c in body["checks"]}
     assert by_name["draft_approved"]["status"] == "error"
     assert "hint" in by_name["draft_approved"]
+
+
+def test_publish_readiness_simulate_query_returns_preview(
+    diag_client: TestClient, brand_profile, db_session: Session
+) -> None:
+    draft = _make_draft(db_session, brand_profile.id, status="approved")
+    _make_asset(db_session, draft)
+    acc = _make_ig_account(db_session, with_token=True)
+    resp = diag_client.get(
+        f"/api/v1/admin/publish-readiness/{draft.id}",
+        params={"simulate": "true", "instagram_account_id": acc.id},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body.get("simulation") is not None
+    assert "image_url" in body["simulation"]
+    assert body["simulation"]["ig_user_id"] == "ig-123"
+
+
+def test_publish_readiness_with_bad_instagram_account_id(
+    svc: DiagnosticsService, db_session: Session, brand_profile
+) -> None:
+    draft = _make_draft(db_session, brand_profile.id, status="approved")
+    _make_asset(db_session, draft)
+    settings = _settings(PUBLIC_BASE_URL="https://x.example.com", INSTAGRAM_ACCESS_TOKEN="t")
+    report = svc.run_publish_readiness(
+        db_session,
+        draft_id=draft.id,
+        settings=settings,
+        instagram_account_id="not-a-uuid-row",
+    )
+    assert report.ready is False
+    assert any(c.name == "instagram_account" and c.status == "error" for c in report.checks)
+
+
+def test_publish_readiness_include_simulation_unit(
+    svc: DiagnosticsService, db_session: Session, brand_profile
+) -> None:
+    draft = _make_draft(db_session, brand_profile.id, status="approved")
+    _make_asset(db_session, draft)
+    settings = _settings(PUBLIC_BASE_URL="https://x.example.com", INSTAGRAM_ACCESS_TOKEN="t")
+    report = svc.run_publish_readiness(
+        db_session,
+        draft_id=draft.id,
+        settings=settings,
+        include_simulation=True,
+    )
+    assert report.simulation is not None
+    assert "/media/" in report.simulation.image_url

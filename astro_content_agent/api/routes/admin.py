@@ -16,8 +16,10 @@ from astro_content_agent.schemas.admin import (
     ContentPillarResponse,
     ContentPillarsBulkCreateRequest,
 )
+from astro_content_agent.schemas.drafts import DraftOperatorReview
 from astro_content_agent.schemas.diagnostics import DiagnosticsReport, PublishReadinessReport
 from astro_content_agent.services.diagnostics.checker import DiagnosticsService
+from astro_content_agent.services.drafts.review_surface import build_draft_operator_review
 
 router = APIRouter(dependencies=[Depends(require_admin_key)])
 
@@ -119,6 +121,36 @@ def list_content_pillars(
 
 
 # ---------------------------------------------------------------------------
+# Operator: draft review surface (content + readiness + dry-run preview)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/drafts/{draft_id}/review", response_model=DraftOperatorReview)
+def get_draft_operator_review(
+    draft_id: str,
+    instagram_account_id: str | None = Query(
+        default=None,
+        description="Optional Instagram account UUID — includes account checks and ig_user_id on dry-run preview.",
+    ),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> DraftOperatorReview:
+    """Single payload for operators: hook/caption/CTA, asset URL, approval state, publish readiness, dry-run simulation.
+
+    Approve or reject via ``POST /api/v1/drafts/{draft_id}/approve`` and ``.../reject`` (no change to those routes).
+    """
+    body = build_draft_operator_review(
+        db,
+        draft_id=draft_id,
+        settings=settings,
+        instagram_account_id=instagram_account_id,
+    )
+    if body is None:
+        raise HTTPException(status_code=404, detail=f"draft not found: {draft_id}")
+    return body
+
+
+# ---------------------------------------------------------------------------
 # Phase 9: diagnostics
 # ---------------------------------------------------------------------------
 
@@ -140,6 +172,14 @@ def get_diagnostics(
 @router.get("/publish-readiness/{draft_id}", response_model=PublishReadinessReport)
 def get_publish_readiness(
     draft_id: str,
+    instagram_account_id: str | None = Query(
+        default=None,
+        description="When set, validates the Instagram account row (active, ig_user_id).",
+    ),
+    simulate: bool = Query(
+        default=False,
+        description="When true, includes image_url/caption preview (no Meta API calls).",
+    ),
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
 ) -> PublishReadinessReport:
@@ -148,4 +188,10 @@ def get_publish_readiness(
     Checks all preconditions for publishing without performing any publish attempt.
     """
     svc = DiagnosticsService()
-    return svc.run_publish_readiness(db, draft_id=draft_id, settings=settings)
+    return svc.run_publish_readiness(
+        db,
+        draft_id=draft_id,
+        settings=settings,
+        instagram_account_id=instagram_account_id,
+        include_simulation=simulate,
+    )

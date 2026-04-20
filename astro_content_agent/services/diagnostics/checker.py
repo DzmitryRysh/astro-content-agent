@@ -1,13 +1,19 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Literal
 from urllib.parse import urlparse
 
 from sqlalchemy.orm import Session
 
 from astro_content_agent.core.config import Settings
-from astro_content_agent.schemas.diagnostics import CheckResult, DiagnosticsReport, PublishReadinessReport
+from astro_content_agent.schemas.diagnostics import (
+    CheckResult,
+    DiagnosticsReport,
+    PublishReadinessReport,
+    PublishSimulationPreview,
+)
 
 _VALID_STORAGE_MODES = frozenset({"local"})
 
@@ -50,7 +56,10 @@ class DiagnosticsService:
             self._check_admin_key(settings),
             self._check_public_base_url(settings),
             self._check_storage_mode(settings),
+            self._check_assets_dir(settings),
             self._check_asset_url_generation(settings),
+            self._check_instagram_access_token(settings),
+            self._check_instagram_ig_user_id_env(settings),
             self._check_instagram_accounts(settings, db),
             self._check_brand_profiles(db),
         ]
@@ -125,6 +134,56 @@ class DiagnosticsService:
             hint="Use 'local' for development. S3/GCS support is a future extension.",
         )
 
+    def _check_assets_dir(self, settings: Settings) -> CheckResult:
+        name = "assets_dir"
+        path = Path(settings.assets_dir).expanduser()
+        try:
+            resolved = path.resolve()
+        except OSError as exc:
+            return _err(name, f"ASSETS_DIR is not usable: {exc}.", hint="Fix ASSETS_DIR to a valid path.")
+        if resolved.is_dir():
+            return _ok(name, f"ASSETS_DIR exists: {resolved}")
+        if settings.app_env == "local":
+            return _warn(
+                name,
+                f"ASSETS_DIR path '{resolved}' is not a directory yet.",
+                hint="The app creates it on startup for local storage, or create it before saving media.",
+            )
+        return _err(
+            name,
+            f"ASSETS_DIR '{resolved}' must exist for local storage when APP_ENV='{settings.app_env}'.",
+            hint="Create the directory or adjust ASSETS_DIR.",
+        )
+
+    def _check_instagram_access_token(self, settings: Settings) -> CheckResult:
+        name = "instagram_access_token"
+        if settings.instagram_access_token:
+            return _ok(name, "INSTAGRAM_ACCESS_TOKEN is set (used for all Graph API publish calls).")
+        if settings.app_env == "local":
+            return _warn(
+                name,
+                "INSTAGRAM_ACCESS_TOKEN is not set — real publish endpoints return 503.",
+                hint="Use POST /api/v1/publish/{draft_id}/dry-run to validate drafts without Meta. Set token when Meta access is ready.",
+            )
+        return _err(
+            name,
+            "INSTAGRAM_ACCESS_TOKEN is not set.",
+            hint="Configure a long-lived token from the Meta Developer Console.",
+        )
+
+    def _check_instagram_ig_user_id_env(self, settings: Settings) -> CheckResult:
+        name = "instagram_ig_user_id"
+        if settings.instagram_ig_user_id:
+            return _ok(
+                name,
+                "INSTAGRAM_IG_USER_ID is set in environment (publish jobs still require instagram_accounts.ig_user_id).",
+            )
+        return _warn(
+            name,
+            "INSTAGRAM_IG_USER_ID is not set in environment (optional).",
+            hint="Each publish job uses instagram_accounts.ig_user_id — set that column from Meta for the connected IG user.",
+        )
+
     def _check_asset_url_generation(self, settings: Settings) -> CheckResult:
         name = "asset_url_generation"
         test_key = "diagnostics/test-key/sample.png"
@@ -189,6 +248,8 @@ class DiagnosticsService:
         *,
         draft_id: str,
         settings: Settings,
+        instagram_account_id: str | None = None,
+        include_simulation: bool = False,
     ) -> PublishReadinessReport:
         """Validate all preconditions for publishing a specific draft.
 
@@ -197,6 +258,14 @@ class DiagnosticsService:
         checks: list[CheckResult] = []
         checks.extend(self._check_draft_for_publish(db, draft_id))
         checks.extend(self._check_publish_config(settings))
+        if instagram_account_id is not None:
+            checks.extend(self._check_instagram_account_for_publish(db, instagram_account_id))
+
+        simulation: PublishSimulationPreview | None = None
+        if include_simulation:
+            sim, sim_checks = self._build_publish_simulation(db, draft_id, settings, instagram_account_id)
+            checks.extend(sim_checks)
+            simulation = sim
 
         all_ok = all(c.status == "ok" for c in checks)
         return PublishReadinessReport(
@@ -204,6 +273,8 @@ class DiagnosticsService:
             ready=all_ok,
             checks=checks,
             checked_at=datetime.now(UTC),
+            instagram_account_id=instagram_account_id,
+            simulation=simulation,
         )
 
     def _check_draft_for_publish(
@@ -287,4 +358,119 @@ class DiagnosticsService:
         else:
             results.append(_ok("publish_public_url", f"PUBLIC_BASE_URL='{settings.public_base_url}' is non-localhost."))
 
+        if settings.instagram_access_token:
+            results.append(
+                _ok(
+                    "publish_instagram_token",
+                    "INSTAGRAM_ACCESS_TOKEN is set — real publish API calls can authenticate.",
+                )
+            )
+        elif settings.app_env == "local":
+            results.append(
+                _warn(
+                    "publish_instagram_token",
+                    "INSTAGRAM_ACCESS_TOKEN is not set — POST /publish/{id} returns 503.",
+                    hint="Use POST /api/v1/publish/{draft_id}/dry-run to validate without Meta. Set token when developer access is ready.",
+                )
+            )
+        else:
+            results.append(
+                _err(
+                    "publish_instagram_token",
+                    "INSTAGRAM_ACCESS_TOKEN is not set — publishing cannot run in this environment.",
+                    hint="Configure the token from Meta Developer Console.",
+                )
+            )
+
         return results
+
+    def _check_instagram_account_for_publish(
+        self, db: Session, instagram_account_id: str
+    ) -> list[CheckResult]:
+        from astro_content_agent.db.models import InstagramAccount
+
+        account = db.get(InstagramAccount, instagram_account_id)
+        if account is None:
+            return [
+                _err(
+                    "instagram_account",
+                    f"No instagram_accounts row for id='{instagram_account_id}'.",
+                    hint="Use an existing instagram_account_id from the DB or admin API.",
+                )
+            ]
+        out: list[CheckResult] = [
+            _ok("instagram_account", f"Account '{account.account_name}' found."),
+        ]
+        if account.is_active != 1:
+            out.append(
+                _err(
+                    "instagram_account_active",
+                    "Instagram account is not active (is_active != 1).",
+                    hint="Set is_active=1 before scheduling publish.",
+                )
+            )
+        else:
+            out.append(_ok("instagram_account_active", "Instagram account is active."))
+        if not account.ig_user_id:
+            out.append(
+                _err(
+                    "instagram_account_ig_user_id",
+                    "instagram_accounts.ig_user_id is missing.",
+                    hint="Set the numeric Instagram user id from Meta (Graph API user id, not @handle).",
+                )
+            )
+        else:
+            out.append(_ok("instagram_account_ig_user_id", "instagram_accounts.ig_user_id is set."))
+        return out
+
+    def _build_publish_simulation(
+        self,
+        db: Session,
+        draft_id: str,
+        settings: Settings,
+        instagram_account_id: str | None,
+    ) -> tuple[PublishSimulationPreview | None, list[CheckResult]]:
+        from astro_content_agent.db.models import InstagramAccount
+        from astro_content_agent.repositories.assets import AssetRepository
+        from astro_content_agent.repositories.drafts import DraftRepository
+        from astro_content_agent.services.instagram.container_builder import ContainerBuilder
+        from astro_content_agent.services.media.url_builder import get_local_storage
+
+        draft = DraftRepository().get_by_id(db, draft_id)
+        if draft is None:
+            return None, []
+
+        assets = AssetRepository().list_for_draft(db, draft_id)
+        if not assets:
+            return None, []
+
+        ig_user_id: str | None = None
+        if instagram_account_id is not None:
+            acc = db.get(InstagramAccount, instagram_account_id)
+            if acc is not None:
+                ig_user_id = acc.ig_user_id
+
+        try:
+            storage = get_local_storage(settings)
+            cb = ContainerBuilder(url_resolver=storage.url)
+            params = cb.build(draft=draft, asset=assets[0])
+        except Exception as exc:
+            return None, [
+                _err(
+                    "publish_payload_build",
+                    str(exc),
+                    hint="Fix draft_type, PostDraftPayload fields, or asset mime_type before publish.",
+                )
+            ]
+
+        cap = params.caption
+        excerpt = cap if len(cap) <= 500 else cap[:497] + "..."
+        return (
+            PublishSimulationPreview(
+                image_url=params.image_url,
+                caption_excerpt=excerpt,
+                storage_key=assets[0].storage_path,
+                ig_user_id=ig_user_id,
+            ),
+            [],
+        )

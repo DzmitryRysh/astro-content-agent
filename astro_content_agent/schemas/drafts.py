@@ -5,6 +5,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from astro_content_agent.schemas.diagnostics import CheckResult, PublishSimulationPreview
+
 
 # ---------------------------------------------------------------------------
 # AI-output payload schemas (used as structured model outputs)
@@ -153,3 +155,44 @@ class DraftRejectResponse(BaseModel):
 class DraftRegenerateRequest(BaseModel):
     day: date
     plan_slot: int | None = None
+
+
+# ---------------------------------------------------------------------------
+# Operator review surface (single payload for review + readiness + dry-run)
+# ---------------------------------------------------------------------------
+
+
+class OperatorReviewActionLinks(BaseModel):
+    """Resolved API paths for the current draft (substituted draft_id)."""
+
+    approve: str
+    reject: str
+    publish_dry_run: str
+    admin_publish_readiness: str
+
+
+class DraftOperatorReview(BaseModel):
+    """One-screen read model: copy for review, readiness, and dry-run preview."""
+
+    draft_id: str
+    brand_profile_id: str
+    draft_type: str
+    status: str
+    title: str | None = None
+    hook: str | None = None
+    caption: str | None = None
+    cta: str | None = None
+    hashtags_preview: list[str] = Field(default_factory=list)
+    text_fallback: str | None = Field(
+        default=None,
+        description="Raw draft.text when structured payload fields are missing.",
+    )
+    primary_asset_storage_key: str | None = None
+    primary_image_public_url: str | None = None
+    approved_at: datetime | None = None
+    rejected_at: datetime | None = None
+    rejection_reason: str | None = None
+    publish_readiness_ready: bool
+    publish_readiness_checks: list[CheckResult]
+    dry_run: PublishSimulationPreview | None = None
+    actions: OperatorReviewActionLinks
