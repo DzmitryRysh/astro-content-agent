@@ -6,7 +6,7 @@ Use this flow to review generated copy, approve or reject, and see publish readi
 
 With the API running (e.g. `uvicorn astro_content_agent.main:app`), open:
 
-**`/operator/review`** (e.g. `http://127.0.0.1:8000/operator/review`)
+**`/operator/review`** (e.g. `http://127.0.0.1:8000/operator/review`) — only available when `APP_ENV` is `local` or `dev`, or when `ADMIN_API_KEY` is configured (otherwise the path returns 404).
 
 Enter draft id, optional `X-Admin-Key` and Instagram account id, then **Load review**. Approve / reject call the same JSON APIs as below.
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
@@ -14,10 +14,15 @@ def _uuid() -> str:
     return str(uuid.uuid4())
 
 
+def _utc_now() -> datetime:
+    """Timezone-aware UTC for ORM defaults (replaces deprecated datetime.utcnow)."""
+    return datetime.now(UTC)
+
+
 class TimestampMixin:
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+        DateTime(timezone=True), default=_utc_now, onupdate=_utc_now, nullable=False
     )
 
 
@@ -138,7 +143,7 @@ class AnalyticsSnapshot(Base, TimestampMixin):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     published_post_id: Mapped[str] = mapped_column(ForeignKey("published_posts.id"), nullable=False)
-    captured_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
+    captured_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now, nullable=False)
     metrics: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
 
 

@@ -15,18 +15,28 @@ def require_admin_key(
     """Dependency that enforces the ADMIN_API_KEY header on admin routes.
 
     Behavior:
-    - If ADMIN_API_KEY is not configured (None/empty), the guard is disabled
-      and all requests pass. This keeps local development friction-free.
-    - If ADMIN_API_KEY is configured:
+    - ``APP_ENV`` in ``("local", "dev")`` and ``ADMIN_API_KEY`` unset/empty:
+      guard disabled — requests pass without header (local developer default).
+    - ``APP_ENV`` in ``("staging", "prod")`` with ``ADMIN_API_KEY`` unset/empty:
+      admin routes are disabled → 503 until a key is configured (fail closed).
+    - ``ADMIN_API_KEY`` configured (any ``APP_ENV``):
         - Missing header  → 401 Unauthorized
         - Wrong key value → 403 Forbidden
         - Correct key     → passes
     """
-    configured_key = settings.admin_api_key
+    configured_key = (settings.admin_api_key or "").strip() or None
+    relaxed_env = settings.app_env in ("local", "dev")
 
     if not configured_key:
-        # Guard disabled — open access (local dev default).
-        return
+        if relaxed_env:
+            return
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                f"Admin routes are disabled: set ADMIN_API_KEY when APP_ENV is '{settings.app_env}'. "
+                "Refusing open admin access outside local/dev."
+            ),
+        )
 
     if x_admin_key is None:
         raise HTTPException(

@@ -11,10 +11,11 @@ from astro_content_agent.db.session import get_db
 from astro_content_agent.main import create_app
 
 
-def _fake_settings(admin_api_key: str | None):
+def _fake_settings(admin_api_key: str | None, *, app_env: str = "local"):
     """Return a minimal settings-like object with the given admin_api_key."""
     s = MagicMock()
     s.admin_api_key = admin_api_key
+    s.app_env = app_env
     return s
 
 
@@ -128,10 +129,9 @@ def test_admin_correct_key_allows_content_pillars(db_session: Session) -> None:
 
 
 def test_guard_passes_when_no_key_configured() -> None:
-    from fastapi import HTTPException
     from astro_content_agent.core.admin_guard import require_admin_key
 
-    settings = _fake_settings(None)
+    settings = _fake_settings(None, app_env="local")
     # Should not raise
     require_admin_key(x_admin_key=None, settings=settings)
 
@@ -139,15 +139,35 @@ def test_guard_passes_when_no_key_configured() -> None:
 def test_guard_passes_when_empty_key_configured() -> None:
     from astro_content_agent.core.admin_guard import require_admin_key
 
-    settings = _fake_settings("")
+    settings = _fake_settings("", app_env="local")
     require_admin_key(x_admin_key=None, settings=settings)
+
+
+def test_guard_staging_without_admin_key_returns_503() -> None:
+    from fastapi import HTTPException
+    from astro_content_agent.core.admin_guard import require_admin_key
+
+    settings = _fake_settings(None, app_env="staging")
+    with pytest.raises(HTTPException) as exc_info:
+        require_admin_key(x_admin_key=None, settings=settings)
+    assert exc_info.value.status_code == 503
+
+
+def test_guard_prod_without_admin_key_returns_503() -> None:
+    from fastapi import HTTPException
+    from astro_content_agent.core.admin_guard import require_admin_key
+
+    settings = _fake_settings("", app_env="prod")
+    with pytest.raises(HTTPException) as exc_info:
+        require_admin_key(x_admin_key=None, settings=settings)
+    assert exc_info.value.status_code == 503
 
 
 def test_guard_raises_401_on_missing_header() -> None:
     from fastapi import HTTPException
     from astro_content_agent.core.admin_guard import require_admin_key
 
-    settings = _fake_settings("real-key")
+    settings = _fake_settings("real-key", app_env="staging")
     with pytest.raises(HTTPException) as exc_info:
         require_admin_key(x_admin_key=None, settings=settings)
     assert exc_info.value.status_code == 401
@@ -157,7 +177,7 @@ def test_guard_raises_403_on_wrong_key() -> None:
     from fastapi import HTTPException
     from astro_content_agent.core.admin_guard import require_admin_key
 
-    settings = _fake_settings("real-key")
+    settings = _fake_settings("real-key", app_env="staging")
     with pytest.raises(HTTPException) as exc_info:
         require_admin_key(x_admin_key="wrong-key", settings=settings)
     assert exc_info.value.status_code == 403
@@ -166,6 +186,6 @@ def test_guard_raises_403_on_wrong_key() -> None:
 def test_guard_passes_on_correct_key() -> None:
     from astro_content_agent.core.admin_guard import require_admin_key
 
-    settings = _fake_settings("real-key")
+    settings = _fake_settings("real-key", app_env="staging")
     # Should not raise
     require_admin_key(x_admin_key="real-key", settings=settings)

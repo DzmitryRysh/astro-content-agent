@@ -51,18 +51,22 @@ def create_app() -> FastAPI:
         assets_path.mkdir(parents=True, exist_ok=True)
         app.mount("/media", StaticFiles(directory=str(assets_path)), name="media")
 
-    # Minimal operator UI: static review console (uses existing admin + drafts APIs).
+    # Operator review console: only exposed in local/dev, or when an admin key is configured
+    # (avoids a discoverable HTML shell in staging/prod with admin APIs disabled).
     _console_dir = Path(__file__).resolve().parent / "static" / "operator_review"
+    _console_ok = settings.app_env in ("local", "dev") or bool((settings.admin_api_key or "").strip())
 
-    @app.get("/operator/review", include_in_schema=False)
-    def operator_review_console() -> FileResponse:
-        return FileResponse(_console_dir / "index.html", media_type="text/html")
+    if _console_ok:
 
-    app.mount(
-        "/operator/review/static",
-        StaticFiles(directory=str(_console_dir)),
-        name="operator_review_static",
-    )
+        @app.get("/operator/review", include_in_schema=False)
+        def operator_review_console() -> FileResponse:
+            return FileResponse(_console_dir / "index.html", media_type="text/html")
+
+        app.mount(
+            "/operator/review/static",
+            StaticFiles(directory=str(_console_dir)),
+            name="operator_review_static",
+        )
 
     return app
 
