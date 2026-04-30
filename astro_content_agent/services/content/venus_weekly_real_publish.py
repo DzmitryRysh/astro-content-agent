@@ -112,15 +112,68 @@ def _find_handoff_post(handoff: dict[str, Any]) -> dict[str, Any]:
     raise ValueError("handoff has no post item (type == 'post')")
 
 
+def _handoff_post_body_text(post: dict[str, Any]) -> str:
+    """Prefer ``body`` (handoff builder); accept legacy/alternate ``caption`` key."""
+    raw = post.get("body")
+    if raw is None or not str(raw).strip():
+        raw = post.get("caption")
+    return str(raw or "").strip()
+
+
+_PLACEHOLDER_BODY_NORMALIZED = frozenset({"caption here"})
+
+
+def _omit_placeholder_body(body: str) -> str:
+    """Drop markdown-template filler so IG caption uses real hook/body only."""
+    t = body.strip()
+    if not t:
+        return ""
+    if t.lower().rstrip(".") in _PLACEHOLDER_BODY_NORMALIZED:
+        return ""
+    return body.strip()
+
+
+def _normalize_hashtag_list(raw: Any) -> list[str]:
+    """Ensure space-joined hashtags render as ``#tag`` (handoff may omit ``#``)."""
+    out: list[str] = []
+    for x in raw or []:
+        s = str(x).strip()
+        if not s:
+            continue
+        if not s.startswith("#"):
+            s = f"#{s}"
+        out.append(s)
+    return out
+
+
+def _instagram_caption_first_block(*, hook: str, body: str, title: str) -> str:
+    """Block merged into ``PostDraftPayload.caption`` (see ``ContainerBuilder``)."""
+    h = hook.strip()
+    b = _omit_placeholder_body(body)
+    parts = [p for p in (h, b) if p]
+    if parts:
+        return "\n\n".join(parts)
+    t = title.strip()
+    return t
+
+
 def handoff_post_to_draft_payload(post: dict[str, Any]) -> dict[str, Any]:
-    """Map Venus handoff post item to ``PostDraftPayload``-compatible dict."""
-    body = str(post.get("body") or "")
+    """Map Venus handoff post item to ``PostDraftPayload``-compatible dict.
+
+    Instagram captions are assembled in ``ContainerBuilder`` from ``caption`` + ``cta``
+    + hashtags, and **do not** read ``hook`` separately — so ``caption`` must carry the
+    hook + main body per the approved handoff (see module docstring).
+    """
+    hook = str(post.get("hook") or "").strip()
+    body_text = _handoff_post_body_text(post)
+    title = str(post.get("title") or "").strip() or "Venus weekly"
+    caption_first = _instagram_caption_first_block(hook=hook, body=body_text, title=title)
     return {
-        "title": str(post.get("title") or "").strip() or "Venus weekly",
-        "hook": str(post.get("hook") or ""),
-        "caption": body,
+        "title": title,
+        "hook": hook,
+        "caption": caption_first,
         "cta": str(post.get("cta") or ""),
-        "hashtags": list(post.get("hashtags") or []),
+        "hashtags": _normalize_hashtag_list(post.get("hashtags")),
         "metadata": {
             "source": "venus_weekly_handoff",
             "handoff_version": post.get("version"),
@@ -140,6 +193,29 @@ def _mime_for_storage_key(key: str) -> str:
     return "image/png"
 
 
+def _looks_like_public_url(value: str) -> bool:
+    v = (value or "").strip().lower()
+    return v.startswith("http://") or v.startswith("https://")
+
+
+class _DirectURLAwareStorage(StorageBackend):
+    """Delegate to storage, but pass through already-public URLs unchanged."""
+
+    def __init__(self, base: StorageBackend) -> None:
+        self._base = base
+
+    def save(self, key: str, data: bytes, *, content_type: str = "application/octet-stream") -> str:
+        return self._base.save(key, data, content_type=content_type)
+
+    def url(self, key: str) -> str:
+        if _looks_like_public_url(key):
+            return key
+        return self._base.url(key)
+
+    def absolute_path(self, key: str) -> Path | None:
+        return self._base.absolute_path(key)
+
+
 def _asset_file_must_exist(settings: Settings, storage_key: str) -> Path:
     assets_root = Path(settings.assets_dir)
     rel = storage_key.replace("\\", "/").lstrip("/")
@@ -156,7 +232,10 @@ def build_meta_client(settings: Settings) -> MetaInstagramClient | None:
     token = settings.instagram_access_token
     if not token:
         return None
-    return MetaInstagramClient(access_token=token)
+    return MetaInstagramClient(
+        access_token=token,
+        base_url=settings.instagram_graph_base_url,
+    )
 
 
 ItemStatus = Literal["succeeded", "failed", "skipped_not_supported_by_publisher_mvp", "blocked"]
@@ -174,6 +253,14 @@ class RealPublishItemResult:
     error: str | None = None
     error_type: str | None = None
     publish_retryable: bool | None = None
+    meta_status_code: int | None = None
+    meta_error_body: str | None = None
+    meta_error_json: dict[str, Any] | list[Any] | None = None
+    meta_error_code: int | None = None
+    meta_error_subcode: int | None = None
+    meta_error_type: str | None = None
+    meta_error_message: str | None = None
+    meta_url: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -187,6 +274,14 @@ class RealPublishItemResult:
             "error": self.error,
             "error_type": self.error_type,
             "publish_retryable": self.publish_retryable,
+            "meta_status_code": self.meta_status_code,
+            "meta_error_body": self.meta_error_body,
+            "meta_error_json": self.meta_error_json,
+            "meta_error_code": self.meta_error_code,
+            "meta_error_subcode": self.meta_error_subcode,
+            "meta_error_type": self.meta_error_type,
+            "meta_error_message": self.meta_error_message,
+            "meta_url": self.meta_url,
         }
 
 
@@ -209,6 +304,14 @@ class RealPublishRunResult:
     publish_error_type: str | None = None
     publish_error_message: str | None = None
     publish_retryable: bool | None = None
+    meta_status_code: int | None = None
+    meta_error_body: str | None = None
+    meta_error_json: dict[str, Any] | list[Any] | None = None
+    meta_error_code: int | None = None
+    meta_error_subcode: int | None = None
+    meta_error_type: str | None = None
+    meta_error_message: str | None = None
+    meta_url: str | None = None
     last_publish_attempt_at: str | None = None
 
     def succeeded_count(self) -> int:
@@ -230,6 +333,14 @@ class RealPublishRunResult:
             "publish_error_type": self.publish_error_type,
             "publish_error_message": self.publish_error_message,
             "publish_retryable": self.publish_retryable,
+            "meta_status_code": self.meta_status_code,
+            "meta_error_body": self.meta_error_body,
+            "meta_error_json": self.meta_error_json,
+            "meta_error_code": self.meta_error_code,
+            "meta_error_subcode": self.meta_error_subcode,
+            "meta_error_type": self.meta_error_type,
+            "meta_error_message": self.meta_error_message,
+            "meta_url": self.meta_url,
             "blocked_reason": self.blocked_reason,
             "handoff_file": self.handoff_file,
             "final_check_file": self.final_check_file,
@@ -451,9 +562,10 @@ def run_venus_weekly_real_publish(
     final_check: dict[str, Any],
     brand_profile_id: str,
     instagram_account_id: str,
-    post_image_storage_key: str,
+    post_image_storage_key: str | None,
     ig_client: InstagramClientProtocol,
     storage: StorageBackend,
+    post_image_url: str | None = None,
     existing_post_draft_id: str | None = None,
     publish_attempt_count: int = 1,
 ) -> RealPublishRunResult:
@@ -484,12 +596,18 @@ def run_venus_weekly_real_publish(
 
     draft_repo = DraftRepository()
     asset_repo = AssetRepository()
-    publisher = PublisherService(ig_client=ig_client, storage=storage)
+    publisher_storage: StorageBackend = _DirectURLAwareStorage(storage) if post_image_url else storage
+    publisher = PublisherService(ig_client=ig_client, storage=publisher_storage)
     draft_id: str
 
     try:
-        if not existing_post_draft_id:
+        if not existing_post_draft_id and not post_image_url:
+            if not post_image_storage_key:
+                raise ValueError("post_image_storage_key is required when post_image_url is not provided")
             _asset_file_must_exist(settings, post_image_storage_key)
+
+        post_item = _find_handoff_post(handoff)
+        payload_from_handoff = handoff_post_to_draft_payload(post_item)
 
         if existing_post_draft_id:
             draft = draft_repo.get_by_id(db, existing_post_draft_id)
@@ -505,12 +623,21 @@ def run_venus_weekly_real_publish(
                     f"expected brand_profile_id ({brand_profile_id!r})"
                 )
             draft_id = draft.id
+            draft.payload = payload_from_handoff
+            draft.text = (payload_from_handoff.get("caption") or "")[:500]
+            db.add(draft)
             assets = asset_repo.list_for_draft(db, draft_id)
             if not assets:
                 raise ValueError(f"draft {draft_id} has no assets; add an image asset before publishing")
+            if post_image_url:
+                primary_asset = assets[0]
+                primary_asset.storage_path = post_image_url.strip()
+                primary_asset.mime_type = "image/jpeg"
+                db.add(primary_asset)
+            db.commit()
+            db.refresh(draft)
         else:
-            post_item = _find_handoff_post(handoff)
-            payload = handoff_post_to_draft_payload(post_item)
+            payload = payload_from_handoff
             text_preview = (payload.get("caption") or "")[:500]
             draft = draft_repo.create(
                 db,
@@ -523,16 +650,25 @@ def run_venus_weekly_real_publish(
             db.flush()
             draft_id = draft.id
             draft_repo.approve(db, draft)
+            asset_storage_path = (
+                post_image_url.strip()
+                if post_image_url
+                else str(post_image_storage_key or "").replace("\\", "/").lstrip("/")
+            )
+            asset_mime = "image/jpeg" if post_image_url else _mime_for_storage_key(str(post_image_storage_key or ""))
             asset_repo.create(
                 db,
                 brand_profile_id=brand_profile_id,
                 draft_id=draft_id,
                 asset_type="image",
-                storage_path=post_image_storage_key.replace("\\", "/").lstrip("/"),
-                mime_type=_mime_for_storage_key(post_image_storage_key),
+                storage_path=asset_storage_path,
+                mime_type=asset_mime,
                 width=None,
                 height=None,
-                meta={"source": "venus_weekly_real_publish"},
+                meta={
+                    "source": "venus_weekly_real_publish",
+                    "image_source": "direct_url" if post_image_url else "storage_key",
+                },
             )
             db.commit()
             db.refresh(draft)
@@ -594,6 +730,15 @@ def run_venus_weekly_real_publish(
         post_result.error = result.error
         post_result.error_type = cls.error_type
         post_result.publish_retryable = cls.publish_retryable
+        if result.meta_error:
+            post_result.meta_status_code = result.meta_error.get("meta_status_code")
+            post_result.meta_error_body = result.meta_error.get("meta_error_body")
+            post_result.meta_error_json = result.meta_error.get("meta_error_json")
+            post_result.meta_error_code = result.meta_error.get("meta_error_code")
+            post_result.meta_error_subcode = result.meta_error.get("meta_error_subcode")
+            post_result.meta_error_type = result.meta_error.get("meta_error_type")
+            post_result.meta_error_message = result.meta_error.get("meta_error_message")
+            post_result.meta_url = result.meta_error.get("meta_url")
 
     overall = _rollup_publish_status(items)
     err_t = None
@@ -618,6 +763,14 @@ def run_venus_weekly_real_publish(
         publish_error_type=err_t,
         publish_error_message=err_m,
         publish_retryable=retry_top,
+        meta_status_code=post_result.meta_status_code,
+        meta_error_body=post_result.meta_error_body,
+        meta_error_json=post_result.meta_error_json,
+        meta_error_code=post_result.meta_error_code,
+        meta_error_subcode=post_result.meta_error_subcode,
+        meta_error_type=post_result.meta_error_type,
+        meta_error_message=post_result.meta_error_message,
+        meta_url=post_result.meta_url,
     )
 
 

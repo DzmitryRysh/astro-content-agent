@@ -11,6 +11,7 @@ from typing import Any
 import httpx
 
 from astro_content_agent.services.instagram.publisher import PublisherService
+from astro_content_agent.services.instagram.client import MetaAPIError
 
 
 @dataclass(frozen=True)
@@ -82,6 +83,31 @@ def classify_exception(exc: BaseException) -> PublishFailureClassification:
             error_type="meta_http_error",
             publish_retryable=code >= 500,
             message=f"HTTP {code}: {msg}",
+        )
+    if isinstance(exc, MetaAPIError):
+        code = int(exc.status_code)
+        if code in (429, 500, 502, 503, 504):
+            return PublishFailureClassification(
+                error_type="meta_http_transient",
+                publish_retryable=True,
+                message=str(exc),
+            )
+        if code in (401, 403):
+            return PublishFailureClassification(
+                error_type="meta_auth_forbidden",
+                publish_retryable=False,
+                message=str(exc),
+            )
+        if 400 <= code < 500:
+            return PublishFailureClassification(
+                error_type="meta_http_client_error",
+                publish_retryable=False,
+                message=str(exc),
+            )
+        return PublishFailureClassification(
+            error_type="meta_http_error",
+            publish_retryable=code >= 500,
+            message=str(exc),
         )
 
     if isinstance(exc, ValueError):

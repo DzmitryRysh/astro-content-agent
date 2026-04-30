@@ -163,3 +163,58 @@ def test_build_handoff_omits_support_when_missing(tmp_path: Path) -> None:
     payload = json.loads(result.out_json.read_text(encoding="utf-8"))
     assert len(payload["items"]) == 2
     assert payload["sources"]["support_draft"] is None
+
+
+def test_build_handoff_preserves_cyrillic_utf8(tmp_path: Path) -> None:
+    ws = "2099-01-15"
+    state = {
+        "week_start": ws,
+        "week_end": "2099-01-21",
+        "status": "approved",
+        "approval_timestamp": "2099-01-16T00:00:00+00:00",
+        "outputs": {
+            "post_draft": f"venus_weekly_post_{ws}.md",
+            "reel_draft": f"venus_weekly_reel_{ws}.md",
+        },
+    }
+    post_md = """# Venus weekly — post draft
+
+## Hook
+В этом обмене кто контролирует ресурс?
+
+## Caption
+Сначала наблюдаем факты, потом принимаем решение.
+
+## CTA
+Сохраните пост и поделитесь с близкими.
+
+## Hashtags
+- #астрология
+- #венера
+"""
+    reel_md = """# Venus weekly — reel draft
+
+## hook_0_3s
+Стоп-кадр на главной мысли
+
+## Spoken hook
+Коротко о самом важном
+
+## Script
+Пункт один
+
+Пункт два
+
+## CTA
+Напишите в комментариях.
+"""
+    d = tmp_path
+    (d / f"venus_weekly_state_{ws}.json").write_text(json.dumps(state), encoding="utf-8")
+    (d / f"venus_weekly_post_{ws}.md").write_text(post_md, encoding="utf-8")
+    (d / f"venus_weekly_reel_{ws}.md").write_text(reel_md, encoding="utf-8")
+
+    result = build_publish_handoff(week_dir=d, week_start_hint=ws, write_markdown_summary=True)
+    payload_text = result.out_json.read_text(encoding="utf-8")
+    assert "В этом обмене кто контролирует ресурс?" in payload_text
+    assert "Ð" not in payload_text
+    assert "Ñ" not in payload_text

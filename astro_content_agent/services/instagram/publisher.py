@@ -11,7 +11,7 @@ from astro_content_agent.repositories.assets import AssetRepository
 from astro_content_agent.repositories.drafts import DraftRepository
 from astro_content_agent.repositories.publish_jobs import PublishJobRepository
 from astro_content_agent.repositories.published_posts import PublishedPostRepository
-from astro_content_agent.services.instagram.client import InstagramClientProtocol
+from astro_content_agent.services.instagram.client import InstagramClientProtocol, MetaAPIError
 from astro_content_agent.services.instagram.container_builder import ContainerBuilder
 from astro_content_agent.services.media.storage import StorageBackend
 
@@ -26,6 +26,7 @@ class PublishResult:
     published_post: PublishedPost | None
     succeeded: bool
     error: str | None = None
+    meta_error: dict | None = None
 
 
 @dataclass(frozen=True)
@@ -180,9 +181,22 @@ class PublisherService:
             self._deps.job_repo.mark_failed(db, job, error=error_msg, max_attempts=MAX_ATTEMPTS)
             db.commit()
             db.refresh(job)
+            meta_payload = None
+            if isinstance(exc, MetaAPIError):
+                meta_payload = {
+                    "meta_status_code": exc.status_code,
+                    "meta_error_body": exc.response_text,
+                    "meta_error_json": exc.response_json,
+                    "meta_error_code": exc.meta_error_code,
+                    "meta_error_subcode": exc.meta_error_subcode,
+                    "meta_error_type": exc.meta_error_type,
+                    "meta_error_message": exc.meta_error_message,
+                    "meta_url": exc.url,
+                }
             return PublishResult(
                 publish_job=job,
                 published_post=None,
                 succeeded=False,
                 error=error_msg,
+                meta_error=meta_payload,
             )

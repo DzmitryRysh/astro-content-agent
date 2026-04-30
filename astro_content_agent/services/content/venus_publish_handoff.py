@@ -6,6 +6,7 @@ Gate: ``status`` must be ``approved``. Does not regenerate LLM content.
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -128,6 +129,35 @@ def _resolve_draft_paths(
     return post_p, reel_p, support_p
 
 
+_MOJIBAKE_MARKERS = ("Ð", "Ñ", "â", "Ã")
+_CYRILLIC_RE = re.compile(r"[\u0400-\u04FF]")
+
+
+def _looks_like_utf8_mojibake(text: str) -> bool:
+    """Heuristic: detect common UTF-8-decoded-as-Latin1/CP1252 artifacts.
+
+    This does not attempt repair; it raises a clear error so operators can
+    regenerate the weekly drafts from source.
+    """
+    if not text:
+        return False
+    if _CYRILLIC_RE.search(text):
+        return False
+    # Typical artifacts for Cyrillic corruption include dense Ð/Ñ digrams.
+    marker_count = sum(text.count(m) for m in _MOJIBAKE_MARKERS)
+    return marker_count >= 3 and ("Ð " in text or "Ñ" in text)
+
+
+def _read_markdown_utf8(path: Path) -> str:
+    text = path.read_text(encoding="utf-8-sig")
+    if _looks_like_utf8_mojibake(text):
+        raise ValueError(
+            f"Markdown appears already mojibake-corrupted: {path}. "
+            "Rebuild/regenerate weekly draft markdown as UTF-8, then rerun build_venus_publish_handoff.py."
+        )
+    return text
+
+
 def build_publish_handoff(
     *,
     week_dir: Path,
@@ -178,11 +208,11 @@ def build_publish_handoff(
     if not reel_p.is_file():
         raise ValueError(f"Missing reel draft: {reel_p}")
 
-    post_item = parse_weekly_post_draft(post_p.read_text(encoding="utf-8"))
-    reel_item = parse_weekly_reel_draft(reel_p.read_text(encoding="utf-8"))
+    post_item = parse_weekly_post_draft(_read_markdown_utf8(post_p))
+    reel_item = parse_weekly_reel_draft(_read_markdown_utf8(reel_p))
     items: list[dict[str, Any]] = [post_item, reel_item]
     if support_p is not None:
-        items.append(parse_weekly_support_draft(support_p.read_text(encoding="utf-8")))
+        items.append(parse_weekly_support_draft(_read_markdown_utf8(support_p)))
 
     approved_at = state.get("approval_timestamp") or ""
     payload: dict[str, Any] = {

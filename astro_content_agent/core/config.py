@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     instagram_access_token: str | None = Field(default=None, alias="INSTAGRAM_ACCESS_TOKEN")
     # Numeric Instagram Business/Creator account ID (not the @username)
     instagram_ig_user_id: str | None = Field(default=None, alias="INSTAGRAM_IG_USER_ID")
+    # Base host/path for Instagram Graph publish endpoints.
+    # Instagram Login token flows should default to graph.instagram.com.
+    instagram_graph_base_url: str = Field(default="https://graph.instagram.com", alias="INSTAGRAM_GRAPH_BASE_URL")
 
     # Scheduler
     scheduler_enabled: bool = Field(default=True, alias="SCHEDULER_ENABLED")

@@ -6,3 +6,9 @@ __pycache__/
 # Operator/script outputs — see scripts/aca/README.md
 scripts/aca/out/
 scripts/aca/weekly_venus/
+.venv/
+
+.venv/
+assets/aca_e2e/
+*.db
+.env
