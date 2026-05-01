@@ -26,7 +26,9 @@ from astro_content_agent.services.content.venus_weekly_real_publish import (
     resolve_week_artifacts,
     run_venus_weekly_real_publish,
 )
+from astro_content_agent.services.media.cloudinary_uploader import upload_local_image, validate_cloudinary_config
 from astro_content_agent.services.media.url_builder import get_local_storage
+from astro_content_agent.services.content.weekly_publish_image_source import weekly_publish_image_mode
 
 
 def main() -> int:
@@ -36,6 +38,12 @@ def main() -> int:
     ap.add_argument("--brand-profile-id", required=True)
     ap.add_argument("--post-image-storage-key", default=None)
     ap.add_argument("--post-image-url", default=None, help="Direct public image URL for Meta ingestion")
+    ap.add_argument(
+        "--post-image-path",
+        type=Path,
+        default=None,
+        help="Local image path; uploaded to Cloudinary, then publish uses returned secure_url",
+    )
     ap.add_argument("--validate-only", action="store_true", help="Check gates + disk asset + DB; no Instagram publish")
     ap.add_argument("--week-dir", type=Path, default=None)
     ap.add_argument("--state-file", type=Path, default=None)
@@ -43,6 +51,25 @@ def main() -> int:
     ap.add_argument("--final-check-file", type=Path, default=None)
     ap.add_argument("--existing-post-draft-id", default=None, help="Reuse existing approved post draft")
     args = ap.parse_args()
+
+    try:
+        mode = weekly_publish_image_mode(
+            post_image_url=args.post_image_url,
+            post_image_storage_key=args.post_image_storage_key,
+            post_image_path=args.post_image_path,
+        )
+    except ValueError as e:
+        print(str(e), file=sys.stderr)
+        return 2
+
+    use_storage_key = mode == "storage_key"
+    post_image_url_for_publish: str | None = None
+
+    if mode == "path":
+        path_img = Path(args.post_image_path).expanduser()
+        if not path_img.is_file():
+            print(f"Image file not found: {path_img.resolve()}", file=sys.stderr)
+            return 1
 
     week_dir = default_week_dir(args.week_start, args.week_dir)
     if not week_dir.is_dir():
@@ -67,14 +94,6 @@ def main() -> int:
     settings = get_settings()
     storage = get_local_storage(settings)
     attempt_count = next_publish_attempt_count(state)
-    use_direct_url = bool((args.post_image_url or "").strip())
-    use_storage_key = bool((args.post_image_storage_key or "").strip())
-    if use_direct_url and use_storage_key:
-        print("Provide only one of --post-image-url or --post-image-storage-key, not both.", file=sys.stderr)
-        return 2
-    if not use_direct_url and not use_storage_key:
-        print("Missing image source: provide --post-image-url or --post-image-storage-key.", file=sys.stderr)
-        return 2
 
     try:
         assert_publish_gates(state=state, final_check=final_check)
@@ -116,6 +135,13 @@ def main() -> int:
             print(next_action_hint(run))
             return 1
 
+    if mode == "path":
+        try:
+            validate_cloudinary_config(settings)
+        except ValueError as e:
+            print(str(e), file=sys.stderr)
+            return 1
+
     db = SessionLocal()
     try:
         if db.get(BrandProfile, args.brand_profile_id) is None:
@@ -137,6 +163,16 @@ def main() -> int:
             print("WARN: INSTAGRAM_ACCESS_TOKEN not set — publish would block.", file=sys.stderr)
         print("validate-only: prerequisites satisfied for gates, image source, and DB rows.")
         return 0
+
+    if mode == "path":
+        try:
+            cu = upload_local_image(settings, Path(args.post_image_path).expanduser())
+        except (ValueError, RuntimeError) as e:
+            print(str(e), file=sys.stderr)
+            return 1
+        post_image_url_for_publish = cu.secure_url
+        print(f"cloudinary secure_url={cu.secure_url}")
+        print(f"cloudinary public_id={cu.public_id}")
 
     ig_client = build_meta_client(settings)
     if ig_client is None:
@@ -167,8 +203,10 @@ def main() -> int:
             final_check=final_check,
             brand_profile_id=args.brand_profile_id,
             instagram_account_id=args.instagram_account_id,
-            post_image_storage_key=args.post_image_storage_key,
-            post_image_url=args.post_image_url,
+            post_image_storage_key=args.post_image_storage_key if use_storage_key else None,
+            post_image_url=post_image_url_for_publish
+            if mode == "path"
+            else (str(args.post_image_url).strip() if mode == "url" else None),
             ig_client=ig_client,
             storage=storage,
             existing_post_draft_id=args.existing_post_draft_id,
