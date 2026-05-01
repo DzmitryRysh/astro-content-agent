@@ -38,6 +38,12 @@ class Settings(BaseSettings):
     # Instagram Login token flows should default to graph.instagram.com.
     instagram_graph_base_url: str = Field(default="https://graph.instagram.com", alias="INSTAGRAM_GRAPH_BASE_URL")
 
+    # Cloudinary (optional — used by upload_cloudinary_image CLI / media helpers)
+    cloudinary_cloud_name: str | None = Field(default=None, alias="CLOUDINARY_CLOUD_NAME")
+    cloudinary_api_key: str | None = Field(default=None, alias="CLOUDINARY_API_KEY")
+    cloudinary_api_secret: str | None = Field(default=None, alias="CLOUDINARY_API_SECRET")
+    cloudinary_folder: str = Field(default="astro-content-agent", alias="CLOUDINARY_FOLDER")
+
     # Scheduler
     scheduler_enabled: bool = Field(default=True, alias="SCHEDULER_ENABLED")
     scheduler_timezone: str = Field(default="UTC", alias="SCHEDULER_TIMEZONE")
