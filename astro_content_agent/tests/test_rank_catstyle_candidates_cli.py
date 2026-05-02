@@ -99,3 +99,19 @@ def test_cli_reads_input_file(rank_cli, tmp_path: Path, capsys: pytest.CaptureFi
     finally:
         sys.argv = old
     assert "Saturn" in capsys.readouterr().out
+
+
+def test_cli_reads_input_file_with_utf8_bom(rank_cli, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """PowerShell Set-Content -Encoding UTF8 may write UTF-8 with BOM; utf-8-sig strips it for json.loads."""
+    inp = tmp_path / "in_bom.json"
+    body = json.dumps([{"planet_a": "Pluto", "planet_b": "Venus", "aspect_type": "conjunction"}])
+    inp.write_bytes(b"\xef\xbb\xbf" + body.encode("utf-8"))
+    old = sys.argv[:]
+    try:
+        sys.argv = ["rank_catstyle_candidates.py", "--input", str(inp)]
+        assert rank_cli.main() == 0
+    finally:
+        sys.argv = old
+    out = capsys.readouterr().out
+    assert "Pluto" in out and "Venus" in out
+    assert "Invalid JSON" not in out

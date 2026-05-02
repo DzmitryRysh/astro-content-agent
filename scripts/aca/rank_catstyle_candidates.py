@@ -19,7 +19,7 @@ def _load_candidates(args: argparse.Namespace) -> list:
         data = json.loads(args.candidates_json)
     elif args.input is not None:
         path = args.input.expanduser().resolve()
-        data = json.loads(path.read_text(encoding="utf-8"))
+        data = json.loads(path.read_text(encoding="utf-8-sig"))
     else:
         raise SystemExit("Provide --candidates-json or --input.")
     if not isinstance(data, list):
