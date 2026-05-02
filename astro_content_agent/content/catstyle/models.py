@@ -40,3 +40,33 @@ class CatstylePromptPack(BaseModel):
     animation_prompt: str
     negative_prompt: str
     carousel_idea: str
+
+
+class CatstyleCandidate(BaseModel):
+    """Ranked Catstyle visual candidate (supported library pair + aspect)."""
+
+    planet_a: str
+    planet_b: str
+    aspect_type: str
+    mode_recommendation: Literal["tension", "compensation", "mixed"]
+    visual_score: int = Field(ge=1, le=10)
+    emotional_score: int = Field(ge=1, le=10)
+    comedy_score: int = Field(ge=1, le=10)
+    clarity_score: int = Field(ge=1, le=10)
+    total_score: int = Field(ge=4, le=40)
+    reason: str
+    recommended_scene_angle: str
+
+
+class CatstyleUnsupportedCandidate(BaseModel):
+    """Input row that cannot be ranked against Catstyle aspect library v0."""
+
+    planet_a: str
+    planet_b: str
+    aspect_type: str
+    reason: str
+
+
+class CatstyleCandidateRankingResult(BaseModel):
+    ranked: list[CatstyleCandidate]
+    unsupported: list[CatstyleUnsupportedCandidate] = Field(default_factory=list)
