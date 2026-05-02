@@ -1,0 +1,108 @@
+#!/usr/bin/env python3
+"""CLI: generate Catstyle v0 visual prompt pack artifact (JSON optional)."""
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+from _venus_cli_paths import ensure_repo_on_path
+
+ensure_repo_on_path()
+
+from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+from astro_content_agent.services.content.catstyle_prompt_generator import (
+    generate_catstyle_prompt_pack,
+    normalize_planet_name,
+)
+
+
+def _artifact_dict(
+    *,
+    planet_a: str,
+    planet_b: str,
+    aspect_type: str,
+    mode: str,
+    pack,
+) -> dict:
+    return {
+        "planet_a": planet_a,
+        "planet_b": planet_b,
+        "aspect_type": aspect_type,
+        "mode": mode,
+        "image_prompts": pack.image_prompts,
+        "animation_prompt": pack.animation_prompt,
+        "negative_prompt": pack.negative_prompt,
+        "carousel_idea": pack.carousel_idea,
+    }
+
+
+def _print_pack_readable(planet_a: str, planet_b: str, aspect_type: str, mode: str, pack) -> None:
+    print()
+    print("Catstyle prompt pack")
+    print(f"  Planets:      {planet_a} + {planet_b}")
+    print(f"  Aspect:       {aspect_type}")
+    print(f"  Mode:         {mode}")
+    print(f"  Variants:     {len(pack.image_prompts)}")
+    print()
+    for i, p in enumerate(pack.image_prompts, start=1):
+        print(f"--- Image prompt {i} ---")
+        print(p)
+        print()
+    print("--- Animation prompt ---")
+    print(pack.animation_prompt)
+    print()
+    print("--- Negative prompt ---")
+    print(pack.negative_prompt)
+    print()
+    print("--- Carousel idea ---")
+    print(pack.carousel_idea)
+    print()
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description="Generate Catstyle v0 prompt pack (text prompts only).")
+    ap.add_argument("--planet-a", required=True, dest="planet_a")
+    ap.add_argument("--planet-b", required=True, dest="planet_b")
+    ap.add_argument("--aspect-type", required=True, dest="aspect_type")
+    ap.add_argument("--mode", required=True, choices=["tension", "compensation", "mixed"])
+    ap.add_argument("--variants-count", type=int, default=4, dest="variants_count")
+    ap.add_argument("--output", type=Path, default=None, help="Write JSON artifact to this path")
+    args = ap.parse_args()
+
+    try:
+        pa = normalize_planet_name(args.planet_a)
+        pb = normalize_planet_name(args.planet_b)
+        req = CatstylePromptRequest(
+            planet_a=args.planet_a,
+            planet_b=args.planet_b,
+            aspect_type=args.aspect_type,
+            mode=args.mode,
+            variants_count=args.variants_count,
+        )
+        pack = generate_catstyle_prompt_pack(req)
+    except ValueError as e:
+        print(str(e), file=sys.stderr)
+        return 1
+
+    _print_pack_readable(pa, pb, args.aspect_type, args.mode, pack)
+
+    if args.output is not None:
+        out_path = args.output.expanduser().resolve()
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        blob = _artifact_dict(
+            planet_a=pa,
+            planet_b=pb,
+            aspect_type=args.aspect_type,
+            mode=args.mode,
+            pack=pack,
+        )
+        out_path.write_text(json.dumps(blob, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        print(f"Wrote artifact: {out_path}")
+
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
