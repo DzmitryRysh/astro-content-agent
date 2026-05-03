@@ -129,7 +129,7 @@ def test_cli_unsupported_pair_exits_nonzero(catstyle_cli, capsys: pytest.Capture
     finally:
         sys.argv = old
     err = capsys.readouterr().err
-    assert "No Catstyle aspect library" in err or "Supported pairs" in err
+    assert "No Catstyle content" in err or "outer-to-personal" in err
 
 
 def test_cli_default_variants_count_is_four(catstyle_cli, tmp_path: Path) -> None:
