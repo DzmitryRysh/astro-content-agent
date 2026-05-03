@@ -53,7 +53,7 @@ class CatstyleCandidate(BaseModel):
     emotional_score: int = Field(ge=1, le=10)
     comedy_score: int = Field(ge=1, le=10)
     clarity_score: int = Field(ge=1, le=10)
-    total_score: int = Field(ge=4, le=60)
+    total_score: int = Field(ge=4, le=80)
     reason: str
     recommended_scene_angle: str
     orb: float | None = None

@@ -22,6 +22,23 @@ _MODE_ORDER: tuple[Mode, ...] = ("tension", "mixed", "compensation")
 _HARD_ASPECTS = frozenset({"conjunction", "square", "opposition"})
 _SOFT_ASPECTS = frozenset({"trine", "sextile"})
 
+# v1: aspect charge for visual-priority ranking (deterministic, not sky math).
+_ASPECT_STRENGTH: dict[str, int] = {
+    "conjunction": 14,
+    "opposition": 12,
+    "square": 11,
+    "trine": 8,
+    "sextile": 5,
+}
+
+_ASPECT_CHARGE_PHRASE: dict[str, str] = {
+    "conjunction": "fusion / maximum pressure",
+    "opposition": "polarity / mirror conflict",
+    "square": "friction / pressure",
+    "trine": "flowing support / talent channel",
+    "sextile": "opportunity / soft support",
+}
+
 _SEED_SCORES = {"visual": 6, "emotional": 6, "comedy": 6, "clarity": 6}
 _FALLBACK_SCORES = {"visual": 5, "emotional": 5, "comedy": 5, "clarity": 5}
 
@@ -136,17 +153,33 @@ def _scan_window_kwargs(raw: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+def _aspect_strength(aspect_type: str) -> int:
+    key = (aspect_type or "").strip().lower()
+    return _ASPECT_STRENGTH.get(key, 3)
+
+
+def _aspect_charge_phrase(aspect_type: str) -> str:
+    key = (aspect_type or "").strip().lower()
+    return _ASPECT_CHARGE_PHRASE.get(key, "neutral / mixed geometry")
+
+
+def _aspect_charge_suffix(aspect_type: str) -> str:
+    return f" Aspect charge: {_aspect_charge_phrase(aspect_type)}."
+
+
 def _orb_bonus(orb: float | None) -> int:
     if orb is None:
         return 0
+    if orb <= 0.3:
+        return 8
     if orb <= 0.5:
-        return 5
+        return 7
     if orb <= 1.0:
-        return 4
+        return 5
     if orb <= 2.0:
         return 3
     if orb <= 3.0:
-        return 2
+        return 1
     return 0
 
 
@@ -154,7 +187,8 @@ def rank_catstyle_candidates(candidates: list[dict[str, Any]]) -> CatstyleCandid
     """
     Rank Catstyle candidates: deep aspect_library pairs first, then 25 transit seeds, then generic outer-to-personal fallback.
 
-    ``orb`` optional on each candidate dict (degrees). Tighter orbs add a deterministic bonus to ``total_score``.
+    ``orb`` optional on each candidate dict (degrees). ``total_score`` = base (visual+…+clarity)
+    + aspect strength weight + orb tightness bonus (v1).
     """
     ranked: list[CatstyleCandidate] = []
     unsupported: list[CatstyleUnsupportedCandidate] = []
@@ -197,6 +231,8 @@ def rank_catstyle_candidates(candidates: list[dict[str, Any]]) -> CatstyleCandid
             aspect_note = " Hard aspect nudges toward tension-forward prompts."
         elif aspect_lower in _SOFT_ASPECTS:
             aspect_note = " Soft aspect nudges toward compensation-forward prompts."
+        charge_suffix = _aspect_charge_suffix(aspect_type)
+        ast = _aspect_strength(aspect_type)
 
         if get_aspect_interaction(pa, pb) is not None:
             spec = _deep_spec(pa, pb)
@@ -227,8 +263,8 @@ def rank_catstyle_candidates(candidates: list[dict[str, Any]]) -> CatstyleCandid
                     emotional_score=emo,
                     comedy_score=com,
                     clarity_score=clar,
-                    total_score=base_total + ob,
-                    reason=str(spec["reason"]) + aspect_note,
+                    total_score=base_total + ast + ob,
+                    reason=str(spec["reason"]) + aspect_note + charge_suffix,
                     recommended_scene_angle=str(spec["angle"]),
                     orb=orb,
                     orb_bonus=ob,
@@ -264,6 +300,7 @@ def rank_catstyle_candidates(candidates: list[dict[str, Any]]) -> CatstyleCandid
             reason = (
                 f"Transit seed v0 ({seed.outer_planet}->{seed.personal_planet}): {seed.core_tension}"
                 + aspect_note
+                + charge_suffix
             )
             ranked.append(
                 CatstyleCandidate(
@@ -275,7 +312,7 @@ def rank_catstyle_candidates(candidates: list[dict[str, Any]]) -> CatstyleCandid
                     emotional_score=emo,
                     comedy_score=com,
                     clarity_score=clar,
-                    total_score=base_total + ob,
+                    total_score=base_total + ast + ob,
                     reason=reason,
                     recommended_scene_angle=angle,
                     orb=orb,
@@ -303,8 +340,12 @@ def rank_catstyle_candidates(candidates: list[dict[str, Any]]) -> CatstyleCandid
                 emotional_score=emo,
                 comedy_score=com,
                 clarity_score=clar,
-                total_score=base_total + ob,
-                reason="Generic Catstyle transit fallback (seed missing for this outer-to-personal pair)." + aspect_note,
+                total_score=base_total + ast + ob,
+                reason=(
+                    "Generic Catstyle transit fallback (seed missing for this outer-to-personal pair)."
+                    + aspect_note
+                    + charge_suffix
+                ),
                 recommended_scene_angle=(
                     f"{outer} social rhythm vs {personal} everyday stakes—clear gesture, minimal props, thick outlines."
                 ),
@@ -319,6 +360,7 @@ def rank_catstyle_candidates(candidates: list[dict[str, Any]]) -> CatstyleCandid
         key=lambda c: (
             -c.total_score,
             -c.orb_bonus,
+            -_aspect_strength(c.aspect_type),
             -c.visual_score,
             -c.emotional_score,
             c.planet_a.lower(),
