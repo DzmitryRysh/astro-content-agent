@@ -12,3 +12,7 @@ scripts/aca/weekly_venus/
 assets/aca_e2e/
 *.db
 .env
+
+# Catstyle operator handoffs (local working files)
+catstyle_handoff_*.md
+catstyle_handoff_*.json
