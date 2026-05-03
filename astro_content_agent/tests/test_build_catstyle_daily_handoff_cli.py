@@ -35,6 +35,52 @@ def handoff_cli():
     return _load_cli()
 
 
+def _handoff_charged_with_secondary_for_cli() -> CatstyleDailyHandoff:
+    c = CatstyleHandoffCandidateSummary(
+        planet_a="Jupiter",
+        planet_b="Mars",
+        aspect_type="square",
+        orb=1.34,
+        total_score=38,
+        mode_recommendation="tension",
+        source="seed",
+        recommended_scene_angle="Mars vs Jupiter beat",
+    )
+    plan = CatstyleHandoffProductionPlan(
+        recommended_format="carousel",
+        image_generation_notes="img",
+        capcut_animation_notes="cap",
+        manual_review_notes="man",
+    )
+    item = CatstyleHandoffItem(
+        candidate=c,
+        why_this_aspect_won="Charged pick.",
+        why_this_post="because",
+        production_plan=plan,
+        image_prompts=["p1"],
+        animation_prompt="anim",
+        negative_prompt="neg",
+        carousel_idea="car",
+        caption_draft="cap draft",
+    )
+    return CatstyleDailyHandoff(
+        date="2026-05-02",
+        scan_mode="day-window",
+        step_hours=2,
+        editorial_profile="charged",
+        ranked_candidates_count=3,
+        selected_count=1,
+        items=[item],
+        secondary_supportive_candidate={
+            "planet_a": "Saturn",
+            "planet_b": "Venus",
+            "aspect_type": "sextile",
+            "total_score": 46,
+            "editorial_selection_score": 52,
+        },
+    )
+
+
 def _minimal_handoff() -> CatstyleDailyHandoff:
     c = CatstyleHandoffCandidateSummary(
         planet_a="A",
@@ -106,6 +152,24 @@ def test_cli_writes_md(handoff_cli, tmp_path: Path) -> None:
     text = out.read_text(encoding="utf-8")
     assert "# Catstyle Daily Handoff" in text
     assert "## Production Checklist" in text
+
+
+def test_cli_summary_shows_secondary_and_strategy_for_charged(handoff_cli, capsys: pytest.CaptureFixture[str]) -> None:
+    old = sys.argv[:]
+    try:
+        sys.argv = ["build_catstyle_daily_handoff.py", "--date", "2026-05-02", "--format", "json"]
+        with patch.object(
+            handoff_cli,
+            "build_catstyle_daily_handoff",
+            return_value=_handoff_charged_with_secondary_for_cli(),
+        ):
+            assert handoff_cli.main() == 0
+    finally:
+        sys.argv = old
+    out = capsys.readouterr().out
+    assert "secondary:" in out.lower()
+    assert "saturn" in out.lower() and "venus" in out.lower()
+    assert "use primary for hook/conflict" in out.lower()
 
 
 def test_cli_writes_json(handoff_cli, tmp_path: Path) -> None:
