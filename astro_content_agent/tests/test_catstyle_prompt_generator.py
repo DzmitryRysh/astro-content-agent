@@ -212,7 +212,7 @@ def test_jupiter_mercury_teacher_vs_analyst_theme() -> None:
 def test_unknown_pair_raises() -> None:
     from astro_content_agent.content.catstyle.models import CatstylePromptRequest
 
-    with pytest.raises(ValueError, match="No Catstyle aspect library"):
+    with pytest.raises(ValueError, match="No Catstyle content.*outer-to-personal"):
         generate_catstyle_prompt_pack(
             CatstylePromptRequest(
                 planet_a="Sun",
@@ -221,6 +221,74 @@ def test_unknown_pair_raises() -> None:
                 mode="tension",
             )
         )
+
+
+def test_pluto_moon_prompt_uses_seed_language() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Pluto",
+            planet_b="Moon",
+            aspect_type="conjunction",
+            mode="tension",
+        )
+    )
+    blob = " ".join(pack.image_prompts).lower()
+    assert "pillow" in blob or "blanket" in blob
+    assert "shadow" in blob or "cauldron" in blob or "spiral" in blob
+
+
+def test_saturn_mars_prompt_uses_seed_language() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(planet_a="Saturn", planet_b="Mars", aspect_type="square", mode="tension")
+    )
+    blob = " ".join(pack.image_prompts).lower()
+    assert "watch" in blob or "flame" in blob or "calendar" in blob or "ruler" in blob
+
+
+def test_neptune_mercury_prompt_fish_fog_checklist_language() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(planet_a="Neptune", planet_b="Mercury", aspect_type="square", mode="tension")
+    )
+    blob = " ".join(pack.image_prompts).lower()
+    assert ("fish" in blob or "fog" in blob) and ("checklist" in blob or "clipboard" in blob or "note" in blob)
+
+
+def test_uranus_venus_prompt_electric_beauty_language() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(planet_a="Uranus", planet_b="Venus", aspect_type="opposition", mode="tension")
+    )
+    blob = " ".join(pack.image_prompts).lower()
+    assert "electric" in blob or "neon" in blob or "portal" in blob or "zig" in blob
+    assert "venus" in blob
+
+
+def test_jupiter_sun_prompt_spotlight_expansion_language() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(planet_a="Jupiter", planet_b="Sun", aspect_type="trine", mode="tension")
+    )
+    blob = " ".join(pack.image_prompts).lower()
+    assert "podium" in blob or "crown" in blob or "spotlight" in blob or "constellation" in blob or "stage" in blob
+
+
+def test_pluto_venus_still_uses_deep_aspect_library_wording() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(planet_a="Pluto", planet_b="Venus", aspect_type="conjunction", mode="tension")
+    )
+    blob = " ".join(pack.image_prompts).lower()
+    assert "cauldron" in blob
+    assert "half-submerged" in blob or "purple" in blob or "potion" in blob
 
 
 def test_normalize_planet_name_case_insensitive() -> None:

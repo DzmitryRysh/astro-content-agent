@@ -43,7 +43,7 @@ class CatstylePromptPack(BaseModel):
 
 
 class CatstyleCandidate(BaseModel):
-    """Ranked Catstyle visual candidate (supported library pair + aspect)."""
+    """Ranked Catstyle visual candidate (deep library, transit seed, or fallback)."""
 
     planet_a: str
     planet_b: str
@@ -53,13 +53,16 @@ class CatstyleCandidate(BaseModel):
     emotional_score: int = Field(ge=1, le=10)
     comedy_score: int = Field(ge=1, le=10)
     clarity_score: int = Field(ge=1, le=10)
-    total_score: int = Field(ge=4, le=40)
+    total_score: int = Field(ge=4, le=60)
     reason: str
     recommended_scene_angle: str
+    orb: float | None = None
+    orb_bonus: int = Field(default=0, ge=0, le=10)
+    source: Literal["deep", "seed", "fallback"] = "deep"
 
 
 class CatstyleUnsupportedCandidate(BaseModel):
-    """Input row that cannot be ranked against Catstyle aspect library v0."""
+    """Input row that cannot be ranked (unknown planets or not outer-to-personal transit)."""
 
     planet_a: str
     planet_b: str

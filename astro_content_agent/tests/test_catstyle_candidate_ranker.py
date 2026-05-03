@@ -75,7 +75,67 @@ def test_unsupported_pair_not_ranked_lists_unsupported() -> None:
     )
     assert result.ranked == []
     assert len(result.unsupported) == 1
-    assert "library" in result.unsupported[0].reason.lower()
+    assert "outer" in result.unsupported[0].reason.lower()
+
+
+def test_mercury_mars_personal_pair_unsupported() -> None:
+    result = rank_catstyle_candidates(
+        [{"planet_a": "Mercury", "planet_b": "Mars", "aspect_type": "square"}]
+    )
+    assert result.ranked == []
+    assert len(result.unsupported) == 1
+
+
+def test_all_25_transit_seeds_exist_and_shapes() -> None:
+    from astro_content_agent.content.catstyle.transit_pair_seed_v0 import (
+        is_seeded_transit_pair,
+        list_transit_pair_seeds,
+    )
+
+    seeds = list_transit_pair_seeds()
+    assert len(seeds) == 25
+    for s in seeds:
+        assert s.outer_planet and s.personal_planet
+        assert s.core_tension.strip()
+        assert s.visual_metaphor.strip()
+        assert s.constructive_channel.strip()
+        assert 3 <= len(s.suggested_scene_angles) <= 5
+        assert len(s.avoid) >= 1
+    assert is_seeded_transit_pair("Moon", "Pluto")
+    assert is_seeded_transit_pair("Pluto", "Moon")
+
+
+def test_pluto_venus_ranker_uses_deep_not_seed() -> None:
+    result = rank_catstyle_candidates(
+        [{"planet_a": "Pluto", "planet_b": "Venus", "aspect_type": "conjunction"}]
+    )
+    assert result.ranked[0].source == "deep"
+    assert "Deep library" in result.ranked[0].reason
+    assert "cauldron" in result.ranked[0].recommended_scene_angle.lower()
+
+
+def test_pluto_moon_ranker_uses_seed() -> None:
+    result = rank_catstyle_candidates(
+        [{"planet_a": "Pluto", "planet_b": "Moon", "aspect_type": "conjunction"}]
+    )
+    assert len(result.ranked) == 1
+    c = result.ranked[0]
+    assert c.source == "seed"
+    blob = (c.reason + " " + c.recommended_scene_angle).lower()
+    assert "pillow" in blob or "blanket" in blob or "shadow" in blob or "cauldron" in blob
+
+
+def test_tighter_orb_ranks_higher_same_pair() -> None:
+    result = rank_catstyle_candidates(
+        [
+            {"planet_a": "Pluto", "planet_b": "Moon", "aspect_type": "conjunction", "orb": 2.5},
+            {"planet_a": "Moon", "planet_b": "Pluto", "aspect_type": "conjunction", "orb": 0.4},
+        ]
+    )
+    assert len(result.ranked) == 2
+    assert result.ranked[0].orb == 0.4
+    assert result.ranked[1].orb == 2.5
+    assert result.ranked[0].total_score > result.ranked[1].total_score
 
 
 def test_unknown_planet_goes_unsupported() -> None:

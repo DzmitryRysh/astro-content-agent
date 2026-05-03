@@ -35,8 +35,13 @@ def _print_readable(result) -> None:
     print()
     for i, c in enumerate(result.ranked, start=1):
         print(f"{i}. {c.planet_a} + {c.planet_b} ({c.aspect_type})")
-        print(f"   total={c.total_score}  visual={c.visual_score} emotional={c.emotional_score} "
-              f"comedy={c.comedy_score} clarity={c.clarity_score}")
+        orb_line = f"   orb={c.orb} deg  orb_bonus=+{c.orb_bonus}\n" if c.orb is not None else ""
+        print(
+            f"   total={c.total_score}  visual={c.visual_score} emotional={c.emotional_score} "
+            f"comedy={c.comedy_score} clarity={c.clarity_score}  source={c.source}"
+        )
+        if orb_line:
+            print(orb_line, end="")
         print(f"   mode: {c.mode_recommendation}")
         print(f"   angle: {c.recommended_scene_angle}")
         print(f"   reason: {c.reason}")
