@@ -60,7 +60,15 @@ def _print_summary(h) -> None:
         s = h.secondary_supportive_candidate
         print(
             f"  secondary: {s.get('planet_a')}+{s.get('planet_b')} {s.get('aspect_type')}  "
-            f"(supportive pick for contrast)"
+            f"(supportive / compensation angle)"
+        )
+    if (
+        h.editorial_profile == "charged"
+        and not h.no_post_reason
+        and h.secondary_supportive_candidate
+    ):
+        print(
+            "  strategy:   Use primary for hook/conflict, secondary for compensation/integration."
         )
     print()
 

@@ -171,6 +171,67 @@ def _caption_draft(c: CatstyleHandoffCandidateSummary) -> str:
     )
 
 
+def _aspect_line_from_dict(d: dict) -> str:
+    return f"{d.get('planet_a')} {d.get('aspect_type')} {d.get('planet_b')}"
+
+
+def _supportive_compensation_section(sec: dict) -> list[str]:
+    """Human-readable supportive / compensation angle from secondary candidate dict."""
+    pair = _aspect_line_from_dict(sec)
+    mode = sec.get("mode_recommendation", "compensation")
+    src = sec.get("source", "")
+    angle = str(sec.get("recommended_scene_angle", "")).strip()
+    orb = sec.get("orb")
+    lines: list[str] = [
+        f"- **Pair:** {pair}",
+        f"- **Mode:** {mode} (supportive read for integration / soften the hook)",
+    ]
+    if src:
+        lines.append(f"- **Source:** {src}")
+    if orb is not None:
+        lines.append(f"- **Orb:** ~{float(orb):.2f}° (exact supportive geometry)")
+    if angle:
+        lines.append(f"- **Scene angle:** {angle}")
+    sel = sec.get("editorial_selection_score")
+    tot = sec.get("total_score")
+    if sel is not None and tot is not None:
+        lines.append(
+            f"- **Editorial note:** supportive-ranking score **{sel}** (intrinsic total_score **{tot}**) "
+            "— use for payoff, B-roll, or caption contrast to the main charged beat."
+        )
+    return lines
+
+
+def _why_pairing_works(primary: CatstyleHandoffCandidateSummary, sec: dict) -> str:
+    main = f"{primary.planet_a} {primary.aspect_type} {primary.planet_b}"
+    soft = _aspect_line_from_dict(sec)
+    return (
+        f"The **{main}** beat carries tension and visual punch for the hook. **{soft}** offers a "
+        "same-day compensation channel: viewers get the friction first, then a believable soft landing "
+        "that still feels on-brand for Catstyle. Keep both in the same session so the story arc "
+        "reads as one sky day, not two unrelated posts."
+    )
+
+
+def _suggested_carousel_structure_lines(primary: CatstyleHandoffCandidateSummary, sec: dict) -> list[str]:
+    charged = f"{primary.planet_a}+{primary.planet_b} ({primary.aspect_type})"
+    supportive = _aspect_line_from_dict(sec)
+    return [
+        f"- **Cover:** Lead with the main charged aspect — **{charged}** — bold read, clear conflict hook.",
+        "- **Slide 1:** Introduce the charged conflict (what the two planet-cats are fighting / negotiating).",
+        "- **Slide 2:** Visual escalation of the main aspect (bigger gesture, sharper contrast, same Catstyle rules).",
+        "- **Slide 3:** What this feels like / behavioral pattern (name the tension in plain language, still visual).",
+        f"- **Slide 4:** Supportive / compensation aspect — **{supportive}** — shift palette or posture toward relief.",
+        "- **Final:** Practical integration / CTA (how to use the day constructively; soft close, no on-image text).",
+    ]
+
+
+def _charged_main_aspect_title(idx: int, n_items: int) -> str:
+    if n_items == 1:
+        return "## Main Charged Aspect"
+    return f"## Main Charged Aspect #{idx}"
+
+
 def build_catstyle_daily_handoff(
     day: date,
     top: int = 1,
@@ -252,10 +313,13 @@ def render_catstyle_daily_handoff_markdown(h: CatstyleDailyHandoff) -> str:
             lines.append(f"- [ ] {step}")
         return "\n".join(lines) + "\n"
 
-    for idx, it in enumerate(h.items, start=1):
-        c = it.candidate
-        title = "## Selected Aspect" if len(h.items) == 1 else f"## Selected Aspect #{idx}"
-        lines.append(title)
+    charged_secondary = (
+        h.editorial_profile == "charged"
+        and h.secondary_supportive_candidate is not None
+        and len(h.items) == 1
+    )
+
+    def _append_main_aspect_bullets(c: CatstyleHandoffCandidateSummary) -> None:
         lines.append(f"- Pair: **{c.planet_a} + {c.planet_b}**")
         lines.append(f"- Aspect: **{c.aspect_type}**")
         lines.append(f"- Mode: **{c.mode_recommendation}**")
@@ -265,12 +329,16 @@ def render_catstyle_daily_handoff_markdown(h: CatstyleDailyHandoff) -> str:
         lines.append(f"- Source: **{c.source}**")
         lines.append(f"- Scene angle: {c.recommended_scene_angle}")
         lines.append("")
+
+    def _append_why_blocks(it: CatstyleHandoffItem) -> None:
         lines.append("## Why this aspect won")
         lines.append(it.why_this_aspect_won)
         lines.append("")
         lines.append("## Why this post")
         lines.append(it.why_this_post)
         lines.append("")
+
+    def _append_visual_through_caption(it: CatstyleHandoffItem) -> None:
         lines.append("## Visual Direction")
         lines.append(f"- **Format:** {it.production_plan.recommended_format}")
         lines.append(f"- **Image gen:** {it.production_plan.image_generation_notes}")
@@ -288,22 +356,49 @@ def render_catstyle_daily_handoff_markdown(h: CatstyleDailyHandoff) -> str:
         lines.append("## Negative Prompt")
         lines.append(it.negative_prompt)
         lines.append("")
-        lines.append("## Carousel Idea")
+        lines.append("## Carousel Idea (from prompt pack)")
         lines.append(it.carousel_idea)
         lines.append("")
         lines.append("## Caption Draft")
         lines.append(it.caption_draft)
         lines.append("")
 
-    if h.secondary_supportive_candidate:
+    if charged_secondary:
+        it0 = h.items[0]
+        c0 = it0.candidate
         sec = h.secondary_supportive_candidate
-        lines.append("## Secondary supportive candidate (charged-day option)")
-        lines.append(
-            f"- **{sec.get('planet_a')} {sec.get('aspect_type')} {sec.get('planet_b')}** "
-            f"(selection_score={sec.get('editorial_selection_score')}, total_score={sec.get('total_score')}) "
-            "— optional softer beat / B-roll / caption contrast."
-        )
+        lines.append("## Main Charged Aspect")
+        _append_main_aspect_bullets(c0)
+        _append_why_blocks(it0)
+        lines.append("## Supportive / Compensation Aspect")
+        lines.extend(_supportive_compensation_section(sec))
         lines.append("")
+        lines.append("## Why this pairing works")
+        lines.append(_why_pairing_works(c0, sec))
+        lines.append("")
+        lines.append("## Suggested Carousel Structure")
+        lines.extend(_suggested_carousel_structure_lines(c0, sec))
+        lines.append("")
+        _append_visual_through_caption(it0)
+    else:
+        for idx, it in enumerate(h.items, start=1):
+            c = it.candidate
+            if h.editorial_profile == "charged":
+                lines.append(_charged_main_aspect_title(idx, len(h.items)))
+            else:
+                lines.append("## Selected Aspect" if len(h.items) == 1 else f"## Selected Aspect #{idx}")
+            _append_main_aspect_bullets(c)
+            _append_why_blocks(it)
+            _append_visual_through_caption(it)
+
+        if h.secondary_supportive_candidate and h.editorial_profile != "charged":
+            sec = h.secondary_supportive_candidate
+            lines.append("## Secondary supportive candidate")
+            lines.append(
+                f"- **{sec.get('planet_a')} {sec.get('aspect_type')} {sec.get('planet_b')}** "
+                f"(selection_score={sec.get('editorial_selection_score')}, total_score={sec.get('total_score')})."
+            )
+            lines.append("")
 
     lines.append("## Production Checklist")
     for step in h.next_steps_checklist:
