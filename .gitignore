@@ -16,3 +16,7 @@ assets/aca_e2e/
 # Catstyle operator handoffs (local working files)
 catstyle_handoff_*.md
 catstyle_handoff_*.json
+
+# Catstyle prompt exports (local working artifacts)
+catstyle_exports/
+catstyle_prompt_exports/
