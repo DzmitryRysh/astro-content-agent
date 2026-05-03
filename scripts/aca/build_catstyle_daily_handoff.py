@@ -34,6 +34,7 @@ def _print_summary(h) -> None:
     print("Catstyle daily handoff")
     print(f"  date:        {h.date}")
     print(f"  scan_mode:   {h.scan_mode}" + (f"  step_hours={h.step_hours}" if h.step_hours else ""))
+    print(f"  editorial:   {h.editorial_profile}")
     print(f"  ranked:      {h.ranked_candidates_count}  selected: {h.selected_count}")
     if h.no_post_reason:
         print(f"  status:      {h.no_post_reason}")
@@ -51,6 +52,16 @@ def _print_summary(h) -> None:
             )
         prev = (it.image_prompts[0][:160] + "…") if it.image_prompts else "(no prompts)"
         print(f"         prompt preview: {prev}")
+        w = (it.why_this_aspect_won or "").replace("\n", " ")
+        if len(w) > 200:
+            w = w[:197] + "…"
+        print(f"         why aspect: {w}")
+    if h.secondary_supportive_candidate and not h.no_post_reason:
+        s = h.secondary_supportive_candidate
+        print(
+            f"  secondary: {s.get('planet_a')}+{s.get('planet_b')} {s.get('aspect_type')}  "
+            f"(supportive pick for contrast)"
+        )
     print()
 
 
@@ -60,6 +71,12 @@ def main() -> int:
     ap.add_argument("--top", type=int, default=1)
     ap.add_argument("--scan-mode", choices=("noon", "day-window"), default="day-window")
     ap.add_argument("--step-hours", type=int, default=2)
+    ap.add_argument(
+        "--editorial-profile",
+        choices=("charged", "balanced", "supportive"),
+        default="charged",
+        help="Match daily pack selection (default charged)",
+    )
     ap.add_argument("--output", type=Path, default=None)
     ap.add_argument("--format", choices=("json", "md"), default="md")
     args = ap.parse_args()
@@ -76,6 +93,7 @@ def main() -> int:
             top=args.top,
             scan_mode=args.scan_mode,
             step_hours=args.step_hours,
+            editorial_profile=args.editorial_profile,
         )
     except RuntimeError as e:
         print(str(e), file=sys.stderr)

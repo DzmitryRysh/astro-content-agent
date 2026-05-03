@@ -5,6 +5,14 @@ from collections.abc import Callable
 from datetime import date
 from astro_content_agent.astro.ephemeris import PlanetPosition
 from astro_content_agent.content.catstyle.models import CatstyleDailyPackResult, CatstylePromptRequest
+from astro_content_agent.services.content.catstyle_editorial_selection import (
+    EDITORIAL_PROFILE_DEFAULT,
+    EditorialProfile,
+    candidate_to_editorial_dict,
+    normalize_editorial_profile,
+    pick_secondary_supportive_for_charged,
+    sort_candidates_for_editorial_profile,
+)
 from astro_content_agent.services.content.catstyle_prompt_generator import generate_catstyle_prompt_pack
 from astro_content_agent.services.content.catstyle_sky_aspect_scan import (
     scan_catstyle_sky_aspect_windows,
@@ -17,13 +25,15 @@ def generate_catstyle_daily_pack(
     top: int = 1,
     scan_mode: str = "day-window",
     step_hours: int = 2,
+    editorial_profile: str = EDITORIAL_PROFILE_DEFAULT,
     *,
     compute_positions_fn: Callable[..., dict[str, PlanetPosition]] | None = None,
     orb_config: dict[str, tuple[float, float]] | None = None,
 ) -> CatstyleDailyPackResult:
     """
-    Run sky scan (noon or full UTC day window), take top *top* ranked candidates,
-    and build a ``CatstylePromptPack`` for each using ``mode_recommendation``.
+    Run sky scan (noon or full UTC day window), rank intrinsically, then select top *top*
+    by ``editorial_profile`` (charged / balanced / supportive), and build a ``CatstylePromptPack``
+    for each selected row using ``mode_recommendation``.
     """
     mode = str(scan_mode).strip().lower()
     if mode not in ("noon", "day-window"):
@@ -42,8 +52,18 @@ def generate_catstyle_daily_pack(
         )
         step = max(1, int(step_hours))
 
+    profile: EditorialProfile = normalize_editorial_profile(str(editorial_profile))
+
+    ranked_list = list(ranking.ranked)
+    ranked_dicts = [c.model_dump(mode="json") for c in ranked_list]
+
     n = max(0, int(top))
-    selected = ranking.ranked[:n]
+    if profile == "balanced":
+        editorial_ordered = ranked_list
+    else:
+        editorial_ordered = sort_candidates_for_editorial_profile(ranked_list, profile)
+
+    selected = editorial_ordered[:n]
 
     sel_dicts: list[dict] = []
     packs: list[dict] = []
@@ -56,17 +76,28 @@ def generate_catstyle_daily_pack(
             variants_count=4,
         )
         pack = generate_catstyle_prompt_pack(req)
-        sel_dicts.append(c.model_dump(mode="json"))
+        sel_dicts.append(candidate_to_editorial_dict(c, profile))
         packs.append(pack.model_dump(mode="json"))
+
+    primary = sel_dicts[0] if sel_dicts else None
+    secondary: dict | None = None
+    if profile == "charged" and selected:
+        sec_c = pick_secondary_supportive_for_charged(ranked_list, selected[0])
+        if sec_c is not None:
+            secondary = candidate_to_editorial_dict(sec_c, "supportive")
 
     return CatstyleDailyPackResult(
         date=day.isoformat(),
         scan_mode=mode,  # type: ignore[arg-type]
         step_hours=step,
+        editorial_profile=profile,
         ranked_candidates_count=len(ranking.ranked),
         selected_count=len(selected),
+        ranked_candidates=ranked_dicts,
         selected_candidates=sel_dicts,
         prompt_packs=packs,
+        primary_candidate=primary,
+        secondary_supportive_candidate=secondary,
     )
 
 

@@ -54,6 +54,7 @@ def _minimal_handoff() -> CatstyleDailyHandoff:
     )
     item = CatstyleHandoffItem(
         candidate=c,
+        why_this_aspect_won="Editorial profile **charged** (fixture).",
         why_this_post="because",
         production_plan=plan,
         image_prompts=["p1"],
@@ -66,9 +67,11 @@ def _minimal_handoff() -> CatstyleDailyHandoff:
         date="2026-05-02",
         scan_mode="day-window",
         step_hours=2,
+        editorial_profile="charged",
         ranked_candidates_count=1,
         selected_count=1,
         items=[item],
+        secondary_supportive_candidate=None,
     )
 
 

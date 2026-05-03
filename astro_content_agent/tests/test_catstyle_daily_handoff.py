@@ -14,29 +14,35 @@ from astro_content_agent.services.content.catstyle_daily_handoff import (
 
 
 def _fake_pack_one() -> CatstyleDailyPackResult:
+    sel = {
+        "planet_a": "Saturn",
+        "planet_b": "Venus",
+        "aspect_type": "sextile",
+        "mode_recommendation": "compensation",
+        "total_score": 38,
+        "orb": 0.24,
+        "source": "deep",
+        "recommended_scene_angle": "design studio beat",
+        "window_first_seen_hour_utc": 0,
+        "window_last_seen_hour_utc": 22,
+        "window_samples_seen": 12,
+        "closest_hour_utc": 0,
+        "is_moon_aspect": False,
+        "editorial_profile": "charged",
+        "editorial_bonus": -3,
+        "editorial_selection_score": 35,
+    }
     return CatstyleDailyPackResult(
         date="2026-05-02",
         scan_mode="day-window",
         step_hours=2,
+        editorial_profile="charged",
         ranked_candidates_count=3,
         selected_count=1,
-        selected_candidates=[
-            {
-                "planet_a": "Saturn",
-                "planet_b": "Venus",
-                "aspect_type": "sextile",
-                "mode_recommendation": "compensation",
-                "total_score": 38,
-                "orb": 0.24,
-                "source": "deep",
-                "recommended_scene_angle": "design studio beat",
-                "window_first_seen_hour_utc": 0,
-                "window_last_seen_hour_utc": 22,
-                "window_samples_seen": 12,
-                "closest_hour_utc": 0,
-                "is_moon_aspect": False,
-            }
-        ],
+        ranked_candidates=[dict(sel)],
+        selected_candidates=[sel],
+        primary_candidate=sel,
+        secondary_supportive_candidate=None,
         prompt_packs=[
             {
                 "image_prompts": ["prompt a", "prompt b", "prompt c", "prompt d"],
@@ -53,8 +59,10 @@ def _fake_pack_empty() -> CatstyleDailyPackResult:
         date="2026-06-01",
         scan_mode="day-window",
         step_hours=2,
+        editorial_profile="charged",
         ranked_candidates_count=0,
         selected_count=0,
+        ranked_candidates=[],
         selected_candidates=[],
         prompt_packs=[],
     )
@@ -77,6 +85,9 @@ def test_handoff_contains_prompts_checklist_and_summary() -> None:
     assert len(h.next_steps_checklist) == 5
     assert "Cloudinary" in h.next_steps_checklist[3]
     assert it.why_this_post
+    assert it.why_this_aspect_won
+    assert "charged" in it.why_this_aspect_won.lower()
+    assert h.editorial_profile == "charged"
     assert it.production_plan.recommended_format
     assert it.caption_draft
 
@@ -90,6 +101,8 @@ def test_markdown_includes_required_sections() -> None:
     md = render_catstyle_daily_handoff_markdown(h)
     for needle in (
         "## Selected Aspect",
+        "## Why this aspect won",
+        "Editorial profile **charged**",
         "## Why this post",
         "## Visual Direction",
         "## Image Prompts",
@@ -112,7 +125,9 @@ def test_json_dump_keys() -> None:
         h = build_catstyle_daily_handoff(date(2026, 5, 2))
     blob = h.model_dump(mode="json")
     assert blob["date"] == "2026-05-02"
+    assert blob["editorial_profile"] == "charged"
     assert "items" in blob and len(blob["items"]) == 1
+    assert "why_this_aspect_won" in blob["items"][0]
     assert "next_steps_checklist" in blob
     assert "production_plan" in blob["items"][0]
 
@@ -128,3 +143,4 @@ def test_no_candidates_handoff() -> None:
     assert h.items == []
     md = render_catstyle_daily_handoff_markdown(h)
     assert "No post" in md or "nothing to hand off" in md.lower()
+    assert "Editorial profile: **charged**" in md

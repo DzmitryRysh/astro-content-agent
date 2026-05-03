@@ -87,7 +87,14 @@ class CatstyleDailyPackResult(BaseModel):
     date: str
     scan_mode: str
     step_hours: int | None = None
+    editorial_profile: Literal["charged", "balanced", "supportive"] = "charged"
     ranked_candidates_count: int
     selected_count: int
+    ranked_candidates: list[dict] = Field(
+        default_factory=list,
+        description="Intrinsic rank_catstyle_candidates order (total_score + aspect/orb v1).",
+    )
     selected_candidates: list[dict]
     prompt_packs: list[dict]
+    primary_candidate: dict | None = None
+    secondary_supportive_candidate: dict | None = None

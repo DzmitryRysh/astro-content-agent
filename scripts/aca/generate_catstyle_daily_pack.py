@@ -42,6 +42,12 @@ def main() -> int:
         help="Sky scan mode (default day-window)",
     )
     ap.add_argument("--step-hours", type=int, default=2, help="UTC step for day-window scan (default 2)")
+    ap.add_argument(
+        "--editorial-profile",
+        choices=("charged", "balanced", "supportive"),
+        default="charged",
+        help="How to pick winners after intrinsic ranking (default charged)",
+    )
     ap.add_argument("--output", type=Path, default=None, help="Write JSON artifact to this path")
     args = ap.parse_args()
 
@@ -57,6 +63,7 @@ def main() -> int:
             top=args.top,
             scan_mode=args.scan_mode,
             step_hours=args.step_hours,
+            editorial_profile=args.editorial_profile,
         )
     except RuntimeError as e:
         print(str(e), file=sys.stderr)
@@ -66,6 +73,7 @@ def main() -> int:
     print("Catstyle daily pack")
     print(f"  date:       {pack.date}")
     print(f"  scan_mode:  {pack.scan_mode}" + (f"  step_hours={pack.step_hours}" if pack.step_hours else ""))
+    print(f"  editorial:  {pack.editorial_profile}")
     print(f"  candidates: {pack.ranked_candidates_count} ranked, {pack.selected_count} selected for packs")
     print()
 
@@ -76,7 +84,12 @@ def main() -> int:
         for i, (cand, pp) in enumerate(zip(pack.selected_candidates, pack.prompt_packs, strict=True), start=1):
             print(f"--- Selected {i} ---")
             print(f"  pair:    {cand.get('planet_a')} + {cand.get('planet_b')}  {cand.get('aspect_type')}")
-            print(f"  score:   {cand.get('total_score')}  mode: {cand.get('mode_recommendation')}  source: {cand.get('source')}")
+            sel = cand.get("editorial_selection_score")
+            sel_s = f"  selection_score={sel}" if sel is not None else ""
+            print(
+                f"  score:   total={cand.get('total_score')}{sel_s}  "
+                f"mode: {cand.get('mode_recommendation')}  source: {cand.get('source')}"
+            )
             print(f"  orb:     {cand.get('orb')}")
             if pack.scan_mode == "day-window" and cand.get("window_samples_seen") is not None:
                 print(
@@ -90,6 +103,15 @@ def main() -> int:
             if ips:
                 print(f"  image 1:  {_preview(ips[0], 240)}")
             print(f"  animation: {_preview(pp.get('animation_prompt', ''), 200)}")
+            print()
+
+        if pack.secondary_supportive_candidate:
+            sec = pack.secondary_supportive_candidate
+            print("--- Secondary supportive (optional) ---")
+            print(
+                f"  pair: {sec.get('planet_a')} + {sec.get('planet_b')}  {sec.get('aspect_type')}  "
+                f"selection_score={sec.get('editorial_selection_score')}  total={sec.get('total_score')}"
+            )
             print()
 
     if args.output is not None:

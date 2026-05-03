@@ -43,6 +43,7 @@ class CatstyleHandoffProductionPlan(BaseModel):
 
 class CatstyleHandoffItem(BaseModel):
     candidate: CatstyleHandoffCandidateSummary
+    why_this_aspect_won: str
     why_this_post: str
     production_plan: CatstyleHandoffProductionPlan
     image_prompts: list[str]
@@ -56,10 +57,12 @@ class CatstyleDailyHandoff(BaseModel):
     date: str
     scan_mode: str
     step_hours: int | None = None
+    editorial_profile: str = "charged"
     ranked_candidates_count: int
     selected_count: int
     no_post_reason: str | None = None
     items: list[CatstyleHandoffItem] = Field(default_factory=list)
+    secondary_supportive_candidate: dict | None = None
     next_steps_checklist: list[str] = Field(default_factory=lambda: list(NEXT_STEPS_CHECKLIST_V0))
 
 
@@ -75,6 +78,32 @@ def _window_line(c: CatstyleHandoffCandidateSummary) -> str:
     if c.is_moon_aspect:
         parts.append("fast Moon aspect")
     return "; ".join(parts)
+
+
+def _why_this_aspect_won(profile: str, cand_dict: dict) -> str:
+    pair = f"{cand_dict['planet_a']} {cand_dict['aspect_type']} {cand_dict['planet_b']}"
+    bonus = cand_dict.get("editorial_bonus")
+    sel = cand_dict.get("editorial_selection_score")
+    total = cand_dict.get("total_score")
+    score_tail = ""
+    if bonus is not None and sel is not None and total is not None:
+        score_tail = f" Intrinsic total_score={total}; editorial_bonus={bonus}; selection_score={sel}."
+    if profile == "charged":
+        return (
+            "Editorial profile **charged** re-ranks toward conjunction, opposition, and square "
+            "(trine small boost, sextile penalty) so a tight soft aspect does not automatically beat "
+            f"a reasonably close hard aspect. Chosen primary: **{pair}**.{score_tail}"
+        )
+    if profile == "supportive":
+        return (
+            "Editorial profile **supportive** re-ranks toward trine and sextile with mild penalties on "
+            f"square/opposition so compensation-forward beats read cleaner for softer campaigns. "
+            f"Chosen primary: **{pair}**.{score_tail}"
+        )
+    return (
+        "Editorial profile **balanced** keeps intrinsic Catstyle ordering (aspect strength, orb tightness, "
+        f"deep/seed visual scores) with no extra editorial bias. Chosen primary: **{pair}**.{score_tail}"
+    )
 
 
 def _why_this_post(c: CatstyleHandoffCandidateSummary) -> str:
@@ -147,6 +176,7 @@ def build_catstyle_daily_handoff(
     top: int = 1,
     scan_mode: str = "day-window",
     step_hours: int = 2,
+    editorial_profile: str = "charged",
     *,
     compute_positions_fn: Callable[..., dict[str, PlanetPosition]] | None = None,
     orb_config: dict[str, tuple[float, float]] | None = None,
@@ -156,6 +186,7 @@ def build_catstyle_daily_handoff(
         top=top,
         scan_mode=scan_mode,
         step_hours=step_hours,
+        editorial_profile=editorial_profile,
         compute_positions_fn=compute_positions_fn,
         orb_config=orb_config,
     )
@@ -165,10 +196,12 @@ def build_catstyle_daily_handoff(
             date=pack.date,
             scan_mode=pack.scan_mode,
             step_hours=pack.step_hours,
+            editorial_profile=pack.editorial_profile,
             ranked_candidates_count=pack.ranked_candidates_count,
             selected_count=0,
             no_post_reason="No Catstyle-ranked outer→personal aspects for this date/scan; nothing to hand off.",
             items=[],
+            secondary_supportive_candidate=None,
         )
 
     items: list[CatstyleHandoffItem] = []
@@ -177,6 +210,7 @@ def build_catstyle_daily_handoff(
         items.append(
             CatstyleHandoffItem(
                 candidate=summary,
+                why_this_aspect_won=_why_this_aspect_won(pack.editorial_profile, cand),
                 why_this_post=_why_this_post(summary),
                 production_plan=_production_plan(summary),
                 image_prompts=list(pp.get("image_prompts") or []),
@@ -191,9 +225,11 @@ def build_catstyle_daily_handoff(
         date=pack.date,
         scan_mode=pack.scan_mode,
         step_hours=pack.step_hours,
+        editorial_profile=pack.editorial_profile,
         ranked_candidates_count=pack.ranked_candidates_count,
         selected_count=pack.selected_count,
         items=items,
+        secondary_supportive_candidate=pack.secondary_supportive_candidate,
     )
 
 
@@ -203,6 +239,7 @@ def render_catstyle_daily_handoff_markdown(h: CatstyleDailyHandoff) -> str:
     lines.append(f"# Catstyle Daily Handoff - {h.date}")
     lines.append("")
     lines.append(f"- Scan: **{h.scan_mode}**" + (f" (step {h.step_hours}h UTC)" if h.step_hours else ""))
+    lines.append(f"- Editorial profile: **{h.editorial_profile}**")
     lines.append(f"- Ranked candidates: **{h.ranked_candidates_count}** | Selected for pack: **{h.selected_count}**")
     lines.append("")
 
@@ -227,6 +264,9 @@ def render_catstyle_daily_handoff_markdown(h: CatstyleDailyHandoff) -> str:
         lines.append(f"- Window: **{_window_line(c)}**")
         lines.append(f"- Source: **{c.source}**")
         lines.append(f"- Scene angle: {c.recommended_scene_angle}")
+        lines.append("")
+        lines.append("## Why this aspect won")
+        lines.append(it.why_this_aspect_won)
         lines.append("")
         lines.append("## Why this post")
         lines.append(it.why_this_post)
@@ -253,6 +293,16 @@ def render_catstyle_daily_handoff_markdown(h: CatstyleDailyHandoff) -> str:
         lines.append("")
         lines.append("## Caption Draft")
         lines.append(it.caption_draft)
+        lines.append("")
+
+    if h.secondary_supportive_candidate:
+        sec = h.secondary_supportive_candidate
+        lines.append("## Secondary supportive candidate (charged-day option)")
+        lines.append(
+            f"- **{sec.get('planet_a')} {sec.get('aspect_type')} {sec.get('planet_b')}** "
+            f"(selection_score={sec.get('editorial_selection_score')}, total_score={sec.get('total_score')}) "
+            "— optional softer beat / B-roll / caption contrast."
+        )
         lines.append("")
 
     lines.append("## Production Checklist")
