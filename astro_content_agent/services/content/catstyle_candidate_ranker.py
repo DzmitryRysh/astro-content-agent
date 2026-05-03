@@ -119,6 +119,23 @@ def _parse_orb(raw: dict[str, Any]) -> float | None:
         return None
 
 
+def _scan_window_kwargs(raw: dict[str, Any]) -> dict[str, Any]:
+    """Optional full-day scan fields passed through from candidate dicts."""
+    out: dict[str, Any] = {}
+    for key in (
+        "closest_hour_utc",
+        "window_first_seen_hour_utc",
+        "window_last_seen_hour_utc",
+        "window_samples_seen",
+    ):
+        v = raw.get(key)
+        if v is not None:
+            out[key] = int(v)
+    if "is_moon_aspect" in raw:
+        out["is_moon_aspect"] = bool(raw["is_moon_aspect"])
+    return out
+
+
 def _orb_bonus(orb: float | None) -> int:
     if orb is None:
         return 0
@@ -216,6 +233,7 @@ def rank_catstyle_candidates(candidates: list[dict[str, Any]]) -> CatstyleCandid
                     orb=orb,
                     orb_bonus=ob,
                     source="deep",
+                    **_scan_window_kwargs(raw),
                 )
             )
             continue
@@ -263,6 +281,7 @@ def rank_catstyle_candidates(candidates: list[dict[str, Any]]) -> CatstyleCandid
                     orb=orb,
                     orb_bonus=ob,
                     source="seed",
+                    **_scan_window_kwargs(raw),
                 )
             )
             continue
@@ -292,6 +311,7 @@ def rank_catstyle_candidates(candidates: list[dict[str, Any]]) -> CatstyleCandid
                 orb=orb,
                 orb_bonus=ob,
                 source="fallback",
+                **_scan_window_kwargs(raw),
             )
         )
 

@@ -59,6 +59,12 @@ class CatstyleCandidate(BaseModel):
     orb: float | None = None
     orb_bonus: int = Field(default=0, ge=0, le=10)
     source: Literal["deep", "seed", "fallback"] = "deep"
+    # Full-day window scan (v1); unset for noon-only / manual candidates
+    closest_hour_utc: int | None = None
+    window_first_seen_hour_utc: int | None = None
+    window_last_seen_hour_utc: int | None = None
+    window_samples_seen: int | None = None
+    is_moon_aspect: bool = False
 
 
 class CatstyleUnsupportedCandidate(BaseModel):
@@ -73,3 +79,15 @@ class CatstyleUnsupportedCandidate(BaseModel):
 class CatstyleCandidateRankingResult(BaseModel):
     ranked: list[CatstyleCandidate]
     unsupported: list[CatstyleUnsupportedCandidate] = Field(default_factory=list)
+
+
+class CatstyleDailyPackResult(BaseModel):
+    """Daily Catstyle scan + top prompt packs (text only)."""
+
+    date: str
+    scan_mode: str
+    step_hours: int | None = None
+    ranked_candidates_count: int
+    selected_count: int
+    selected_candidates: list[dict]
+    prompt_packs: list[dict]
