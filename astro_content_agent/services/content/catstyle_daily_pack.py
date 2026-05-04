@@ -26,6 +26,8 @@ def generate_catstyle_daily_pack(
     scan_mode: str = "day-window",
     step_hours: int = 2,
     editorial_profile: str = EDITORIAL_PROFILE_DEFAULT,
+    skin_a: str | None = None,
+    skin_b: str | None = None,
     *,
     compute_positions_fn: Callable[..., dict[str, PlanetPosition]] | None = None,
     orb_config: dict[str, tuple[float, float]] | None = None,
@@ -34,7 +36,16 @@ def generate_catstyle_daily_pack(
     Run sky scan (noon or full UTC day window), rank intrinsically, then select top *top*
     by ``editorial_profile`` (charged / balanced / supportive), and build a ``CatstylePromptPack``
     for each selected row using ``mode_recommendation``.
+
+    Optional ``skin_a`` / ``skin_b`` are passed through to ``CatstylePromptRequest`` (character_skins v0).
     """
+    skin_a_c = str(skin_a).strip() if skin_a else None
+    skin_b_c = str(skin_b).strip() if skin_b else None
+    if skin_a_c == "":
+        skin_a_c = None
+    if skin_b_c == "":
+        skin_b_c = None
+
     mode = str(scan_mode).strip().lower()
     if mode not in ("noon", "day-window"):
         raise ValueError("scan_mode must be 'noon' or 'day-window'")
@@ -74,6 +85,8 @@ def generate_catstyle_daily_pack(
             aspect_type=c.aspect_type,
             mode=c.mode_recommendation,
             variants_count=4,
+            skin_a=skin_a_c,
+            skin_b=skin_b_c,
         )
         pack = generate_catstyle_prompt_pack(req)
         sel_dicts.append(candidate_to_editorial_dict(c, profile))
