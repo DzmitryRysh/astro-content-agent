@@ -33,6 +33,14 @@ class CatstylePromptRequest(BaseModel):
     aspect_type: str
     mode: Literal["tension", "compensation", "mixed"]
     variants_count: int = Field(default=4, ge=1, le=8)
+    skin_a: str | None = Field(
+        default=None,
+        description="Optional character skin key for planet_a (v0: Mars, Jupiter, Saturn skins only).",
+    )
+    skin_b: str | None = Field(
+        default=None,
+        description="Optional character skin key for planet_b (v0: Mars, Jupiter, Saturn skins only).",
+    )
 
 
 class CatstylePromptPack(BaseModel):
