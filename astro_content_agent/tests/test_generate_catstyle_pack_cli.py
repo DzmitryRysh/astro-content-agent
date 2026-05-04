@@ -132,6 +132,53 @@ def test_cli_unsupported_pair_exits_nonzero(catstyle_cli, capsys: pytest.Capture
     assert "No Catstyle content" in err or "outer-to-personal" in err
 
 
+def test_cli_accepts_valid_skin_b(catstyle_cli, capsys: pytest.CaptureFixture[str]) -> None:
+    old = sys.argv[:]
+    try:
+        sys.argv = [
+            "generate_catstyle_pack.py",
+            "--planet-a",
+            "Jupiter",
+            "--planet-b",
+            "Mars",
+            "--aspect-type",
+            "square",
+            "--mode",
+            "tension",
+            "--skin-b",
+            "spartan_king",
+        ]
+        assert catstyle_cli.main() == 0
+    finally:
+        sys.argv = old
+    out = capsys.readouterr().out
+    assert "Spartan King" in out or "spartan" in out.lower()
+    assert "Skins:" in out
+
+
+def test_cli_rejects_invalid_skin(catstyle_cli, capsys: pytest.CaptureFixture[str]) -> None:
+    old = sys.argv[:]
+    try:
+        sys.argv = [
+            "generate_catstyle_pack.py",
+            "--planet-a",
+            "Jupiter",
+            "--planet-b",
+            "Mars",
+            "--aspect-type",
+            "square",
+            "--mode",
+            "tension",
+            "--skin-b",
+            "not_a_skin",
+        ]
+        assert catstyle_cli.main() == 1
+    finally:
+        sys.argv = old
+    err = capsys.readouterr().err
+    assert "No character skin" in err or "skin" in err.lower()
+
+
 def test_cli_default_variants_count_is_four(catstyle_cli, tmp_path: Path) -> None:
     """Omitting --variants-count uses model default (4)."""
     out_file = tmp_path / "default_variants.json"

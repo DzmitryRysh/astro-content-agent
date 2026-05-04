@@ -25,8 +25,10 @@ def _artifact_dict(
     aspect_type: str,
     mode: str,
     pack,
+    skin_a: str | None,
+    skin_b: str | None,
 ) -> dict:
-    return {
+    blob: dict = {
         "planet_a": planet_a,
         "planet_b": planet_b,
         "aspect_type": aspect_type,
@@ -36,12 +38,21 @@ def _artifact_dict(
         "negative_prompt": pack.negative_prompt,
         "carousel_idea": pack.carousel_idea,
     }
+    if skin_a:
+        blob["skin_a"] = skin_a
+    if skin_b:
+        blob["skin_b"] = skin_b
+    return blob
 
 
-def _print_pack_readable(planet_a: str, planet_b: str, aspect_type: str, mode: str, pack) -> None:
+def _print_pack_readable(
+    planet_a: str, planet_b: str, aspect_type: str, mode: str, pack, *, skin_a: str | None, skin_b: str | None
+) -> None:
     print()
     print("Catstyle prompt pack")
     print(f"  Planets:      {planet_a} + {planet_b}")
+    if skin_a or skin_b:
+        print(f"  Skins:        skin_a={skin_a or '(none)'}  skin_b={skin_b or '(none)'}")
     print(f"  Aspect:       {aspect_type}")
     print(f"  Mode:         {mode}")
     print(f"  Variants:     {len(pack.image_prompts)}")
@@ -68,8 +79,23 @@ def main() -> int:
     ap.add_argument("--aspect-type", required=True, dest="aspect_type")
     ap.add_argument("--mode", required=True, choices=["tension", "compensation", "mixed"])
     ap.add_argument("--variants-count", type=int, default=4, dest="variants_count")
+    ap.add_argument(
+        "--skin-a",
+        default=None,
+        dest="skin_a",
+        help="Optional character skin key for planet-a (v0: Mars, Jupiter, Saturn)",
+    )
+    ap.add_argument(
+        "--skin-b",
+        default=None,
+        dest="skin_b",
+        help="Optional character skin key for planet-b (v0: Mars, Jupiter, Saturn)",
+    )
     ap.add_argument("--output", type=Path, default=None, help="Write JSON artifact to this path")
     args = ap.parse_args()
+
+    skin_a = str(args.skin_a).strip() if args.skin_a else None
+    skin_b = str(args.skin_b).strip() if args.skin_b else None
 
     try:
         pa = normalize_planet_name(args.planet_a)
@@ -80,13 +106,15 @@ def main() -> int:
             aspect_type=args.aspect_type,
             mode=args.mode,
             variants_count=args.variants_count,
+            skin_a=skin_a,
+            skin_b=skin_b,
         )
         pack = generate_catstyle_prompt_pack(req)
     except ValueError as e:
         print(str(e), file=sys.stderr)
         return 1
 
-    _print_pack_readable(pa, pb, args.aspect_type, args.mode, pack)
+    _print_pack_readable(pa, pb, args.aspect_type, args.mode, pack, skin_a=skin_a, skin_b=skin_b)
 
     if args.output is not None:
         out_path = args.output.expanduser().resolve()
@@ -97,6 +125,8 @@ def main() -> int:
             aspect_type=args.aspect_type,
             mode=args.mode,
             pack=pack,
+            skin_a=skin_a,
+            skin_b=skin_b,
         )
         out_path.write_text(json.dumps(blob, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         print(f"Wrote artifact: {out_path}")

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from astro_content_agent.content.catstyle.aspect_library_v0 import ASPECT_CAT_INTERACTIONS, get_aspect_interaction
+from astro_content_agent.content.catstyle.character_skins_v0 import get_character_skin
 from astro_content_agent.content.catstyle.models import CatstylePromptPack, CatstylePromptRequest, PlanetCatProfile
 from astro_content_agent.content.catstyle.planet_bible_v0 import PLANET_CAT_PROFILES
 from astro_content_agent.content.catstyle.transit_pair_seed_v0 import (
@@ -28,6 +29,57 @@ def normalize_planet_name(name: str) -> str:
     return _CANONICAL_PLANET[key]
 
 
+def _strip_optional_skin(raw: str | None) -> str | None:
+    if raw is None:
+        return None
+    s = str(raw).strip()
+    return s or None
+
+
+def _validate_skins_for_pair(pa: str, pb: str, skin_a: str | None, skin_b: str | None) -> None:
+    if skin_a:
+        get_character_skin(pa, skin_a)
+    if skin_b:
+        get_character_skin(pb, skin_b)
+
+
+def _planet_cat_line(planet: str, prof: PlanetCatProfile, skin_key: str | None) -> str:
+    base = (
+        f"{planet} planet-cat: {prof.visual_identity}; palette {prof.colors}; "
+        f"expression style {prof.facial_expression_style}; props {prof.signature_props}."
+    )
+    sk_raw = _strip_optional_skin(skin_key)
+    if not sk_raw:
+        return base
+    sk = get_character_skin(planet, sk_raw)
+    overlay = (
+        f" Archetype skin **{sk.display_name}** (overlay—keep core {planet} round-cat identity; do not replace bible read): "
+        f"costume: {sk.costume_elements}. Props: {sk.prop_elements}. Body language: {sk.body_language}. "
+        f"Scene hooks: {sk.scene_hooks}. Signature details: {sk.signature_details}. "
+        f"Avoid for this skin: {sk.avoid_elements}."
+    )
+    return base + overlay
+
+
+def _skin_animation_suffix(pa: str, pb: str, skin_a: str | None, skin_b: str | None) -> str:
+    parts: list[str] = []
+    if skin_a:
+        sk = get_character_skin(pa, skin_a)
+        parts.append(f"{pa} in {sk.display_name} skin")
+    if skin_b:
+        sk = get_character_skin(pb, skin_b)
+        parts.append(f"{pb} in {sk.display_name} skin")
+    if not parts:
+        return ""
+    return " Archetype overlays: " + "; ".join(parts) + "."
+
+
+def _skin_carousel_suffix(skin_a: str | None, skin_b: str | None) -> str:
+    if not skin_a and not skin_b:
+        return ""
+    return " Honor optional archetype skins on labeled planet-cats where specified (still Catstyle round bodies)."
+
+
 def _supported_pairs_hint() -> str:
     deep = [" + ".join(sorted(k, key=str.lower)) for k in ASPECT_CAT_INTERACTIONS]
     return "Deep aspect library: " + "; ".join(sorted(deep)) + ". Plus 25 social/outer-to-personal transit seeds (transit_pair_seed_v0)."
@@ -41,10 +93,15 @@ def _pack_from_deep(
     prof_a: PlanetCatProfile,
     prof_b: PlanetCatProfile,
     aspect_ix,
+    skin_a: str | None,
+    skin_b: str | None,
 ) -> CatstylePromptPack:
     tension_scenes = list(aspect_ix.scene_ideas)
     comp_scenes = list(aspect_ix.compensation_scene_ideas)
     n = req.variants_count
+    line_a = _planet_cat_line(pa, prof_a, skin_a)
+    line_b = _planet_cat_line(pb, prof_b, skin_b)
+    anim_skin = _skin_animation_suffix(pa, pb, skin_a, skin_b)
 
     image_prompts: list[str] = []
     for i in range(n):
@@ -61,10 +118,8 @@ def _pack_from_deep(
         prompt = (
             f"{_STYLE_CORE} "
             f"Aspect type: {req.aspect_type}. "
-            f"{pa} planet-cat: {prof_a.visual_identity}; palette {prof_a.colors}; "
-            f"expression style {prof_a.facial_expression_style}; props {prof_a.signature_props}. "
-            f"{pb} planet-cat: {prof_b.visual_identity}; palette {prof_b.colors}; "
-            f"expression style {prof_b.facial_expression_style}; props {prof_b.signature_props}. "
+            f"{line_a} "
+            f"{line_b} "
             f"Scene beat: {base_scene} "
             f"Story tension (cartoon metaphor): {aspect_ix.core_tension} "
             f"Constructive undertone available: {aspect_ix.constructive_channel}"
@@ -74,7 +129,7 @@ def _pack_from_deep(
     animation_prompt = (
         f"Loopable 3–5s animation, same catstyle: {pa} and {pb} planet-cats, aspect {req.aspect_type}, "
         f"minimal squash-and-stretch on round bodies, thick outlines held crisp at small size, "
-        f"dark starry backdrop, readable silhouettes, comic timing; {_STYLE_CORE}"
+        f"dark starry backdrop, readable silhouettes, comic timing;{anim_skin} {_STYLE_CORE}"
     ).strip()
 
     negative_chunks = [
@@ -88,7 +143,7 @@ def _pack_from_deep(
         f"Carousel outline (cover + {n} art slides): cover shows {pa}+{pb} round cats under stars with clear "
         f"{req.aspect_type} read; slides rotate through the variant scene beats without on-image text; "
         f"final slide leans into constructive channel: {aspect_ix.constructive_channel} "
-        f"(props and poses only, catstyle rules unchanged)."
+        f"(props and poses only, catstyle rules unchanged).{_skin_carousel_suffix(skin_a, skin_b)}"
     ).strip()
 
     return CatstylePromptPack(
@@ -107,10 +162,15 @@ def _pack_from_seed(
     prof_a: PlanetCatProfile,
     prof_b: PlanetCatProfile,
     seed: CatstyleTransitPairSeed,
+    skin_a: str | None,
+    skin_b: str | None,
 ) -> CatstylePromptPack:
     tension_scenes = list(seed.suggested_scene_angles)
     comp_scenes = [seed.constructive_channel, seed.visual_metaphor]
     n = req.variants_count
+    line_a = _planet_cat_line(pa, prof_a, skin_a)
+    line_b = _planet_cat_line(pb, prof_b, skin_b)
+    anim_skin = _skin_animation_suffix(pa, pb, skin_a, skin_b)
 
     image_prompts: list[str] = []
     for i in range(n):
@@ -127,10 +187,8 @@ def _pack_from_seed(
         prompt = (
             f"{_STYLE_CORE} "
             f"Aspect type: {req.aspect_type}. "
-            f"{pa} planet-cat: {prof_a.visual_identity}; palette {prof_a.colors}; "
-            f"expression style {prof_a.facial_expression_style}; props {prof_a.signature_props}. "
-            f"{pb} planet-cat: {prof_b.visual_identity}; palette {prof_b.colors}; "
-            f"expression style {prof_b.facial_expression_style}; props {prof_b.signature_props}. "
+            f"{line_a} "
+            f"{line_b} "
             f"Scene beat: {base_scene} "
             f"Story tension (cartoon metaphor): {seed.core_tension} "
             f"Constructive undertone available: {seed.constructive_channel} "
@@ -141,7 +199,7 @@ def _pack_from_seed(
     animation_prompt = (
         f"Loopable 3–5s animation, same catstyle: {pa} and {pb} planet-cats, aspect {req.aspect_type}, "
         f"minimal squash-and-stretch on round bodies, thick outlines held crisp at small size, "
-        f"dark starry backdrop, readable silhouettes, comic timing; {_STYLE_CORE}"
+        f"dark starry backdrop, readable silhouettes, comic timing;{anim_skin} {_STYLE_CORE}"
     ).strip()
 
     negative_chunks = [
@@ -155,7 +213,7 @@ def _pack_from_seed(
         f"Carousel outline (cover + {n} art slides): cover shows {pa}+{pb} round cats under stars with clear "
         f"{req.aspect_type} read; slides rotate through transit seed v0 scene angles without on-image text; "
         f"final slide leans into constructive channel: {seed.constructive_channel} "
-        f"(props and poses only, catstyle rules unchanged)."
+        f"(props and poses only, catstyle rules unchanged).{_skin_carousel_suffix(skin_a, skin_b)}"
     ).strip()
 
     return CatstylePromptPack(
@@ -175,6 +233,8 @@ def _pack_from_fallback(
     prof_b: PlanetCatProfile,
     outer: str,
     personal: str,
+    skin_a: str | None,
+    skin_b: str | None,
 ) -> CatstylePromptPack:
     core = f"{outer} social rhythm meets {personal} everyday stakes—generic transit beat v0 (seed TBD)."
     constructive = f"Shared constructive beat: {outer} and {personal} negotiate one clear cartoon gesture."
@@ -188,6 +248,9 @@ def _pack_from_fallback(
     comp_scenes = [constructive, f"{outer} and {personal} co-build one tiny two-block tower."]
     avoid = ["gore", "real weapons", "readable text in frame", "photorealistic violence"]
     n = req.variants_count
+    line_a = _planet_cat_line(pa, prof_a, skin_a)
+    line_b = _planet_cat_line(pb, prof_b, skin_b)
+    anim_skin = _skin_animation_suffix(pa, pb, skin_a, skin_b)
 
     image_prompts: list[str] = []
     for i in range(n):
@@ -204,10 +267,8 @@ def _pack_from_fallback(
         prompt = (
             f"{_STYLE_CORE} "
             f"Aspect type: {req.aspect_type}. "
-            f"{pa} planet-cat: {prof_a.visual_identity}; palette {prof_a.colors}; "
-            f"expression style {prof_a.facial_expression_style}; props {prof_a.signature_props}. "
-            f"{pb} planet-cat: {prof_b.visual_identity}; palette {prof_b.colors}; "
-            f"expression style {prof_b.facial_expression_style}; props {prof_b.signature_props}. "
+            f"{line_a} "
+            f"{line_b} "
             f"Scene beat: {base_scene} "
             f"Story tension (cartoon metaphor): {core} "
             f"Constructive undertone available: {constructive}"
@@ -217,7 +278,7 @@ def _pack_from_fallback(
     animation_prompt = (
         f"Loopable 3–5s animation, same catstyle: {pa} and {pb} planet-cats, aspect {req.aspect_type}, "
         f"minimal squash-and-stretch on round bodies, thick outlines held crisp at small size, "
-        f"dark starry backdrop, readable silhouettes, comic timing; {_STYLE_CORE}"
+        f"dark starry backdrop, readable silhouettes, comic timing;{anim_skin} {_STYLE_CORE}"
     ).strip()
 
     negative_chunks = [
@@ -230,7 +291,7 @@ def _pack_from_fallback(
     carousel_idea = (
         f"Carousel outline (cover + {n} art slides): cover shows {pa}+{pb} round cats under stars with clear "
         f"{req.aspect_type} read; generic outer-to-personal fallback beats; "
-        f"final slide leans into: {constructive} (props and poses only)."
+        f"final slide leans into: {constructive} (props and poses only).{_skin_carousel_suffix(skin_a, skin_b)}"
     ).strip()
 
     return CatstylePromptPack(
@@ -247,10 +308,15 @@ def generate_catstyle_prompt_pack(req: CatstylePromptRequest) -> CatstylePromptP
     pb = normalize_planet_name(req.planet_b)
     prof_a: PlanetCatProfile = PLANET_CAT_PROFILES[pa]
     prof_b: PlanetCatProfile = PLANET_CAT_PROFILES[pb]
+    skin_a = _strip_optional_skin(req.skin_a)
+    skin_b = _strip_optional_skin(req.skin_b)
+    _validate_skins_for_pair(pa, pb, skin_a, skin_b)
 
     aspect_ix = get_aspect_interaction(pa, pb)
     if aspect_ix is not None:
-        return _pack_from_deep(pa, pb, req, prof_a=prof_a, prof_b=prof_b, aspect_ix=aspect_ix)
+        return _pack_from_deep(
+            pa, pb, req, prof_a=prof_a, prof_b=prof_b, aspect_ix=aspect_ix, skin_a=skin_a, skin_b=skin_b
+        )
 
     oriented = orient_outer_personal(pa, pb)
     if oriented is None:
@@ -261,9 +327,11 @@ def generate_catstyle_prompt_pack(req: CatstylePromptRequest) -> CatstylePromptP
     outer, personal = oriented
     seed = get_transit_pair_seed(outer, personal)
     if seed is not None:
-        return _pack_from_seed(pa, pb, req, prof_a=prof_a, prof_b=prof_b, seed=seed)
+        return _pack_from_seed(pa, pb, req, prof_a=prof_a, prof_b=prof_b, seed=seed, skin_a=skin_a, skin_b=skin_b)
 
-    return _pack_from_fallback(pa, pb, req, prof_a=prof_a, prof_b=prof_b, outer=outer, personal=personal)
+    return _pack_from_fallback(
+        pa, pb, req, prof_a=prof_a, prof_b=prof_b, outer=outer, personal=personal, skin_a=skin_a, skin_b=skin_b
+    )
 
 
 __all__ = [

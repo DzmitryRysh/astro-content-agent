@@ -293,3 +293,90 @@ def test_pluto_venus_still_uses_deep_aspect_library_wording() -> None:
 
 def test_normalize_planet_name_case_insensitive() -> None:
     assert normalize_planet_name("VENUS") == "Venus"
+
+
+def test_prompt_pack_without_skins_unchanged_shape() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    req = CatstylePromptRequest(
+        planet_a="Jupiter",
+        planet_b="Mars",
+        aspect_type="square",
+        mode="tension",
+    )
+    pack = generate_catstyle_prompt_pack(req)
+    assert len(pack.image_prompts) == 4
+    joined = " ".join(pack.image_prompts).lower()
+    assert "archetype skin" not in joined
+
+
+def test_prompt_pack_includes_spartan_skin_on_mars() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Jupiter",
+            planet_b="Mars",
+            aspect_type="square",
+            mode="tension",
+            skin_b="spartan_king",
+        )
+    )
+    blob = " ".join(pack.image_prompts).lower()
+    assert "archetype skin" in blob
+    assert "spartan king" in blob
+    assert "spear" in blob or "shield" in blob
+    assert "mars planet-cat:" in blob
+    assert "bandana" in blob
+    assert "archetype overlays" in pack.animation_prompt.lower()
+    assert "mars in spartan king skin" in pack.animation_prompt.lower()
+
+
+def test_prompt_pack_includes_rambo_skin_on_mars() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Jupiter",
+            planet_b="Mars",
+            aspect_type="square",
+            mode="tension",
+            skin_b="rambo",
+        )
+    )
+    blob = " ".join(pack.image_prompts).lower()
+    assert "rambo" in blob
+    assert "ammo" in blob or "machine gun" in blob or "tattoo" in blob
+
+
+def test_skin_on_unsupported_planet_raises() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    with pytest.raises(ValueError, match="only support|Character skins"):
+        generate_catstyle_prompt_pack(
+            CatstylePromptRequest(
+                planet_a="Moon",
+                planet_b="Uranus",
+                aspect_type="opposition",
+                mode="tension",
+                skin_a="spartan_king",
+            )
+        )
+
+
+def test_jupiter_philosopher_skin_on_planet_a() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Jupiter",
+            planet_b="Mars",
+            aspect_type="square",
+            mode="tension",
+            skin_a="philosopher_mentor",
+        )
+    )
+    blob = pack.image_prompts[0].lower()
+    assert "philosopher mentor" in blob
+    assert "scroll" in blob or "robe" in blob
+
