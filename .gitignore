@@ -20,3 +20,7 @@ catstyle_handoff_*.json
 # Catstyle prompt exports (local working artifacts)
 catstyle_exports/
 catstyle_prompt_exports/
+
+# Catstyle image job manifests (local working artifacts)
+catstyle_image_jobs/
+catstyle_generation_jobs/
