@@ -124,6 +124,8 @@ def test_openai_writes_png_from_mocked_b64(tmp_path: Path, monkeypatch: pytest.M
     call_kw = mock_client.images.generate.call_args.kwargs
     assert call_kw["model"]
     assert "Avoid / negative guidance:" in call_kw["prompt"]
+    assert "response_format" not in call_kw
+    assert call_kw.get("output_format") == "png"
 
 
 def test_openai_missing_api_key_returns_failed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
