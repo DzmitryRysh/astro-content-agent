@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CLI: execute Catstyle image jobs via a named provider (v0: stub only)."""
+"""CLI: execute Catstyle image jobs via a named provider (stub or OpenAI Images)."""
 from __future__ import annotations
 
 import argparse
@@ -17,22 +17,25 @@ from astro_content_agent.services.content.catstyle_image_generation_executor imp
 
 def main() -> int:
     ap = argparse.ArgumentParser(
-        description="Execute Catstyle image_generation_jobs.json with a provider (v0: stub only).",
+        description=(
+            "Execute Catstyle image_generation_jobs.json with a provider. "
+            "openai_image saves PNGs locally only (no Cloudinary / Instagram)."
+        ),
     )
     ap.add_argument("--manifest", type=Path, required=True, help="Path to image_generation_jobs.json")
     ap.add_argument(
         "--provider",
         default="stub",
-        choices=("stub",),
-        help="Image provider (default stub; no real image APIs in v0)",
+        choices=("stub", "openai_image"),
+        help="Image provider: stub (placeholder files) or openai_image (OpenAI Images API)",
     )
     ap.add_argument(
         "--output-dir",
         type=Path,
         default=None,
-        help="Output directory (default: <manifest_dir>/generated_stub/)",
+        help="Output directory (default: <manifest_dir>/generated_stub or generated_images)",
     )
-    ap.add_argument("--overwrite", action="store_true", help="Overwrite existing stub artifacts")
+    ap.add_argument("--overwrite", action="store_true", help="Overwrite existing output artifacts")
     args = ap.parse_args()
 
     try:
@@ -55,14 +58,20 @@ def main() -> int:
     if result.message:
         print(f"  message:        {result.message}")
     print(f"  status:         {result.status}")
-    written = sum(1 for o in result.outputs if o.status == "generated_stub")
+    written = sum(
+        1 for o in result.outputs if o.status in ("generated_stub", "generated")
+    )
     print(f"  outputs_written: {written}")
+    failed = sum(1 for o in result.outputs if o.status == "failed")
+    if failed:
+        print(f"  failed:         {failed}")
     if result.skipped_count:
         print(f"  skipped:        {result.skipped_count}")
     if result.execution_manifest_path:
         print(f"  execution_manifest: {result.execution_manifest_path}")
     if result.stub_files_written:
-        print("  stub_files:")
+        label = "stub_files:" if result.provider_name == "stub" else "output_files:"
+        print(f"  {label}")
         for name in result.stub_files_written:
             print(f"    - {name}")
     print()

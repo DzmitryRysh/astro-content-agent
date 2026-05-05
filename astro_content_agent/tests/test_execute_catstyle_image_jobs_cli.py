@@ -5,8 +5,20 @@ import importlib.util
 import json
 import sys
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import pytest
+
+from astro_content_agent.core.config import get_settings
+from astro_content_agent.services.content.catstyle_image_providers import (
+    OpenAICatstyleImageProvider,
+    get_catstyle_image_provider,
+)
+
+_MINI_PNG_B64 = (
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+)
 
 
 def _load_cli():
@@ -25,6 +37,13 @@ def _load_cli():
 @pytest.fixture()
 def jobs_cli():
     return _load_cli()
+
+
+@pytest.fixture(autouse=True)
+def _reset_settings_cache_cli() -> None:
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
 
 
 def _manifest(tmp_path: Path) -> Path:
@@ -83,3 +102,43 @@ def test_generic_cli_runs_stub_provider(jobs_cli, tmp_path: Path, capsys: pytest
     assert "provider:" in out_cap.lower()
     assert "stub" in out_cap.lower()
     assert (out / "generated_stub_01.txt").is_file()
+
+
+def test_generic_cli_accepts_openai_image_provider(
+    jobs_cli, tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    mock_client = MagicMock()
+    mock_client.images.generate.return_value = SimpleNamespace(
+        data=[SimpleNamespace(b64_json=_MINI_PNG_B64, url=None)]
+    )
+
+    def fake_get(name: str):
+        if name == "openai_image":
+            return OpenAICatstyleImageProvider(client=mock_client)
+        return get_catstyle_image_provider(name)
+
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-fake-key-for-unit-test")
+    monkeypatch.setattr(
+        "astro_content_agent.services.content.catstyle_image_generation_executor.get_catstyle_image_provider",
+        fake_get,
+    )
+    mp = _manifest(tmp_path)
+    out = tmp_path / "gen_openai"
+    old = sys.argv[:]
+    try:
+        sys.argv = [
+            "execute_catstyle_image_jobs.py",
+            "--manifest",
+            str(mp),
+            "--provider",
+            "openai_image",
+            "--output-dir",
+            str(out),
+        ]
+        assert jobs_cli.main() == 0
+    finally:
+        sys.argv = old
+    out_cap = capsys.readouterr().out
+    assert "openai_image" in out_cap.lower()
+    assert "output_files:" in out_cap.lower()
+    assert (out / "a.png").is_file()

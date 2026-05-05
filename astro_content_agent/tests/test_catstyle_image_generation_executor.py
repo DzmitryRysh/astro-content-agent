@@ -3,14 +3,32 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import pytest
 
+from astro_content_agent.core.config import get_settings
 from astro_content_agent.services.content.catstyle_image_generation_executor import (
     CatstyleImageExecutorStubResult,
     execute_catstyle_image_jobs,
     execute_catstyle_image_jobs_stub,
 )
+from astro_content_agent.services.content.catstyle_image_providers import (
+    OpenAICatstyleImageProvider,
+    get_catstyle_image_provider,
+)
+
+_MINI_PNG_B64 = (
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+)
+
+
+@pytest.fixture(autouse=True)
+def _reset_settings_cache_executor() -> None:
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
 
 
 def _write_manifest(path: Path, jobs: list[dict]) -> None:
@@ -155,6 +173,65 @@ def test_unsupported_provider_raises_before_io(tmp_path: Path) -> None:
     _write_manifest(mpath, [_sample_job(1)])
     with pytest.raises(ValueError, match="Unsupported Catstyle image provider"):
         execute_catstyle_image_jobs(mpath, provider_name="dalle", output_dir=tmp_path / "x")
+
+
+def _fake_openai_provider_registry(monkeypatch: pytest.MonkeyPatch, mock_client: MagicMock) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-fake-key-for-unit-test")
+    get_settings.cache_clear()
+
+    def fake_get(name: str):
+        if name == "openai_image":
+            return OpenAICatstyleImageProvider(client=mock_client)
+        return get_catstyle_image_provider(name)
+
+    monkeypatch.setattr(
+        "astro_content_agent.services.content.catstyle_image_generation_executor.get_catstyle_image_provider",
+        fake_get,
+    )
+
+
+def test_execute_openai_image_behaves_like_stub_executor_shape(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    mock_client = MagicMock()
+    mock_client.images.generate.return_value = SimpleNamespace(
+        data=[SimpleNamespace(b64_json=_MINI_PNG_B64, url=None)]
+    )
+    _fake_openai_provider_registry(monkeypatch, mock_client)
+
+    mpath = tmp_path / "image_generation_jobs.json"
+    _write_manifest(mpath, [_sample_job(1)])
+    out = tmp_path / "gen_img"
+    r = execute_catstyle_image_jobs(
+        mpath, provider_name="openai_image", output_dir=out, overwrite=False
+    )
+    assert r.provider_name == "openai_image"
+    assert r.status == "completed_openai"
+    assert r.jobs_processed == 1
+    assert r.outputs[0].status == "generated"
+    assert (out / "out_1.png").is_file()
+    assert r.stub_files_written == ["out_1.png"]
+    exec_path = out / "image_generation_execution_stub.json"
+    assert exec_path.is_file()
+    payload = json.loads(exec_path.read_text(encoding="utf-8"))
+    assert payload["provider"] == "openai_image"
+    assert payload["status"] == "completed_openai"
+
+
+def test_default_output_dir_openai_is_generated_images(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    mock_client = MagicMock()
+    mock_client.images.generate.return_value = SimpleNamespace(
+        data=[SimpleNamespace(b64_json=_MINI_PNG_B64, url=None)]
+    )
+    _fake_openai_provider_registry(monkeypatch, mock_client)
+
+    mpath = tmp_path / "pack" / "image_generation_jobs.json"
+    _write_manifest(mpath, [_sample_job(1)])
+    r = execute_catstyle_image_jobs(
+        mpath, provider_name="openai_image", output_dir=None, overwrite=False
+    )
+    assert r.outputs_dir == str((mpath.parent / "generated_images").resolve())
+    assert (mpath.parent / "generated_images" / "out_1.png").is_file()
 
 
 def test_no_pending_jobs_writes_execution_manifest(tmp_path: Path) -> None:
