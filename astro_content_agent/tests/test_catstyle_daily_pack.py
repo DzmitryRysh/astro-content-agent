@@ -111,6 +111,9 @@ def test_daily_pack_json_shape() -> None:
     assert blob.get("editorial_profile") == "charged"
     assert "ranked_candidates" in blob
     assert "scan_mode" in blob and "selected_candidates" in blob and "prompt_packs" in blob
+    meta = blob["prompt_packs"][0].get("art_direction_profile") or {}
+    assert meta.get("version") == "catstyle-art-direction-v0"
+    assert meta.get("energy") in ("charged", "supportive", "balanced")
 
 
 def _ranking_saturn_jupiter_moon_jupiter_mars() -> CatstyleCandidateRankingResult:

@@ -41,6 +41,14 @@ class CatstylePromptRequest(BaseModel):
         default=None,
         description="Optional character skin key for planet_b (v0: Mars, Jupiter, Saturn skins only).",
     )
+    editorial_profile: Literal["charged", "balanced", "supportive"] | None = Field(
+        default=None,
+        description="Optional editorial lens for deterministic premium art-direction (daily pack sets this).",
+    )
+    premium_art_direction: bool = Field(
+        default=True,
+        description="When True, append deterministic premium comic-direction blocks (no LLM).",
+    )
 
 
 class CatstylePromptPack(BaseModel):
@@ -48,6 +56,10 @@ class CatstylePromptPack(BaseModel):
     animation_prompt: str
     negative_prompt: str
     carousel_idea: str
+    art_direction_profile: dict | None = Field(
+        default=None,
+        description="Metadata from catstyle_art_direction v0 when premium enrichment applied.",
+    )
 
 
 class CatstyleCandidate(BaseModel):

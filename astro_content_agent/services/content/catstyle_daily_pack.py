@@ -87,6 +87,7 @@ def generate_catstyle_daily_pack(
             variants_count=4,
             skin_a=skin_a_c,
             skin_b=skin_b_c,
+            editorial_profile=profile,
         )
         pack = generate_catstyle_prompt_pack(req)
         sel_dicts.append(candidate_to_editorial_dict(c, profile))

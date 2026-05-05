@@ -310,6 +310,93 @@ def test_prompt_pack_without_skins_unchanged_shape() -> None:
     assert "archetype skin" not in joined
 
 
+def test_premium_art_direction_disabled_skips_enrichment_block() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    req = CatstylePromptRequest(
+        planet_a="Jupiter",
+        planet_b="Mars",
+        aspect_type="square",
+        mode="tension",
+        premium_art_direction=False,
+    )
+    pack = generate_catstyle_prompt_pack(req)
+    assert "Premium comic direction" not in pack.image_prompts[0]
+    assert pack.art_direction_profile is None
+
+
+def test_jupiter_mars_charged_editorial_includes_premium_action_language() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Jupiter",
+            planet_b="Mars",
+            aspect_type="square",
+            mode="tension",
+            editorial_profile="charged",
+        )
+    )
+    blob = pack.image_prompts[0].lower()
+    assert "premium comic direction" in blob
+    assert "scene energy (charged)" in blob
+    assert "dynamic action read" in blob
+    assert pack.art_direction_profile is not None
+    assert pack.art_direction_profile["energy"] == "charged"
+
+
+def test_saturn_venus_supportive_compensation_includes_collaboration_language() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Saturn",
+            planet_b="Venus",
+            aspect_type="trine",
+            mode="compensation",
+            editorial_profile="supportive",
+        )
+    )
+    blob = pack.image_prompts[0].lower()
+    assert "scene energy (supportive)" in blob
+    assert "elegant collaboration" in blob
+
+
+def test_negative_prompt_includes_anti_bland_additions() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Jupiter",
+            planet_b="Mars",
+            aspect_type="square",
+            mode="tension",
+            editorial_profile="charged",
+        )
+    )
+    neg = pack.negative_prompt.lower()
+    assert "bland mascot pose" in neg
+    assert "sticker-like" in neg
+
+
+def test_spartan_skin_prompt_includes_skin_mandate_language() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Jupiter",
+            planet_b="Mars",
+            aspect_type="square",
+            mode="tension",
+            editorial_profile="charged",
+            skin_b="spartan_king",
+        )
+    )
+    low = pack.image_prompts[0].lower()
+    assert "character skin mandate" in low
+    assert "prioritize staging from hooks" in low
+
+
 def test_prompt_pack_includes_spartan_skin_on_mars() -> None:
     from astro_content_agent.content.catstyle.models import CatstylePromptRequest
 
