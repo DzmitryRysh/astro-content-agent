@@ -3,12 +3,15 @@ from __future__ import annotations
 
 from astro_content_agent.content.catstyle.aspect_library_v0 import ASPECT_CAT_INTERACTIONS, get_aspect_interaction
 from astro_content_agent.content.catstyle.character_skins_v0 import get_character_skin
-from astro_content_agent.content.catstyle.models import CatstylePromptPack, CatstylePromptRequest, PlanetCatProfile
+from astro_content_agent.content.catstyle.models import CatstylePromptPack, CatstylePromptRequest, PlanetCatCanon
+from astro_content_agent.content.catstyle.planet_canon_v1 import (
+    get_planet_canon,
+    normalize_planet_name as canon_normalize_planet_name,
+)
 from astro_content_agent.services.content.catstyle_art_direction import (
     apply_art_direction_to_prompt_pack,
     build_catstyle_art_direction_profile,
 )
-from astro_content_agent.content.catstyle.planet_bible_v0 import PLANET_CAT_PROFILES
 from astro_content_agent.content.catstyle.transit_pair_seed_v0 import (
     CatstyleTransitPairSeed,
     get_transit_pair_seed,
@@ -22,15 +25,9 @@ _STYLE_CORE = (
     "no anime style, no glossy luxury aesthetic, no excessive jewelry or fine detail clutter."
 )
 
-_CANONICAL_PLANET: dict[str, str] = {p.lower(): p for p in PLANET_CAT_PROFILES}
-
-
 def normalize_planet_name(name: str) -> str:
-    key = (name or "").strip().lower()
-    if key not in _CANONICAL_PLANET:
-        known = ", ".join(sorted(PLANET_CAT_PROFILES))
-        raise ValueError(f"Unknown planet {name!r}. Catstyle v0 supports: {known}.")
-    return _CANONICAL_PLANET[key]
+    """Canonical planet title (delegates to planet canon v1)."""
+    return canon_normalize_planet_name(name)
 
 
 def _strip_optional_skin(raw: str | None) -> str | None:
@@ -47,19 +44,34 @@ def _validate_skins_for_pair(pa: str, pb: str, skin_a: str | None, skin_b: str |
         get_character_skin(pb, skin_b)
 
 
-def _planet_cat_line(planet: str, prof: PlanetCatProfile, skin_key: str | None) -> str:
+def _planet_cat_line(planet: str, canon: PlanetCatCanon, skin_key: str | None) -> str:
     base = (
-        f"{planet} planet-cat: {prof.visual_identity}; palette {prof.colors}; "
-        f"expression style {prof.facial_expression_style}; props {prof.signature_props}."
+        f"{planet} planet-cat [CANON v1 base]: {canon.short_prompt_line} "
+        f"This block is the immutable planet identity — keep recognizable across every scene and skin. "
+        f"Archetype: {canon.role_archetype} "
+        f"Silhouette: {canon.silhouette_notes} "
+        f"Shape language: {canon.core_shape_language} "
+        f"Palette: {canon.core_palette} "
+        f"Face: {canon.facial_expression_language} "
+        f"Body: {canon.body_language} "
+        f"Signature props: {canon.signature_props} "
+        f"Signature details: {canon.signature_details} "
+        f"Emotional tone: {canon.emotional_tone} "
+        f"Motion style: {canon.motion_style} "
+        f"Visual priorities: {canon.visual_do} "
+        f"Visual avoid: {canon.visual_avoid} "
+        f"Recognizability rule: {canon.recognizability_rule}"
     )
     sk_raw = _strip_optional_skin(skin_key)
     if not sk_raw:
         return base
     sk = get_character_skin(planet, sk_raw)
     overlay = (
-        f" Archetype skin **{sk.display_name}** (overlay—keep core {planet} round-cat identity; do not replace bible read): "
+        f" Archetype skin **{sk.display_name}** (OPTIONAL COSTUME OVERLAY ONLY — preserve the full [CANON v1 base] "
+        f"above: same planet, base silhouette, signature props/details, and recognizability rule must remain readable; "
+        f"skin enhances costume/scene hooks, never replaces the planet-cat core): "
         f"costume: {sk.costume_elements}. Props: {sk.prop_elements}. Body language: {sk.body_language}. "
-        f"Scene hooks: {sk.scene_hooks}. Signature details: {sk.signature_details}. "
+        f"Scene hooks: {sk.scene_hooks}. Skin signature details: {sk.signature_details}. "
         f"Avoid for this skin: {sk.avoid_elements}."
     )
     return base + overlay
@@ -94,8 +106,8 @@ def _pack_from_deep(
     pb: str,
     req: CatstylePromptRequest,
     *,
-    prof_a: PlanetCatProfile,
-    prof_b: PlanetCatProfile,
+    canon_a: PlanetCatCanon,
+    canon_b: PlanetCatCanon,
     aspect_ix,
     skin_a: str | None,
     skin_b: str | None,
@@ -103,8 +115,8 @@ def _pack_from_deep(
     tension_scenes = list(aspect_ix.scene_ideas)
     comp_scenes = list(aspect_ix.compensation_scene_ideas)
     n = req.variants_count
-    line_a = _planet_cat_line(pa, prof_a, skin_a)
-    line_b = _planet_cat_line(pb, prof_b, skin_b)
+    line_a = _planet_cat_line(pa, canon_a, skin_a)
+    line_b = _planet_cat_line(pb, canon_b, skin_b)
     anim_skin = _skin_animation_suffix(pa, pb, skin_a, skin_b)
 
     image_prompts: list[str] = []
@@ -163,8 +175,8 @@ def _pack_from_seed(
     pb: str,
     req: CatstylePromptRequest,
     *,
-    prof_a: PlanetCatProfile,
-    prof_b: PlanetCatProfile,
+    canon_a: PlanetCatCanon,
+    canon_b: PlanetCatCanon,
     seed: CatstyleTransitPairSeed,
     skin_a: str | None,
     skin_b: str | None,
@@ -172,8 +184,8 @@ def _pack_from_seed(
     tension_scenes = list(seed.suggested_scene_angles)
     comp_scenes = [seed.constructive_channel, seed.visual_metaphor]
     n = req.variants_count
-    line_a = _planet_cat_line(pa, prof_a, skin_a)
-    line_b = _planet_cat_line(pb, prof_b, skin_b)
+    line_a = _planet_cat_line(pa, canon_a, skin_a)
+    line_b = _planet_cat_line(pb, canon_b, skin_b)
     anim_skin = _skin_animation_suffix(pa, pb, skin_a, skin_b)
 
     image_prompts: list[str] = []
@@ -233,8 +245,8 @@ def _pack_from_fallback(
     pb: str,
     req: CatstylePromptRequest,
     *,
-    prof_a: PlanetCatProfile,
-    prof_b: PlanetCatProfile,
+    canon_a: PlanetCatCanon,
+    canon_b: PlanetCatCanon,
     outer: str,
     personal: str,
     skin_a: str | None,
@@ -252,8 +264,8 @@ def _pack_from_fallback(
     comp_scenes = [constructive, f"{outer} and {personal} co-build one tiny two-block tower."]
     avoid = ["gore", "real weapons", "readable text in frame", "photorealistic violence"]
     n = req.variants_count
-    line_a = _planet_cat_line(pa, prof_a, skin_a)
-    line_b = _planet_cat_line(pb, prof_b, skin_b)
+    line_a = _planet_cat_line(pa, canon_a, skin_a)
+    line_b = _planet_cat_line(pb, canon_b, skin_b)
     anim_skin = _skin_animation_suffix(pa, pb, skin_a, skin_b)
 
     image_prompts: list[str] = []
@@ -310,8 +322,8 @@ def generate_catstyle_prompt_pack(req: CatstylePromptRequest) -> CatstylePromptP
     """Build prompts from deep aspect library, transit pair seeds, or generic outer-to-personal fallback."""
     pa = normalize_planet_name(req.planet_a)
     pb = normalize_planet_name(req.planet_b)
-    prof_a: PlanetCatProfile = PLANET_CAT_PROFILES[pa]
-    prof_b: PlanetCatProfile = PLANET_CAT_PROFILES[pb]
+    canon_a = get_planet_canon(pa)
+    canon_b = get_planet_canon(pb)
     skin_a = _strip_optional_skin(req.skin_a)
     skin_b = _strip_optional_skin(req.skin_b)
     _validate_skins_for_pair(pa, pb, skin_a, skin_b)
@@ -319,7 +331,7 @@ def generate_catstyle_prompt_pack(req: CatstylePromptRequest) -> CatstylePromptP
     aspect_ix = get_aspect_interaction(pa, pb)
     if aspect_ix is not None:
         pack = _pack_from_deep(
-            pa, pb, req, prof_a=prof_a, prof_b=prof_b, aspect_ix=aspect_ix, skin_a=skin_a, skin_b=skin_b
+            pa, pb, req, canon_a=canon_a, canon_b=canon_b, aspect_ix=aspect_ix, skin_a=skin_a, skin_b=skin_b
         )
     else:
         oriented = orient_outer_personal(pa, pb)
@@ -331,14 +343,14 @@ def generate_catstyle_prompt_pack(req: CatstylePromptRequest) -> CatstylePromptP
         outer, personal = oriented
         seed = get_transit_pair_seed(outer, personal)
         if seed is not None:
-            pack = _pack_from_seed(pa, pb, req, prof_a=prof_a, prof_b=prof_b, seed=seed, skin_a=skin_a, skin_b=skin_b)
+            pack = _pack_from_seed(pa, pb, req, canon_a=canon_a, canon_b=canon_b, seed=seed, skin_a=skin_a, skin_b=skin_b)
         else:
             pack = _pack_from_fallback(
                 pa,
                 pb,
                 req,
-                prof_a=prof_a,
-                prof_b=prof_b,
+                canon_a=canon_a,
+                canon_b=canon_b,
                 outer=outer,
                 personal=personal,
                 skin_a=skin_a,
