@@ -27,5 +27,6 @@ catstyle_generation_jobs/
 
 # Catstyle stub executor / mock image outputs (not source code)
 generated_stub/
+generated_images/
 catstyle_image_outputs/
 catstyle_generated_images/

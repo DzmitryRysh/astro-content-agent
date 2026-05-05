@@ -19,6 +19,8 @@ class Settings(BaseSettings):
 
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
     openai_model: str = Field(default="omni-mini", alias="OPENAI_MODEL")
+    openai_image_model: str = Field(default="gpt-image-1", alias="OPENAI_IMAGE_MODEL")
+    catstyle_image_size: str = Field(default="1024x1024", alias="CATSTYLE_IMAGE_SIZE")
 
     assets_dir: str = Field(default="./assets", alias="ASSETS_DIR")
 

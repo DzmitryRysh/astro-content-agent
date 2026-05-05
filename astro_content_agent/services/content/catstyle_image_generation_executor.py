@@ -1,4 +1,4 @@
-"""Catstyle v0 image job executor — orchestrates providers (stub default; no APIs)."""
+"""Catstyle v0 image job executor — orchestrates providers (stub / OpenAI Images)."""
 from __future__ import annotations
 
 import json
@@ -18,7 +18,7 @@ class StubJobOutputRecord(BaseModel):
     suggested_output_name: str
     prompt_index: int
     stub_filename: str
-    status: Literal["generated_stub", "skipped_existing"]
+    status: Literal["generated_stub", "skipped_existing", "generated", "failed"]
     prompt_preview: str | None = None
     note: str | None = None
 
@@ -36,6 +36,29 @@ class CatstyleImageExecutorStubResult(BaseModel):
     stub_files_written: list[str] = Field(default_factory=list)
     skipped_count: int = 0
     provider_name: str = "stub"
+
+
+def _default_output_dir(manifest_path: Path, provider_name: str) -> Path:
+    parent = manifest_path.parent
+    key = (provider_name or "").strip().lower()
+    if key == "openai_image":
+        return (parent / "generated_images").resolve()
+    return (parent / "generated_stub").resolve()
+
+
+def _completion_meta(provider_name: str) -> tuple[str, str]:
+    key = (provider_name or "").strip().lower()
+    if key == "stub":
+        return (
+            "completed_stub",
+            "Stub executor finished. No image model was invoked.",
+        )
+    if key == "openai_image":
+        return (
+            "completed_openai",
+            "OpenAI image generation finished. Files saved locally for manual review (no upload).",
+        )
+    return ("completed", "Execution finished.")
 
 
 def _load_jobs_manifest(path: Path) -> dict[str, Any]:
@@ -59,6 +82,9 @@ def _provider_result_to_stub_record(
     seq: int,
     res: CatstyleImageProviderResult,
 ) -> StubJobOutputRecord:
+    note = res.metadata.get("note")
+    if res.provider == "openai_image" and note is None:
+        note = res.message
     return StubJobOutputRecord(
         job_id=res.job_id,
         suggested_output_name=str(row.get("suggested_output_name", "") or f"output_{seq}.png"),
@@ -66,7 +92,7 @@ def _provider_result_to_stub_record(
         stub_filename=res.output_filename or "",
         status=res.status,
         prompt_preview=res.metadata.get("prompt_preview"),
-        note=res.metadata.get("note"),
+        note=note if isinstance(note, str) else None,
     )
 
 
@@ -79,15 +105,18 @@ def execute_catstyle_image_jobs(
     """
     Read ``image_generation_jobs.json`` and run the named provider for each pending job.
 
-    v0 supports only ``provider_name=\"stub\"``.
+    Supports ``provider_name`` ``stub`` or ``openai_image``. Default output directory is
+    ``<manifest_dir>/generated_stub`` or ``<manifest_dir>/generated_images`` respectively,
+    unless ``output_dir`` is given.
     """
     provider = get_catstyle_image_provider(provider_name)
     manifest_path = jobs_manifest_path.expanduser().resolve()
+    done_status, done_message = _completion_meta(provider_name)
     data = _load_jobs_manifest(manifest_path)
     jobs_raw: list[Any] = data["jobs"]
 
     if not jobs_raw:
-        out_default = (manifest_path.parent / "generated_stub").resolve()
+        out_default = _default_output_dir(manifest_path, provider_name)
         out = (output_dir.expanduser().resolve() if output_dir is not None else out_default)
         return CatstyleImageExecutorStubResult(
             source_manifest_path=str(manifest_path),
@@ -102,7 +131,7 @@ def execute_catstyle_image_jobs(
     out = (
         output_dir.expanduser().resolve()
         if output_dir is not None
-        else (manifest_path.parent / "generated_stub").resolve()
+        else _default_output_dir(manifest_path, provider_name)
     )
     out.mkdir(parents=True, exist_ok=True)
 
@@ -152,7 +181,7 @@ def execute_catstyle_image_jobs(
         outputs.append(_provider_result_to_stub_record(row, seq, res))
         if res.status == "skipped_existing":
             skipped += 1
-        elif res.status == "generated_stub" and res.output_filename:
+        elif res.status in ("generated_stub", "generated") and res.output_filename:
             stub_files_written.append(res.output_filename)
 
     exec_payload: dict[str, Any] = {
@@ -161,8 +190,8 @@ def execute_catstyle_image_jobs(
         "source_manifest_path": str(manifest_path),
         "outputs_dir": str(out),
         "jobs_processed": len(pending),
-        "status": "completed_stub",
-        "message": "Stub executor finished. No image model was invoked.",
+        "status": done_status,
+        "message": done_message,
         "outputs": [o.model_dump(mode="json") for o in outputs],
         "skipped_existing_count": skipped,
         "stub_files_written": stub_files_written,
@@ -175,8 +204,8 @@ def execute_catstyle_image_jobs(
         outputs_dir=str(out),
         jobs_processed=len(pending),
         outputs=outputs,
-        status="completed_stub",
-        message="Stub executor finished. No image model was invoked.",
+        status=done_status,
+        message=done_message,
         execution_manifest_path=str(exec_path),
         stub_files_written=stub_files_written,
         skipped_count=skipped,
