@@ -8,6 +8,7 @@ import pytest
 
 from astro_content_agent.services.content.catstyle_image_generation_executor import (
     CatstyleImageExecutorStubResult,
+    execute_catstyle_image_jobs,
     execute_catstyle_image_jobs_stub,
 )
 
@@ -133,6 +134,27 @@ def test_empty_jobs_returns_no_jobs(tmp_path: Path) -> None:
     assert r.status == "no_jobs"
     assert r.jobs_processed == 0
     assert r.outputs == []
+
+
+def test_execute_catstyle_image_jobs_stub_matches_generic_stub(tmp_path: Path) -> None:
+    mpath = tmp_path / "image_generation_jobs.json"
+    _write_manifest(mpath, [_sample_job(1)])
+    out_a = tmp_path / "cmp_a"
+    out_b = tmp_path / "cmp_b"
+    a = execute_catstyle_image_jobs_stub(mpath, output_dir=out_a, overwrite=False)
+    b = execute_catstyle_image_jobs(mpath, provider_name="stub", output_dir=out_b, overwrite=False)
+    assert isinstance(a, CatstyleImageExecutorStubResult) and isinstance(b, CatstyleImageExecutorStubResult)
+    assert a.status == b.status == "completed_stub"
+    assert a.provider_name == b.provider_name == "stub"
+    assert len(a.outputs) == len(b.outputs) == 1
+    assert a.outputs[0].job_id == b.outputs[0].job_id
+
+
+def test_unsupported_provider_raises_before_io(tmp_path: Path) -> None:
+    mpath = tmp_path / "image_generation_jobs.json"
+    _write_manifest(mpath, [_sample_job(1)])
+    with pytest.raises(ValueError, match="Unsupported Catstyle image provider"):
+        execute_catstyle_image_jobs(mpath, provider_name="dalle", output_dir=tmp_path / "x")
 
 
 def test_no_pending_jobs_writes_execution_manifest(tmp_path: Path) -> None:
