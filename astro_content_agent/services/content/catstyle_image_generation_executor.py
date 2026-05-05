@@ -1,4 +1,4 @@
-"""Catstyle v0 stub image job executor — reads job manifests, writes reviewable placeholders (no APIs)."""
+"""Catstyle v0 image job executor — orchestrates providers (stub default; no APIs)."""
 from __future__ import annotations
 
 import json
@@ -7,8 +7,10 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-
-_PREVIEW_MAX = 480
+from astro_content_agent.services.content.catstyle_image_providers import (
+    CatstyleImageProviderResult,
+    get_catstyle_image_provider,
+)
 
 
 class StubJobOutputRecord(BaseModel):
@@ -22,7 +24,7 @@ class StubJobOutputRecord(BaseModel):
 
 
 class CatstyleImageExecutorStubResult(BaseModel):
-    """Result of ``execute_catstyle_image_jobs_stub``."""
+    """Result of ``execute_catstyle_image_jobs`` / ``execute_catstyle_image_jobs_stub``."""
 
     source_manifest_path: str
     outputs_dir: str
@@ -33,6 +35,7 @@ class CatstyleImageExecutorStubResult(BaseModel):
     execution_manifest_path: str | None = None
     stub_files_written: list[str] = Field(default_factory=list)
     skipped_count: int = 0
+    provider_name: str = "stub"
 
 
 def _load_jobs_manifest(path: Path) -> dict[str, Any]:
@@ -51,23 +54,34 @@ def _load_jobs_manifest(path: Path) -> dict[str, Any]:
     return raw
 
 
-def _preview(text: str) -> str:
-    t = (text or "").strip().replace("\n", " ")
-    if len(t) <= _PREVIEW_MAX:
-        return t
-    return t[: _PREVIEW_MAX - 3] + "..."
+def _provider_result_to_stub_record(
+    row: dict[str, Any],
+    seq: int,
+    res: CatstyleImageProviderResult,
+) -> StubJobOutputRecord:
+    return StubJobOutputRecord(
+        job_id=res.job_id,
+        suggested_output_name=str(row.get("suggested_output_name", "") or f"output_{seq}.png"),
+        prompt_index=int(row.get("prompt_index", seq)),
+        stub_filename=res.output_filename or "",
+        status=res.status,
+        prompt_preview=res.metadata.get("prompt_preview"),
+        note=res.metadata.get("note"),
+    )
 
 
-def execute_catstyle_image_jobs_stub(
+def execute_catstyle_image_jobs(
     jobs_manifest_path: Path,
+    provider_name: str = "stub",
     output_dir: Path | None = None,
     overwrite: bool = False,
 ) -> CatstyleImageExecutorStubResult:
     """
-    Read ``image_generation_jobs.json`` and write stub text artifacts plus an execution manifest.
+    Read ``image_generation_jobs.json`` and run the named provider for each pending job.
 
-    Does not call OpenAI, other image APIs, Cloudinary, or Instagram.
+    v0 supports only ``provider_name=\"stub\"``.
     """
+    provider = get_catstyle_image_provider(provider_name)
     manifest_path = jobs_manifest_path.expanduser().resolve()
     data = _load_jobs_manifest(manifest_path)
     jobs_raw: list[Any] = data["jobs"]
@@ -82,6 +96,7 @@ def execute_catstyle_image_jobs_stub(
             outputs=[],
             status="no_jobs",
             message="Manifest contained no jobs; nothing to execute.",
+            provider_name=provider_name,
         )
 
     out = (
@@ -102,6 +117,7 @@ def execute_catstyle_image_jobs_stub(
     if not pending:
         exec_payload = {
             "version": "catstyle-image-executor-stub-v0",
+            "provider": provider_name,
             "source_manifest_path": str(manifest_path),
             "outputs_dir": str(out),
             "jobs_processed": 0,
@@ -121,6 +137,7 @@ def execute_catstyle_image_jobs_stub(
             status="no_pending_jobs",
             message="No jobs with status 'pending' in manifest; nothing executed.",
             execution_manifest_path=str(exec_path),
+            provider_name=provider_name,
         )
 
     outputs: list[StubJobOutputRecord] = []
@@ -130,55 +147,17 @@ def execute_catstyle_image_jobs_stub(
 
     for row in pending:
         seq += 1
-        job_id = str(row.get("job_id", "") or f"job-{seq}")
-        suggested = str(row.get("suggested_output_name", "") or f"output_{seq}.png")
-        prompt_index = int(row.get("prompt_index", seq))
-        prompt_text = str(row.get("prompt_text", ""))
-        preview = _preview(prompt_text)
-
-        stub_name = f"generated_stub_{seq:02d}.txt"
-        stub_path = out / stub_name
-        note = "Stub only. No image API was called."
-
-        if stub_path.is_file() and not overwrite:
-            outputs.append(
-                StubJobOutputRecord(
-                    job_id=job_id,
-                    suggested_output_name=suggested,
-                    prompt_index=prompt_index,
-                    stub_filename=stub_name,
-                    status="skipped_existing",
-                    prompt_preview=preview,
-                    note=note,
-                )
-            )
+        job_in = {**row, "_stub_output_seq": seq}
+        res = provider.generate(job_in, out, overwrite)
+        outputs.append(_provider_result_to_stub_record(row, seq, res))
+        if res.status == "skipped_existing":
             skipped += 1
-            continue
-
-        body = {
-            "job_id": job_id,
-            "suggested_output_name": suggested,
-            "prompt_index": prompt_index,
-            "status": "generated_stub",
-            "prompt_preview": preview,
-            "note": note,
-        }
-        stub_path.write_text(json.dumps(body, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-        stub_files_written.append(stub_name)
-        outputs.append(
-            StubJobOutputRecord(
-                job_id=job_id,
-                suggested_output_name=suggested,
-                prompt_index=prompt_index,
-                stub_filename=stub_name,
-                status="generated_stub",
-                prompt_preview=preview,
-                note=note,
-            )
-        )
+        elif res.status == "generated_stub" and res.output_filename:
+            stub_files_written.append(res.output_filename)
 
     exec_payload: dict[str, Any] = {
         "version": "catstyle-image-executor-stub-v0",
+        "provider": provider_name,
         "source_manifest_path": str(manifest_path),
         "outputs_dir": str(out),
         "jobs_processed": len(pending),
@@ -201,11 +180,27 @@ def execute_catstyle_image_jobs_stub(
         execution_manifest_path=str(exec_path),
         stub_files_written=stub_files_written,
         skipped_count=skipped,
+        provider_name=provider_name,
+    )
+
+
+def execute_catstyle_image_jobs_stub(
+    jobs_manifest_path: Path,
+    output_dir: Path | None = None,
+    overwrite: bool = False,
+) -> CatstyleImageExecutorStubResult:
+    """Backward-compatible alias for ``execute_catstyle_image_jobs(..., provider_name=\"stub\")``."""
+    return execute_catstyle_image_jobs(
+        jobs_manifest_path,
+        provider_name="stub",
+        output_dir=output_dir,
+        overwrite=overwrite,
     )
 
 
 __all__ = [
     "CatstyleImageExecutorStubResult",
     "StubJobOutputRecord",
+    "execute_catstyle_image_jobs",
     "execute_catstyle_image_jobs_stub",
 ]
