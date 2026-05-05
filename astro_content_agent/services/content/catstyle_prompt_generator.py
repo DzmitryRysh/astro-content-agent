@@ -8,6 +8,10 @@ from astro_content_agent.content.catstyle.planet_canon_v1 import (
     get_planet_canon,
     normalize_planet_name as canon_normalize_planet_name,
 )
+from astro_content_agent.content.catstyle.planet_identity_markers_v1 import (
+    format_identity_markers_prompt_block,
+    get_planet_identity_marker_profile,
+)
 from astro_content_agent.services.content.catstyle_art_direction import (
     apply_art_direction_to_prompt_pack,
     build_catstyle_art_direction_profile,
@@ -45,6 +49,9 @@ def _validate_skins_for_pair(pa: str, pb: str, skin_a: str | None, skin_b: str |
 
 
 def _planet_cat_line(planet: str, canon: PlanetCatCanon, skin_key: str | None) -> str:
+    sk_raw = _strip_optional_skin(skin_key)
+    marker = get_planet_identity_marker_profile(planet)
+    marker_block = format_identity_markers_prompt_block(planet, marker, has_skin=bool(sk_raw))
     base = (
         f"{planet} planet-cat [CANON v1 base]: {canon.short_prompt_line} "
         f"This block is the immutable planet identity — keep recognizable across every scene and skin. "
@@ -62,19 +69,20 @@ def _planet_cat_line(planet: str, canon: PlanetCatCanon, skin_key: str | None) -
         f"Visual avoid: {canon.visual_avoid} "
         f"Recognizability rule: {canon.recognizability_rule}"
     )
-    sk_raw = _strip_optional_skin(skin_key)
+    base_with_markers = f"{base} {marker_block}"
     if not sk_raw:
-        return base
+        return base_with_markers
     sk = get_character_skin(planet, sk_raw)
     overlay = (
         f" Archetype skin **{sk.display_name}** (OPTIONAL COSTUME OVERLAY ONLY — preserve the full [CANON v1 base] "
-        f"above: same planet, base silhouette, signature props/details, and recognizability rule must remain readable; "
+        f"and [IDENTITY MARKERS v1] sections above: same planet, base silhouette, glyphs/placement cues, "
+        f"signature props/details, and recognizability rule must remain readable; "
         f"skin enhances costume/scene hooks, never replaces the planet-cat core): "
         f"costume: {sk.costume_elements}. Props: {sk.prop_elements}. Body language: {sk.body_language}. "
         f"Scene hooks: {sk.scene_hooks}. Skin signature details: {sk.signature_details}. "
         f"Avoid for this skin: {sk.avoid_elements}."
     )
-    return base + overlay
+    return base_with_markers + overlay
 
 
 def _skin_animation_suffix(pa: str, pb: str, skin_a: str | None, skin_b: str | None) -> str:

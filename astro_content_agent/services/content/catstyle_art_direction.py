@@ -84,7 +84,8 @@ def composition_line() -> str:
         "decisive foreground/background separation, one focal action readable at thumbnail size. "
         "Not a flat mascot pose, not a centered sticker-like character floating in empty space—"
         "stage the beat like a premium comic panel or movie one-sheet while staying cartony flat-color Catstyle "
-        "(never photoreal, never glossy prestige portrait)."
+        "(never photoreal, never glossy prestige portrait). "
+        "Keep each planet's [IDENTITY MARKERS v1] symbol/prop stamps readable at thumbnail scale beside faces/bodies."
     )
 
 
