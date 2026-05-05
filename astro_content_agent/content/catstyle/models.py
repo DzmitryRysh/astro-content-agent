@@ -17,6 +17,23 @@ class PlanetCatProfile(BaseModel):
     constructive_expression: str
 
 
+class PlanetIdentityMarkerProfile(BaseModel):
+    """Deterministic symbol/prop placement cues so each planet-cat stays recognizable (markers v1)."""
+
+    planet_name: str
+    planet_symbol: str = Field(description="Glyph or compact symbol cue (flat icon, not readable words).")
+    symbol_name: str = Field(description="Spelled-out name for prompts.")
+    primary_marker: str
+    secondary_marker: str
+    signature_prop: str
+    placement_rules: list[str] = Field(default_factory=list)
+    must_show_markers: list[str] = Field(default_factory=list)
+    optional_label_ideas: list[str] = Field(default_factory=list)
+    visual_read_rule: str
+    avoid_marker_mistakes: list[str] = Field(default_factory=list)
+    short_prompt_line: str
+
+
 class PlanetCatCanon(BaseModel):
     """Immutable core visual identity for a round planet-cat (Catstyle canon v1 — prompt layer)."""
 

@@ -295,6 +295,23 @@ def test_normalize_planet_name_case_insensitive() -> None:
     assert normalize_planet_name("VENUS") == "Venus"
 
 
+def test_prompt_pack_includes_identity_markers_v1_block() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Jupiter",
+            planet_b="Mars",
+            aspect_type="square",
+            mode="tension",
+            premium_art_direction=False,
+        )
+    )
+    low = pack.image_prompts[0].lower()
+    assert "[identity markers v1]" in low
+    assert "jupiter glyph" in low and "mars glyph" in low
+
+
 def test_prompt_pack_without_skins_unchanged_shape() -> None:
     from astro_content_agent.content.catstyle.models import CatstylePromptRequest
 

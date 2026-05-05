@@ -127,4 +127,5 @@ def test_mars_skin_preserves_canon_language() -> None:
     assert "bandana" in text or "flame" in text
     assert "optional costume overlay only" in text
     assert "preserve the full [canon v1 base]" in text
+    assert "[identity markers v1]" in text
     assert "spartan king" in text
