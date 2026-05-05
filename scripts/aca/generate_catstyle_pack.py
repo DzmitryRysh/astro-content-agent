@@ -27,6 +27,8 @@ def _artifact_dict(
     pack,
     skin_a: str | None,
     skin_b: str | None,
+    world_template_key: str | None,
+    scene_template_key: str | None,
 ) -> dict:
     blob: dict = {
         "planet_a": planet_a,
@@ -42,6 +44,14 @@ def _artifact_dict(
         blob["skin_a"] = skin_a
     if skin_b:
         blob["skin_b"] = skin_b
+    if world_template_key:
+        blob["world_template_key"] = world_template_key
+    if scene_template_key:
+        blob["scene_template_key"] = scene_template_key
+    if pack.world_template_profile is not None:
+        blob["world_template_profile"] = pack.world_template_profile
+    if pack.scene_template_profile is not None:
+        blob["scene_template_profile"] = pack.scene_template_profile
     return blob
 
 
@@ -53,6 +63,11 @@ def _print_pack_readable(
     print(f"  Planets:      {planet_a} + {planet_b}")
     if skin_a or skin_b:
         print(f"  Skins:        skin_a={skin_a or '(none)'}  skin_b={skin_b or '(none)'}")
+    if pack.world_template_profile or pack.scene_template_profile:
+        wk = (pack.world_template_profile or {}).get("template_key", "(none)")
+        sk = (pack.scene_template_profile or {}).get("template_key", "(none)")
+        print(f"  World tmpl:   {wk}")
+        print(f"  Scene tmpl:   {sk}")
     print(f"  Aspect:       {aspect_type}")
     print(f"  Mode:         {mode}")
     print(f"  Variants:     {len(pack.image_prompts)}")
@@ -91,11 +106,29 @@ def main() -> int:
         dest="skin_b",
         help="Optional character skin key for planet-b (v0: Mars, Jupiter, Saturn)",
     )
+    ap.add_argument(
+        "--world-template",
+        default=None,
+        dest="world_template",
+        help="Catstyle world template key v1 (defaults internally when premium art-direction is on).",
+    )
+    ap.add_argument(
+        "--scene-template",
+        default=None,
+        dest="scene_template",
+        help="Catstyle scene template key v1 (optional explicit hero beat).",
+    )
     ap.add_argument("--output", type=Path, default=None, help="Write JSON artifact to this path")
     args = ap.parse_args()
 
     skin_a = str(args.skin_a).strip() if args.skin_a else None
     skin_b = str(args.skin_b).strip() if args.skin_b else None
+    world_template = str(args.world_template).strip() if args.world_template else None
+    scene_template = str(args.scene_template).strip() if args.scene_template else None
+    if world_template == "":
+        world_template = None
+    if scene_template == "":
+        scene_template = None
 
     try:
         pa = normalize_planet_name(args.planet_a)
@@ -108,6 +141,8 @@ def main() -> int:
             variants_count=args.variants_count,
             skin_a=skin_a,
             skin_b=skin_b,
+            world_template_key=world_template,
+            scene_template_key=scene_template,
         )
         pack = generate_catstyle_prompt_pack(req)
     except ValueError as e:
@@ -127,6 +162,8 @@ def main() -> int:
             pack=pack,
             skin_a=skin_a,
             skin_b=skin_b,
+            world_template_key=world_template,
+            scene_template_key=scene_template,
         )
         out_path.write_text(json.dumps(blob, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         print(f"Wrote artifact: {out_path}")

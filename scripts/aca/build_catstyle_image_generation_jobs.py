@@ -53,6 +53,18 @@ def main() -> int:
     )
     ap.add_argument("--skin-a", default=None, dest="skin_a")
     ap.add_argument("--skin-b", default=None, dest="skin_b")
+    ap.add_argument(
+        "--world-template",
+        default=None,
+        dest="world_template",
+        help="Optional Catstyle world template key v1 passed into daily pack prompts.",
+    )
+    ap.add_argument(
+        "--scene-template",
+        default=None,
+        dest="scene_template",
+        help="Optional Catstyle scene template key v1 passed into daily pack prompts.",
+    )
     args = ap.parse_args()
 
     try:
@@ -74,6 +86,8 @@ def main() -> int:
             output_dir=out_dir,
             skin_a=args.skin_a,
             skin_b=args.skin_b,
+            world_template_key=args.world_template,
+            scene_template_key=args.scene_template,
         )
     except ValueError as e:
         print(str(e), file=sys.stderr)

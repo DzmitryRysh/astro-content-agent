@@ -44,6 +44,22 @@ class CatstyleImageGenJob(BaseModel):
         default=None,
         description="Copied from prompt pack art_direction_profile when premium enrichment was applied.",
     )
+    world_template_key: str | None = Field(
+        default=None,
+        description="From prompt pack world_template_profile.template_key when present.",
+    )
+    scene_template_key: str | None = Field(
+        default=None,
+        description="From prompt pack scene_template_profile.template_key when present.",
+    )
+    world_template_profile: dict[str, Any] | None = Field(
+        default=None,
+        description="Copied serialized CatstyleWorldTemplate when applied to the prompt pack.",
+    )
+    scene_template_profile: dict[str, Any] | None = Field(
+        default=None,
+        description="Copied serialized CatstyleSceneTemplate when applied to the prompt pack.",
+    )
 
 
 class CatstyleImageGenerationJobsResult(BaseModel):
@@ -116,6 +132,8 @@ def build_catstyle_image_generation_jobs(
     output_dir: Path | None = None,
     skin_a: str | None = None,
     skin_b: str | None = None,
+    world_template_key: str | None = None,
+    scene_template_key: str | None = None,
     *,
     compute_positions_fn: Callable[..., dict[str, PlanetPosition]] | None = None,
     orb_config: dict[str, tuple[float, float]] | None = None,
@@ -132,6 +150,13 @@ def build_catstyle_image_generation_jobs(
     if skin_b_c == "":
         skin_b_c = None
 
+    world_k = str(world_template_key).strip() if world_template_key else None
+    scene_k = str(scene_template_key).strip() if scene_template_key else None
+    if world_k == "":
+        world_k = None
+    if scene_k == "":
+        scene_k = None
+
     pack = generate_catstyle_daily_pack(
         day,
         top=top,
@@ -140,6 +165,8 @@ def build_catstyle_image_generation_jobs(
         editorial_profile=editorial_profile,
         skin_a=skin_a_c,
         skin_b=skin_b_c,
+        world_template_key=world_k,
+        scene_template_key=scene_k,
         compute_positions_fn=compute_positions_fn,
         orb_config=orb_config,
     )
@@ -167,6 +194,18 @@ def build_catstyle_image_generation_jobs(
     carousel = str(pp.get("carousel_idea", ""))
     art_meta = pp.get("art_direction_profile")
     art_direction_profile = art_meta if isinstance(art_meta, dict) else None
+
+    w_prof = pp.get("world_template_profile")
+    world_template_profile = w_prof if isinstance(w_prof, dict) else None
+    world_template_key = (
+        str(world_template_profile["template_key"]) if world_template_profile and "template_key" in world_template_profile else None
+    )
+
+    s_prof = pp.get("scene_template_profile")
+    scene_template_profile = s_prof if isinstance(s_prof, dict) else None
+    scene_template_key = (
+        str(scene_template_profile["template_key"]) if scene_template_profile and "template_key" in scene_template_profile else None
+    )
 
     vpp = max(1, int(variants_per_prompt))
     pa = str(primary["planet_a"])
@@ -221,6 +260,10 @@ def build_catstyle_image_generation_jobs(
                     suggested_output_name=suggested,
                     status="pending",
                     art_direction_profile=art_direction_profile,
+                    world_template_key=world_template_key,
+                    scene_template_key=scene_template_key,
+                    world_template_profile=world_template_profile,
+                    scene_template_profile=scene_template_profile,
                 )
             )
 

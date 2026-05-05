@@ -28,6 +28,8 @@ def generate_catstyle_daily_pack(
     editorial_profile: str = EDITORIAL_PROFILE_DEFAULT,
     skin_a: str | None = None,
     skin_b: str | None = None,
+    world_template_key: str | None = None,
+    scene_template_key: str | None = None,
     *,
     compute_positions_fn: Callable[..., dict[str, PlanetPosition]] | None = None,
     orb_config: dict[str, tuple[float, float]] | None = None,
@@ -38,6 +40,7 @@ def generate_catstyle_daily_pack(
     for each selected row using ``mode_recommendation``.
 
     Optional ``skin_a`` / ``skin_b`` are passed through to ``CatstylePromptRequest`` (character_skins v0).
+    Optional ``world_template_key`` / ``scene_template_key`` map to world/scene templates v1 when set.
     """
     skin_a_c = str(skin_a).strip() if skin_a else None
     skin_b_c = str(skin_b).strip() if skin_b else None
@@ -45,6 +48,13 @@ def generate_catstyle_daily_pack(
         skin_a_c = None
     if skin_b_c == "":
         skin_b_c = None
+
+    world_k = str(world_template_key).strip() if world_template_key else None
+    scene_k = str(scene_template_key).strip() if scene_template_key else None
+    if world_k == "":
+        world_k = None
+    if scene_k == "":
+        scene_k = None
 
     mode = str(scan_mode).strip().lower()
     if mode not in ("noon", "day-window"):
@@ -88,6 +98,8 @@ def generate_catstyle_daily_pack(
             skin_a=skin_a_c,
             skin_b=skin_b_c,
             editorial_profile=profile,
+            world_template_key=world_k,
+            scene_template_key=scene_k,
         )
         pack = generate_catstyle_prompt_pack(req)
         sel_dicts.append(candidate_to_editorial_dict(c, profile))
