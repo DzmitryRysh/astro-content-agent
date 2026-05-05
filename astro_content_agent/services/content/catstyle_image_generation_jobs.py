@@ -40,6 +40,10 @@ class CatstyleImageGenJob(BaseModel):
     carousel_idea: str
     suggested_output_name: str
     status: Literal["pending"] = "pending"
+    art_direction_profile: dict[str, Any] | None = Field(
+        default=None,
+        description="Copied from prompt pack art_direction_profile when premium enrichment was applied.",
+    )
 
 
 class CatstyleImageGenerationJobsResult(BaseModel):
@@ -161,6 +165,8 @@ def build_catstyle_image_generation_jobs(
     neg = str(pp.get("negative_prompt", ""))
     anim = str(pp.get("animation_prompt", ""))
     carousel = str(pp.get("carousel_idea", ""))
+    art_meta = pp.get("art_direction_profile")
+    art_direction_profile = art_meta if isinstance(art_meta, dict) else None
 
     vpp = max(1, int(variants_per_prompt))
     pa = str(primary["planet_a"])
@@ -214,6 +220,7 @@ def build_catstyle_image_generation_jobs(
                     carousel_idea=carousel,
                     suggested_output_name=suggested,
                     status="pending",
+                    art_direction_profile=art_direction_profile,
                 )
             )
 

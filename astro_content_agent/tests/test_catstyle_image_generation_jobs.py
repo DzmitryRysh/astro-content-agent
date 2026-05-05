@@ -51,6 +51,16 @@ def _fake_pack_one_primary() -> CatstyleDailyPackResult:
                 "animation_prompt": "anim body",
                 "negative_prompt": "neg body",
                 "carousel_idea": "carousel body",
+                "art_direction_profile": {
+                    "version": "catstyle-art-direction-v0",
+                    "energy": "charged",
+                    "editorial_profile": "charged",
+                    "mode": "tension",
+                    "planet_a": "Jupiter",
+                    "planet_b": "Mars",
+                    "skin_a": None,
+                    "skin_b": None,
+                },
             }
         ],
     )
@@ -89,6 +99,8 @@ def test_build_jobs_four_prompts_all_pending(tmp_path: Path) -> None:
     assert r.jobs[0].negative_prompt == "neg body"
     assert r.jobs[0].animation_prompt == "anim body"
     assert r.jobs[0].carousel_idea == "carousel body"
+    assert r.jobs[0].art_direction_profile is not None
+    assert r.jobs[0].art_direction_profile.get("energy") == "charged"
     assert r.jobs[0].selection_score == 43
     assert r.jobs[0].orb == pytest.approx(1.2)
     assert r.jobs[0].job_id == "catstyle-2026-05-02-001"

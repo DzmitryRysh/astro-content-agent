@@ -4,6 +4,10 @@ from __future__ import annotations
 from astro_content_agent.content.catstyle.aspect_library_v0 import ASPECT_CAT_INTERACTIONS, get_aspect_interaction
 from astro_content_agent.content.catstyle.character_skins_v0 import get_character_skin
 from astro_content_agent.content.catstyle.models import CatstylePromptPack, CatstylePromptRequest, PlanetCatProfile
+from astro_content_agent.services.content.catstyle_art_direction import (
+    apply_art_direction_to_prompt_pack,
+    build_catstyle_art_direction_profile,
+)
 from astro_content_agent.content.catstyle.planet_bible_v0 import PLANET_CAT_PROFILES
 from astro_content_agent.content.catstyle.transit_pair_seed_v0 import (
     CatstyleTransitPairSeed,
@@ -314,24 +318,55 @@ def generate_catstyle_prompt_pack(req: CatstylePromptRequest) -> CatstylePromptP
 
     aspect_ix = get_aspect_interaction(pa, pb)
     if aspect_ix is not None:
-        return _pack_from_deep(
+        pack = _pack_from_deep(
             pa, pb, req, prof_a=prof_a, prof_b=prof_b, aspect_ix=aspect_ix, skin_a=skin_a, skin_b=skin_b
         )
+    else:
+        oriented = orient_outer_personal(pa, pb)
+        if oriented is None:
+            raise ValueError(
+                f"No Catstyle content for {pa} + {pb}: not a social/outer-to-personal transit pair. {_supported_pairs_hint()}"
+            )
 
-    oriented = orient_outer_personal(pa, pb)
-    if oriented is None:
-        raise ValueError(
-            f"No Catstyle content for {pa} + {pb}: not a social/outer-to-personal transit pair. {_supported_pairs_hint()}"
-        )
+        outer, personal = oriented
+        seed = get_transit_pair_seed(outer, personal)
+        if seed is not None:
+            pack = _pack_from_seed(pa, pb, req, prof_a=prof_a, prof_b=prof_b, seed=seed, skin_a=skin_a, skin_b=skin_b)
+        else:
+            pack = _pack_from_fallback(
+                pa,
+                pb,
+                req,
+                prof_a=prof_a,
+                prof_b=prof_b,
+                outer=outer,
+                personal=personal,
+                skin_a=skin_a,
+                skin_b=skin_b,
+            )
 
-    outer, personal = oriented
-    seed = get_transit_pair_seed(outer, personal)
-    if seed is not None:
-        return _pack_from_seed(pa, pb, req, prof_a=prof_a, prof_b=prof_b, seed=seed, skin_a=skin_a, skin_b=skin_b)
+    return _finalize_pack_with_art_direction(pack, req, pa, pb, skin_a, skin_b)
 
-    return _pack_from_fallback(
-        pa, pb, req, prof_a=prof_a, prof_b=prof_b, outer=outer, personal=personal, skin_a=skin_a, skin_b=skin_b
+
+def _finalize_pack_with_art_direction(
+    pack: CatstylePromptPack,
+    req: CatstylePromptRequest,
+    pa: str,
+    pb: str,
+    skin_a: str | None,
+    skin_b: str | None,
+) -> CatstylePromptPack:
+    if not req.premium_art_direction:
+        return pack
+    art_profile = build_catstyle_art_direction_profile(
+        editorial_profile=req.editorial_profile,
+        mode=req.mode,
+        planet_a=pa,
+        planet_b=pb,
+        skin_a=skin_a,
+        skin_b=skin_b,
     )
+    return apply_art_direction_to_prompt_pack(pack, art_profile)
 
 
 __all__ = [
