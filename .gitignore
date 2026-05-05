@@ -24,3 +24,8 @@ catstyle_prompt_exports/
 # Catstyle image job manifests (local working artifacts)
 catstyle_image_jobs/
 catstyle_generation_jobs/
+
+# Catstyle stub executor / mock image outputs (not source code)
+generated_stub/
+catstyle_image_outputs/
+catstyle_generated_images/
