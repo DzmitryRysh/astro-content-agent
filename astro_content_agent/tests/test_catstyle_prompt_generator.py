@@ -431,7 +431,7 @@ def test_prompt_pack_includes_spartan_skin_on_mars() -> None:
     assert "spartan king" in blob
     assert "spear" in blob or "shield" in blob
     assert "mars planet-cat [canon v1 base]" in blob
-    assert "bandana" in blob
+    assert "shield" in blob or "spear" in blob or "cliff" in blob
     assert "archetype overlays" in pack.animation_prompt.lower()
     assert "mars in spartan king skin" in pack.animation_prompt.lower()
 
@@ -483,4 +483,130 @@ def test_jupiter_philosopher_skin_on_planet_a() -> None:
     blob = pack.image_prompts[0].lower()
     assert "philosopher mentor" in blob
     assert "scroll" in blob or "robe" in blob
+
+
+def test_default_premium_injects_world_template_block() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Jupiter",
+            planet_b="Mars",
+            aspect_type="square",
+            mode="tension",
+            premium_art_direction=True,
+        )
+    )
+    low = pack.image_prompts[0].lower()
+    assert "[world template v1 - high-priority setting direction]" in low
+    assert pack.world_template_profile is not None
+    assert pack.world_template_profile["template_key"] == "cosmic_zodiac_arena"
+
+
+def test_premium_off_skips_default_world_shell() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Jupiter",
+            planet_b="Mars",
+            aspect_type="square",
+            mode="tension",
+            premium_art_direction=False,
+        )
+    )
+    low = pack.image_prompts[0].lower()
+    assert "[world template v1" not in low
+    assert pack.world_template_profile is None
+
+
+def test_explicit_world_and_scene_blocks_in_prompt() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Jupiter",
+            planet_b="Mars",
+            aspect_type="square",
+            mode="tension",
+            world_template_key="cosmic_zodiac_arena",
+            scene_template_key="mars_spartan_cliff_kick",
+            skin_b="spartan_king",
+        )
+    )
+    raw = pack.image_prompts[0].lower()
+    assert "[world template v1 - high-priority setting direction]" in raw
+    assert "[scene template v1 - high-priority frame direction]" in raw
+    assert "[canon v1 base]" in raw
+    assert "[identity markers v1]" in raw
+    assert "cliff" in raw or "kick" in raw
+    assert "shield" in raw and "spear" in raw
+    assert "mars glyph" in raw
+    assert pack.scene_template_profile is not None
+    assert pack.scene_template_profile["template_key"] == "mars_spartan_cliff_kick"
+
+
+def test_venus_wind_grate_scene_prompt_lines() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Uranus",
+            planet_b="Venus",
+            aspect_type="square",
+            mode="tension",
+            world_template_key="cosmic_zodiac_arena",
+            scene_template_key="venus_marilyn_wind_grate",
+        )
+    )
+    raw = pack.image_prompts[0].lower()
+    assert "[scene template v1 - high-priority frame direction]" in raw
+    assert "grate" in raw
+    assert "skirt" in raw or "dress" in raw
+    assert "venus glyph" in raw
+
+
+def test_invalid_world_template_raises() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    with pytest.raises(ValueError, match="Unknown Catstyle world template"):
+        generate_catstyle_prompt_pack(
+            CatstylePromptRequest(
+                planet_a="Jupiter",
+                planet_b="Mars",
+                aspect_type="square",
+                mode="tension",
+                world_template_key="bad_world",
+            )
+        )
+
+
+def test_invalid_scene_template_raises() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    with pytest.raises(ValueError, match="Unknown Catstyle scene template"):
+        generate_catstyle_prompt_pack(
+            CatstylePromptRequest(
+                planet_a="Jupiter",
+                planet_b="Mars",
+                aspect_type="square",
+                mode="tension",
+                scene_template_key="nope_scene",
+            )
+        )
+
+
+def test_incompatible_scene_template_raises() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    with pytest.raises(ValueError, match="incompatible"):
+        generate_catstyle_prompt_pack(
+            CatstylePromptRequest(
+                planet_a="Jupiter",
+                planet_b="Mars",
+                aspect_type="square",
+                mode="tension",
+                scene_template_key="venus_marilyn_wind_grate",
+            )
+        )
 

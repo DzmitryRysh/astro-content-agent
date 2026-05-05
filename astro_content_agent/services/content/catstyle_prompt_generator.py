@@ -12,9 +12,19 @@ from astro_content_agent.content.catstyle.planet_identity_markers_v1 import (
     format_identity_markers_prompt_block,
     get_planet_identity_marker_profile,
 )
+from astro_content_agent.content.catstyle.scene_templates_v1 import (
+    format_scene_template_prompt_block,
+    validate_explicit_scene_template,
+)
+from astro_content_agent.content.catstyle.world_templates_v1 import (
+    DEFAULT_WORLD_TEMPLATE_KEY,
+    format_world_template_prompt_block,
+    get_world_template,
+)
 from astro_content_agent.services.content.catstyle_art_direction import (
     apply_art_direction_to_prompt_pack,
     build_catstyle_art_direction_profile,
+    resolve_art_energy,
 )
 from astro_content_agent.content.catstyle.transit_pair_seed_v0 import (
     CatstyleTransitPairSeed,
@@ -39,6 +49,57 @@ def _strip_optional_skin(raw: str | None) -> str | None:
         return None
     s = str(raw).strip()
     return s or None
+
+
+def _strip_optional_str(raw: str | None) -> str | None:
+    if raw is None:
+        return None
+    s = str(raw).strip()
+    return s or None
+
+
+def _join_world_scene_middle(world_block: str, scene_block: str) -> str:
+    parts = [p.strip() for p in (world_block, scene_block) if p and str(p).strip()]
+    if not parts:
+        return ""
+    return " ".join(parts) + " "
+
+
+def _resolve_world_scene_blocks(
+    req: CatstylePromptRequest, pa: str, pb: str
+) -> tuple[str, str, dict | None, dict | None]:
+    scene_energy = resolve_art_energy(req.editorial_profile, req.mode)
+    raw_w = _strip_optional_str(req.world_template_key)
+    wt = None
+    if raw_w:
+        wt = get_world_template(raw_w)
+    elif req.premium_art_direction:
+        wt = get_world_template(DEFAULT_WORLD_TEMPLATE_KEY)
+
+    world_block = format_world_template_prompt_block(wt, scene_energy=scene_energy) if wt else ""
+    world_prof = wt.model_dump(mode="json") if wt else None
+
+    raw_s = _strip_optional_str(req.scene_template_key)
+    scene_block = ""
+    scene_prof = None
+    if raw_s:
+        st = validate_explicit_scene_template(raw_s, pa, pb, req.aspect_type)
+        scene_block = format_scene_template_prompt_block(st)
+        scene_prof = st.model_dump(mode="json")
+
+    return world_block, scene_block, world_prof, scene_prof
+
+
+def _attach_template_profiles(
+    pack: CatstylePromptPack,
+    *,
+    world_template_profile: dict | None,
+    scene_template_profile: dict | None,
+) -> CatstylePromptPack:
+    data = pack.model_dump(mode="json")
+    data["world_template_profile"] = world_template_profile
+    data["scene_template_profile"] = scene_template_profile
+    return CatstylePromptPack.model_validate(data)
 
 
 def _validate_skins_for_pair(pa: str, pb: str, skin_a: str | None, skin_b: str | None) -> None:
@@ -119,6 +180,7 @@ def _pack_from_deep(
     aspect_ix,
     skin_a: str | None,
     skin_b: str | None,
+    template_middle: str = "",
 ) -> CatstylePromptPack:
     tension_scenes = list(aspect_ix.scene_ideas)
     comp_scenes = list(aspect_ix.compensation_scene_ideas)
@@ -144,6 +206,7 @@ def _pack_from_deep(
             f"Aspect type: {req.aspect_type}. "
             f"{line_a} "
             f"{line_b} "
+            f"{template_middle}"
             f"Scene beat: {base_scene} "
             f"Story tension (cartoon metaphor): {aspect_ix.core_tension} "
             f"Constructive undertone available: {aspect_ix.constructive_channel}"
@@ -188,6 +251,7 @@ def _pack_from_seed(
     seed: CatstyleTransitPairSeed,
     skin_a: str | None,
     skin_b: str | None,
+    template_middle: str = "",
 ) -> CatstylePromptPack:
     tension_scenes = list(seed.suggested_scene_angles)
     comp_scenes = [seed.constructive_channel, seed.visual_metaphor]
@@ -213,6 +277,7 @@ def _pack_from_seed(
             f"Aspect type: {req.aspect_type}. "
             f"{line_a} "
             f"{line_b} "
+            f"{template_middle}"
             f"Scene beat: {base_scene} "
             f"Story tension (cartoon metaphor): {seed.core_tension} "
             f"Constructive undertone available: {seed.constructive_channel} "
@@ -259,6 +324,7 @@ def _pack_from_fallback(
     personal: str,
     skin_a: str | None,
     skin_b: str | None,
+    template_middle: str = "",
 ) -> CatstylePromptPack:
     core = f"{outer} social rhythm meets {personal} everyday stakes—generic transit beat v0 (seed TBD)."
     constructive = f"Shared constructive beat: {outer} and {personal} negotiate one clear cartoon gesture."
@@ -293,6 +359,7 @@ def _pack_from_fallback(
             f"Aspect type: {req.aspect_type}. "
             f"{line_a} "
             f"{line_b} "
+            f"{template_middle}"
             f"Scene beat: {base_scene} "
             f"Story tension (cartoon metaphor): {core} "
             f"Constructive undertone available: {constructive}"
@@ -336,10 +403,21 @@ def generate_catstyle_prompt_pack(req: CatstylePromptRequest) -> CatstylePromptP
     skin_b = _strip_optional_skin(req.skin_b)
     _validate_skins_for_pair(pa, pb, skin_a, skin_b)
 
+    world_block, scene_block, world_prof, scene_prof = _resolve_world_scene_blocks(req, pa, pb)
+    template_middle = _join_world_scene_middle(world_block, scene_block)
+
     aspect_ix = get_aspect_interaction(pa, pb)
     if aspect_ix is not None:
         pack = _pack_from_deep(
-            pa, pb, req, canon_a=canon_a, canon_b=canon_b, aspect_ix=aspect_ix, skin_a=skin_a, skin_b=skin_b
+            pa,
+            pb,
+            req,
+            canon_a=canon_a,
+            canon_b=canon_b,
+            aspect_ix=aspect_ix,
+            skin_a=skin_a,
+            skin_b=skin_b,
+            template_middle=template_middle,
         )
     else:
         oriented = orient_outer_personal(pa, pb)
@@ -351,7 +429,17 @@ def generate_catstyle_prompt_pack(req: CatstylePromptRequest) -> CatstylePromptP
         outer, personal = oriented
         seed = get_transit_pair_seed(outer, personal)
         if seed is not None:
-            pack = _pack_from_seed(pa, pb, req, canon_a=canon_a, canon_b=canon_b, seed=seed, skin_a=skin_a, skin_b=skin_b)
+            pack = _pack_from_seed(
+                pa,
+                pb,
+                req,
+                canon_a=canon_a,
+                canon_b=canon_b,
+                seed=seed,
+                skin_a=skin_a,
+                skin_b=skin_b,
+                template_middle=template_middle,
+            )
         else:
             pack = _pack_from_fallback(
                 pa,
@@ -363,8 +451,10 @@ def generate_catstyle_prompt_pack(req: CatstylePromptRequest) -> CatstylePromptP
                 personal=personal,
                 skin_a=skin_a,
                 skin_b=skin_b,
+                template_middle=template_middle,
             )
 
+    pack = _attach_template_profiles(pack, world_template_profile=world_prof, scene_template_profile=scene_prof)
     return _finalize_pack_with_art_direction(pack, req, pa, pb, skin_a, skin_b)
 
 

@@ -153,8 +153,26 @@ def skin_emphasis_block(
     return " ".join(lines)
 
 
-def compose_premium_catstyle_prompt(base_image_prompt: str, profile: CatstyleArtDirectionProfile) -> str:
+def compose_premium_catstyle_prompt(
+    base_image_prompt: str,
+    profile: CatstyleArtDirectionProfile,
+    *,
+    world_template_profile: dict | None = None,
+    scene_template_profile: dict | None = None,
+) -> str:
+    locked: list[str] = []
+    if world_template_profile:
+        locked.append(
+            "Honor locked world shell from world_template_profile: keep the arena disc, perimeter zodiac ring, "
+            "and cosmic void staging readable - do not relocate to unrelated biomes."
+        )
+    if scene_template_profile:
+        locked.append(
+            "Honor locked scene_template_profile beat: amplify the stated action, camera angle, and props - "
+            "do not substitute a generic tableau."
+        )
     chunks = [
+        *locked,
         composition_line(),
         scene_intensity_line(profile.energy),
         visual_gag_line(profile.energy),
@@ -237,11 +255,21 @@ def enrich_carousel_idea(base_carousel: str, profile: CatstyleArtDirectionProfil
 def apply_art_direction_to_prompt_pack(pack: CatstylePromptPack, profile: CatstyleArtDirectionProfile) -> CatstylePromptPack:
     meta = profile.to_metadata_dict()
     return CatstylePromptPack(
-        image_prompts=[compose_premium_catstyle_prompt(p, profile) for p in pack.image_prompts],
+        image_prompts=[
+            compose_premium_catstyle_prompt(
+                p,
+                profile,
+                world_template_profile=pack.world_template_profile,
+                scene_template_profile=pack.scene_template_profile,
+            )
+            for p in pack.image_prompts
+        ],
         animation_prompt=enrich_animation_prompt(pack.animation_prompt, profile),
         negative_prompt=strengthen_negative_prompt(pack.negative_prompt, profile),
         carousel_idea=enrich_carousel_idea(pack.carousel_idea, profile),
         art_direction_profile=meta,
+        world_template_profile=pack.world_template_profile,
+        scene_template_profile=pack.scene_template_profile,
     )
 
 

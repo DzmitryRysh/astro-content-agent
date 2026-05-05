@@ -61,6 +61,8 @@ def _fake_pack_one_primary() -> CatstyleDailyPackResult:
                     "skin_a": None,
                     "skin_b": None,
                 },
+                "world_template_profile": {"template_key": "cosmic_zodiac_arena", "display_name": "Cosmic Zodiac Arena"},
+                "scene_template_profile": {"template_key": "mars_spartan_cliff_kick", "display_name": "Kick"},
             }
         ],
     )
@@ -101,6 +103,10 @@ def test_build_jobs_four_prompts_all_pending(tmp_path: Path) -> None:
     assert r.jobs[0].carousel_idea == "carousel body"
     assert r.jobs[0].art_direction_profile is not None
     assert r.jobs[0].art_direction_profile.get("energy") == "charged"
+    assert r.jobs[0].world_template_key == "cosmic_zodiac_arena"
+    assert r.jobs[0].scene_template_key == "mars_spartan_cliff_kick"
+    assert r.jobs[0].world_template_profile is not None
+    assert r.jobs[0].scene_template_profile is not None
     assert r.jobs[0].selection_score == 43
     assert r.jobs[0].orb == pytest.approx(1.2)
     assert r.jobs[0].job_id == "catstyle-2026-05-02-001"

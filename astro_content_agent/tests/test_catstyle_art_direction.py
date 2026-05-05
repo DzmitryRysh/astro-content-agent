@@ -113,9 +113,35 @@ def test_apply_pack_sets_art_direction_metadata() -> None:
         animation_prompt="anim",
         negative_prompt="neg",
         carousel_idea="car",
+        world_template_profile={"template_key": "cosmic_zodiac_arena"},
+        scene_template_profile={"template_key": "mars_spartan_cliff_kick"},
     )
     enriched = apply_art_direction_to_prompt_pack(base, prof)
     assert enriched.art_direction_profile is not None
     assert enriched.art_direction_profile["version"] == "catstyle-art-direction-v0"
     assert enriched.art_direction_profile["energy"] == "charged"
     assert "Premium comic direction" in enriched.image_prompts[0]
+    assert enriched.world_template_profile == base.world_template_profile
+    assert enriched.scene_template_profile == base.scene_template_profile
+    low = enriched.image_prompts[0].lower()
+    assert "honor locked world shell" in low
+    assert "honor locked scene_template_profile beat" in low
+
+
+def test_compose_premium_respects_template_profiles_optional() -> None:
+    prof = build_catstyle_art_direction_profile(
+        editorial_profile="charged",
+        mode="tension",
+        planet_a="Jupiter",
+        planet_b="Mars",
+        skin_a=None,
+        skin_b=None,
+    )
+    out = compose_premium_catstyle_prompt(
+        "BASE.",
+        prof,
+        world_template_profile={"template_key": "cosmic_zodiac_arena"},
+        scene_template_profile={"template_key": "mars_spartan_cliff_kick"},
+    ).lower()
+    assert "honor locked world shell" in out
+    assert "honor locked scene_template_profile beat" in out

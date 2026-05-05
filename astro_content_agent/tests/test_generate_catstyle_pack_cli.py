@@ -179,6 +179,80 @@ def test_cli_rejects_invalid_skin(catstyle_cli, capsys: pytest.CaptureFixture[st
     assert "No character skin" in err or "skin" in err.lower()
 
 
+def test_cli_accepts_world_and_scene_templates(catstyle_cli, capsys: pytest.CaptureFixture[str]) -> None:
+    old = sys.argv[:]
+    try:
+        sys.argv = [
+            "generate_catstyle_pack.py",
+            "--planet-a",
+            "Jupiter",
+            "--planet-b",
+            "Mars",
+            "--aspect-type",
+            "square",
+            "--mode",
+            "tension",
+            "--variants-count",
+            "1",
+            "--skin-b",
+            "spartan_king",
+            "--world-template",
+            "cosmic_zodiac_arena",
+            "--scene-template",
+            "mars_spartan_cliff_kick",
+        ]
+        assert catstyle_cli.main() == 0
+    finally:
+        sys.argv = old
+    out = capsys.readouterr().out.lower()
+    assert "[world template v1" in out
+    assert "[scene template v1" in out
+
+
+def test_cli_rejects_invalid_world_template(catstyle_cli, capsys: pytest.CaptureFixture[str]) -> None:
+    old = sys.argv[:]
+    try:
+        sys.argv = [
+            "generate_catstyle_pack.py",
+            "--planet-a",
+            "Jupiter",
+            "--planet-b",
+            "Mars",
+            "--aspect-type",
+            "square",
+            "--mode",
+            "tension",
+            "--world-template",
+            "not_a_world",
+        ]
+        assert catstyle_cli.main() == 1
+    finally:
+        sys.argv = old
+    assert "Unknown Catstyle world template" in capsys.readouterr().err
+
+
+def test_cli_rejects_invalid_scene_template(catstyle_cli, capsys: pytest.CaptureFixture[str]) -> None:
+    old = sys.argv[:]
+    try:
+        sys.argv = [
+            "generate_catstyle_pack.py",
+            "--planet-a",
+            "Jupiter",
+            "--planet-b",
+            "Mars",
+            "--aspect-type",
+            "square",
+            "--mode",
+            "tension",
+            "--scene-template",
+            "missing_scene",
+        ]
+        assert catstyle_cli.main() == 1
+    finally:
+        sys.argv = old
+    assert "Unknown Catstyle scene template" in capsys.readouterr().err
+
+
 def test_cli_default_variants_count_is_four(catstyle_cli, tmp_path: Path) -> None:
     """Omitting --variants-count uses model default (4)."""
     out_file = tmp_path / "default_variants.json"

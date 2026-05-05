@@ -64,6 +64,67 @@ class AspectCatInteraction(BaseModel):
     avoid_list: list[str]
 
 
+CatstyleTemplateEnergy = Literal["charged", "supportive", "balanced"]
+
+
+class CatstyleWorldTemplate(BaseModel):
+    """Shared universe shell for Catstyle aspect scenes (world templates v1)."""
+
+    template_key: str
+    display_name: str
+    description: str
+    environment_type: str
+    energy_default: CatstyleTemplateEnergy
+    setting_line: str
+    composition_line: str
+    horizon_line: str
+    floor_line: str
+    background_line: str
+    lighting_line: str
+    zodiac_ring_line: str
+    interaction_read_charged: str
+    interaction_read_supportive: str
+    interaction_read_balanced: str
+    optional_variants: list[str] = Field(default_factory=list)
+    avoid: list[str] = Field(default_factory=list)
+    short_prompt_line: str
+
+
+class CatstyleSceneTemplate(BaseModel):
+    """Deterministic hero beat / camera frame layered on world + canon (scene templates v1)."""
+
+    template_key: str
+    display_name: str
+    compatible_planets: list[str] = Field(
+        default_factory=list,
+        description="If non-empty, every listed planet must appear in the pair (unordered).",
+    )
+    compatible_pairs: list[tuple[str, str]] = Field(
+        default_factory=list,
+        description="If non-empty, planet pair must match one tuple (either order).",
+    )
+    compatible_aspects: list[str] | None = Field(
+        default=None,
+        description="If set, aspect_type must match one entry (case-insensitive). None = any aspect.",
+    )
+    compatible_skins: list[str] | None = Field(
+        default=None,
+        description="If set, boosts rank when any applied skin matches (normalized keys). None = skin optional.",
+    )
+    energy: CatstyleTemplateEnergy
+    primary_action: str
+    composition: str
+    camera_angle: str
+    foreground_elements: str
+    background_elements: str
+    emotional_read: str
+    required_markers: list[str] = Field(default_factory=list)
+    optional_props: list[str] = Field(default_factory=list)
+    text_overlay_ideas: list[str] = Field(default_factory=list)
+    avoid: list[str] = Field(default_factory=list)
+    short_prompt_line: str
+
+
 class CatstylePromptRequest(BaseModel):
     planet_a: str
     planet_b: str
@@ -86,6 +147,14 @@ class CatstylePromptRequest(BaseModel):
         default=True,
         description="When True, append deterministic premium comic-direction blocks (no LLM).",
     )
+    world_template_key: str | None = Field(
+        default=None,
+        description="Explicit world template (defaults to cosmic arena when premium_art_direction is True).",
+    )
+    scene_template_key: str | None = Field(
+        default=None,
+        description="Optional scene beat template (identity markers and canon still apply).",
+    )
 
 
 class CatstylePromptPack(BaseModel):
@@ -96,6 +165,14 @@ class CatstylePromptPack(BaseModel):
     art_direction_profile: dict | None = Field(
         default=None,
         description="Metadata from catstyle_art_direction v0 when premium enrichment applied.",
+    )
+    world_template_profile: dict | None = Field(
+        default=None,
+        description="Serialized CatstyleWorldTemplate when a world shell was applied.",
+    )
+    scene_template_profile: dict | None = Field(
+        default=None,
+        description="Serialized CatstyleSceneTemplate when a scene beat was applied.",
     )
 
 
