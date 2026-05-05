@@ -4,9 +4,15 @@ from astro_content_agent.content.catstyle.models import (
     AspectCatInteraction,
     CatstylePromptPack,
     CatstylePromptRequest,
+    PlanetCatCanon,
     PlanetCatProfile,
 )
 from astro_content_agent.content.catstyle.planet_bible_v0 import PLANET_CAT_PROFILES
+from astro_content_agent.content.catstyle.planet_canon_v1 import (
+    PLANET_CAT_CANONS,
+    get_planet_canon,
+    list_planet_canons,
+)
 from astro_content_agent.content.catstyle.aspect_library_v0 import ASPECT_CAT_INTERACTIONS
 
 __all__ = [
@@ -14,6 +20,10 @@ __all__ = [
     "AspectCatInteraction",
     "CatstylePromptPack",
     "CatstylePromptRequest",
+    "PLANET_CAT_CANONS",
     "PLANET_CAT_PROFILES",
+    "PlanetCatCanon",
     "PlanetCatProfile",
+    "get_planet_canon",
+    "list_planet_canons",
 ]

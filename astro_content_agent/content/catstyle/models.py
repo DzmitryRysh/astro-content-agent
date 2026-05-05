@@ -17,6 +17,26 @@ class PlanetCatProfile(BaseModel):
     constructive_expression: str
 
 
+class PlanetCatCanon(BaseModel):
+    """Immutable core visual identity for a round planet-cat (Catstyle canon v1 — prompt layer)."""
+
+    planet_name: str
+    role_archetype: str
+    silhouette_notes: str
+    core_shape_language: str
+    core_palette: str
+    facial_expression_language: str
+    body_language: str
+    signature_props: str
+    signature_details: str
+    emotional_tone: str
+    motion_style: str
+    visual_do: str
+    visual_avoid: str
+    recognizability_rule: str
+    short_prompt_line: str
+
+
 class AspectCatInteraction(BaseModel):
     planet_a: str
     planet_b: str

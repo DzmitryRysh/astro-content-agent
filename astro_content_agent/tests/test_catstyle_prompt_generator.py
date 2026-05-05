@@ -413,7 +413,7 @@ def test_prompt_pack_includes_spartan_skin_on_mars() -> None:
     assert "archetype skin" in blob
     assert "spartan king" in blob
     assert "spear" in blob or "shield" in blob
-    assert "mars planet-cat:" in blob
+    assert "mars planet-cat [canon v1 base]" in blob
     assert "bandana" in blob
     assert "archetype overlays" in pack.animation_prompt.lower()
     assert "mars in spartan king skin" in pack.animation_prompt.lower()
