@@ -200,12 +200,14 @@ class OpenAICatstyleImageProvider:
 
         client = self._effective_client(str(api_key).strip())
         try:
+            # GPT image models (e.g. gpt-image-1): no response_format — base64 is default;
+            # use output_format instead (response_format is invalid for these models).
             resp = client.images.generate(
                 model=model,
                 prompt=prompt,
                 size=size,  # type: ignore[arg-type]
                 n=1,
-                response_format="b64_json",
+                output_format="png",
             )
         except Exception as exc:  # noqa: BLE001 — surface safe summary only
             safe = _sanitize_error_message(str(exc))
