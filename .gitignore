@@ -30,3 +30,6 @@ generated_stub/
 generated_images/
 catstyle_image_outputs/
 catstyle_generated_images/
+
+# Catstyle local post packages (generated review bundles)
+catstyle_post_packages/
