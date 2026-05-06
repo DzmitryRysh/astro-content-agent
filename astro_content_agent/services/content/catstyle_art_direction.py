@@ -78,7 +78,15 @@ def build_catstyle_art_direction_profile(
     )
 
 
-def composition_line() -> str:
+def composition_line(*, render_style_profile_key: str | None = None) -> str:
+    if render_style_profile_key == "premium_comic_poster_v2":
+        return (
+            "Cinematic comic-panel composition with premium battle-poster clarity: heroic silhouette dominance, "
+            "foreground-heavy duel staging with authoritative poses, decisive FG/MG/BG separation and impactful depth—"
+            "reject centered sticker mascots floating on empty flats. Keep backgrounds simplified relative to characters: "
+            "arena + zodiac floor readable and epic, but lower detail density than focal bodies."
+            " Keep each planet's [IDENTITY MARKERS v1] symbol/prop stamps readable at thumbnail scale beside faces/bodies."
+        )
     return (
         "Cinematic comic-panel composition with poster-like clarity: strong silhouette readability, "
         "decisive foreground/background separation, one focal action readable at thumbnail size. "
@@ -159,6 +167,7 @@ def compose_premium_catstyle_prompt(
     *,
     world_template_profile: dict | None = None,
     scene_template_profile: dict | None = None,
+    render_style_profile_key: str | None = None,
 ) -> str:
     locked: list[str] = []
     if world_template_profile:
@@ -171,12 +180,20 @@ def compose_premium_catstyle_prompt(
             "Honor locked scene_template_profile beat: amplify the stated action, camera angle, and props - "
             "do not substitute a generic tableau."
         )
-    chunks = [
-        *locked,
-        composition_line(),
-        scene_intensity_line(profile.energy),
-        visual_gag_line(profile.energy),
-    ]
+    chunks: list[str] = [*locked]
+    if render_style_profile_key == "premium_comic_poster_v2":
+        chunks.append(
+            "Heroic presentation pressure (preserve [CANON v1 base] + [IDENTITY MARKERS v1]): foreground-dominant bodies "
+            "with pose authority and face intensity; stronger silhouette-first comic-cover energy—still unmistakable "
+            "anthropomorphic planet-cats, never generic animals."
+        )
+    chunks.extend(
+        [
+            composition_line(render_style_profile_key=render_style_profile_key),
+            scene_intensity_line(profile.energy),
+            visual_gag_line(profile.energy),
+        ]
+    )
     skin = skin_emphasis_block(profile.planet_a, profile.planet_b, profile.skin_a, profile.skin_b)
     if skin:
         chunks.append(skin)
@@ -184,7 +201,26 @@ def compose_premium_catstyle_prompt(
     return f"{base_image_prompt.strip()}\n\n{_PREMIUM_HEADER} {premium}"
 
 
-def strengthen_negative_prompt(base_negative: str, profile: CatstyleArtDirectionProfile) -> str:
+def strengthen_negative_prompt(
+    base_negative: str,
+    profile: CatstyleArtDirectionProfile,
+    *,
+    render_style_profile_key: str | None = None,
+) -> str:
+    def _split_chunks(text: str) -> list[str]:
+        return [p.strip() for p in (text or "").split(",") if p.strip()]
+
+    def _dedupe_keep_order(parts: list[str]) -> list[str]:
+        seen: set[str] = set()
+        out: list[str] = []
+        for p in parts:
+            k = " ".join(p.lower().split())
+            if k in seen:
+                continue
+            seen.add(k)
+            out.append(p)
+        return out
+
     universal = [
         "bland mascot pose",
         "sticker-like centered character floating in empty space",
@@ -194,6 +230,47 @@ def strengthen_negative_prompt(base_negative: str, profile: CatstyleArtDirection
         "generic nursery-cartoon softness",
         "weak unclear interaction between the two planet-cats",
     ]
+    if render_style_profile_key == "premium_comic_poster_v2":
+        style_compact = [
+            "text / logos / watermarks / captions",
+            "photoreal / hyperreal / CGI / 3D game render finish",
+            "game splash render look",
+            "childish nursery / kawaii / chibi mascot look",
+            "sticker mascot center-float posing",
+            "sticker-like centered character floating in empty space",
+            "flat mascot pose",
+            "bland mascot pose",
+            "flat vector / cheap icon / mobile-game icon look",
+            "crowded background, micro-detail clutter, filigree noise",
+            "microtexture noise and tiny crack clutter",
+            "excess particles clutter",
+            "over-rendered fur strands and material gloss",
+            "cluttered architecture detail spam",
+            "weak bland composition with disconnected characters",
+        ]
+        safety_terms = (
+            "real weapons",
+            "blood",
+            "gore",
+            "toxic machismo",
+            "horror",
+            "fetish",
+            "explicit",
+        )
+        carried_safety = [p for p in _split_chunks(base_negative) if any(t in p.lower() for t in safety_terms)]
+        merged = _dedupe_keep_order(style_compact + carried_safety)
+        return ", ".join(merged)
+    universal.extend(
+            [
+                "childish nursery illustration dominance",
+                "kawaii cute mascot softness overload",
+                "chibi emoji-flat mascot proportions",
+                "flat mobile-game skill icon silhouette",
+                "simplistic educational preschool cartoon",
+                "baby-cartoon oversized infant head proportions",
+                "cheap simplistic sticker-energy posing",
+            ]
+    )
     extra: list[str] = []
     if profile.energy == "charged":
         extra.extend(
@@ -214,7 +291,7 @@ def strengthen_negative_prompt(base_negative: str, profile: CatstyleArtDirection
         extra.append("poster-like energy collapses into flat icon poses")
 
     chunks = [base_negative.strip().rstrip(",").strip(), *universal, *extra]
-    return ", ".join(c for c in chunks if c)
+    return ", ".join(_dedupe_keep_order([c for c in chunks if c]))
 
 
 def enrich_animation_prompt(base_animation: str, profile: CatstyleArtDirectionProfile) -> str:
@@ -252,8 +329,17 @@ def enrich_carousel_idea(base_carousel: str, profile: CatstyleArtDirectionProfil
     return f"{base_carousel.strip()}{tail}"
 
 
+def _render_style_profile_key_from_pack(pack: CatstylePromptPack) -> str | None:
+    rsp = pack.render_style_profile
+    if isinstance(rsp, dict):
+        key = rsp.get("key")
+        return str(key).strip() if key else None
+    return None
+
+
 def apply_art_direction_to_prompt_pack(pack: CatstylePromptPack, profile: CatstyleArtDirectionProfile) -> CatstylePromptPack:
     meta = profile.to_metadata_dict()
+    rk = _render_style_profile_key_from_pack(pack)
     return CatstylePromptPack(
         image_prompts=[
             compose_premium_catstyle_prompt(
@@ -261,16 +347,18 @@ def apply_art_direction_to_prompt_pack(pack: CatstylePromptPack, profile: Catsty
                 profile,
                 world_template_profile=pack.world_template_profile,
                 scene_template_profile=pack.scene_template_profile,
+                render_style_profile_key=rk,
             )
             for p in pack.image_prompts
         ],
         animation_prompt=enrich_animation_prompt(pack.animation_prompt, profile),
-        negative_prompt=strengthen_negative_prompt(pack.negative_prompt, profile),
+        negative_prompt=strengthen_negative_prompt(pack.negative_prompt, profile, render_style_profile_key=rk),
         carousel_idea=enrich_carousel_idea(pack.carousel_idea, profile),
         art_direction_profile=meta,
         world_template_profile=pack.world_template_profile,
         scene_template_profile=pack.scene_template_profile,
         render_style_profile=pack.render_style_profile,
+        image_prompt_shot_roles=pack.image_prompt_shot_roles,
     )
 
 

@@ -70,9 +70,9 @@ def test_prompts_include_planet_names_and_style_constraints() -> None:
     pack = generate_catstyle_prompt_pack(req)
     joined = " ".join(pack.image_prompts).lower()
     assert "mars" in joined and "neptune" in joined
-    assert "thick black outlines" in joined
-    assert "round bodies" in joined
-    assert "dark starry" in joined
+    assert "premium cinematic comic-poster illustration" in joined
+    assert "contour" in joined or "silhouette" in joined
+    assert "rounded comic-body proportions" in joined or "planet-cats" in joined
 
 
 def test_negative_prompt_bans_text_logos_realism_excess_detail() -> None:
@@ -91,6 +91,9 @@ def test_negative_prompt_bans_text_logos_realism_excess_detail() -> None:
     assert "logo" in neg
     assert "photorealistic" in neg or "hyperreal" in neg
     assert "micro-detail" in neg or "filigree" in neg or "crowded" in neg
+    assert "kawaii" in neg or "chibi" in neg
+    assert "sticker" in neg or "flat mascot" in neg
+    assert "childish" in neg or "nursery" in neg
 
 
 def test_pluto_venus_includes_cauldron_and_shadow_control_metaphor_non_explicit() -> None:
@@ -206,7 +209,7 @@ def test_jupiter_mercury_teacher_vs_analyst_theme() -> None:
     assert "jupiter" in blob and "mercury" in blob
     assert "teacher" in blob and "analyst" in blob
     assert "star map" in blob or "star-map" in blob.replace(" ", "")
-    assert "travel" in blob
+    assert "tug-of-war" in blob or "travel" in blob or "adventure" in blob
 
 
 def test_unknown_pair_raises() -> None:
@@ -322,7 +325,7 @@ def test_prompt_pack_without_skins_unchanged_shape() -> None:
         mode="tension",
     )
     pack = generate_catstyle_prompt_pack(req)
-    assert len(pack.image_prompts) == 4
+    assert len(pack.image_prompts) == 2
     joined = " ".join(pack.image_prompts).lower()
     assert "archetype skin" not in joined
 
@@ -611,7 +614,7 @@ def test_incompatible_scene_template_raises() -> None:
         )
 
 
-def test_default_render_style_is_premium_poster() -> None:
+def test_default_render_style_is_premium_poster_v2() -> None:
     from astro_content_agent.content.catstyle.models import CatstylePromptRequest
 
     req = CatstylePromptRequest(
@@ -621,7 +624,7 @@ def test_default_render_style_is_premium_poster() -> None:
         mode="tension",
         premium_art_direction=False,
     )
-    assert req.render_style_profile_key == "premium_comic_poster_v1"
+    assert req.render_style_profile_key == "premium_comic_poster_v2"
 
 
 def test_prompt_includes_render_style_block_default_profile() -> None:
@@ -639,7 +642,7 @@ def test_prompt_includes_render_style_block_default_profile() -> None:
     raw = pack.image_prompts[0].lower()
     assert "[render style v1 - high-priority visual finish]" in raw
     assert pack.render_style_profile is not None
-    assert pack.render_style_profile["key"] == "premium_comic_poster_v1"
+    assert pack.render_style_profile["key"] == "premium_comic_poster_v2"
 
 
 def test_premium_render_style_keywords_movie_poster_lighting() -> None:
@@ -725,5 +728,182 @@ def test_prompt_pack_model_dump_includes_render_style_profile() -> None:
     )
     blob = pack.model_dump(mode="json")
     assert blob.get("render_style_profile") is not None
-    assert blob["render_style_profile"]["key"] == "premium_comic_poster_v1"
+    assert blob["render_style_profile"]["key"] == "premium_comic_poster_v2"
+    assert blob.get("image_prompt_shot_roles") == ["hero_poster", "alternate_action_angle"]
+
+
+def test_default_hero_pair_assigns_distinct_shot_roles_and_banners() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Pluto",
+            planet_b="Moon",
+            aspect_type="conjunction",
+            mode="tension",
+        )
+    )
+    assert pack.image_prompt_shot_roles == ["hero_poster", "alternate_action_angle"]
+    low0 = pack.image_prompts[0].lower()
+    low1 = pack.image_prompts[1].lower()
+    assert "[shot role v1 - premium hero framing] hero_poster:" in low0
+    assert "[shot role v1 - premium hero framing] alternate_action_angle:" in low1
+    assert "alternate_action_angle:" not in low0
+
+
+def test_shot_mode_standard_omits_shot_role_labels() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Pluto",
+            planet_b="Moon",
+            aspect_type="conjunction",
+            mode="tension",
+            shot_mode="standard",
+        )
+    )
+    assert pack.image_prompt_shot_roles == [None, None]
+    joined = " ".join(pack.image_prompts).lower()
+    assert "[shot role v1" not in joined
+
+
+def test_premium_render_style_opens_prompt_without_legacy_flat_cartoon_anchor() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Jupiter",
+            planet_b="Mars",
+            aspect_type="square",
+            mode="tension",
+            render_style_profile_key="premium_comic_poster_v1",
+            world_template_key="cosmic_zodiac_arena",
+            scene_template_key="mars_spartan_cliff_kick",
+        )
+    )
+    p0 = pack.image_prompts[0]
+    low = p0.lower()
+    assert low.startswith("premium cinematic comic-poster illustration")
+    assert "simple adult-cartoon" not in low
+    assert "flat colors" not in low[:520]
+    assert "[canon v1 base]" in low
+    assert "[identity markers v1]" in low
+    assert "[world template v1 - high-priority setting direction]" in low
+    assert "[scene template v1 - high-priority frame direction]" in low
+    assert "[render style v1 - high-priority visual finish]" in low
+    assert "[shot role v1 - premium hero framing]" in low
+
+
+def test_clean_cartoon_render_style_opens_with_cartoon_action_language() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Jupiter",
+            planet_b="Mars",
+            aspect_type="square",
+            mode="tension",
+            render_style_profile_key="clean_cartoon_action_v1",
+        )
+    )
+    assert pack.image_prompts[0].lower().startswith("clean premium cartoon-action illustration")
+
+
+def test_negative_prompt_includes_strengthened_anti_childish_flat_guidance() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(planet_a="Moon", planet_b="Uranus", aspect_type="opposition", mode="tension")
+    )
+    neg = pack.negative_prompt.lower()
+    assert "sticker mascot" in neg
+    assert "childish nursery" in neg
+    assert "kawaii" in neg and "chibi" in neg
+    assert "3d game render finish" in neg or "3d cgi" in neg
+    assert "game splash render" in neg
+    assert "microtexture" in neg and "tiny crack" in neg
+
+
+def test_animation_prompt_uses_render_style_opening_not_legacy_style_core() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(planet_a="Pluto", planet_b="Moon", aspect_type="conjunction", mode="tension")
+    )
+    anim = pack.animation_prompt.lower()
+    assert anim.startswith("premium cinematic comic-poster illustration")
+    assert "[style hardlock v2 - premium poster mandate]" in anim
+    assert "simple adult-cartoon" not in anim
+    assert "thick black outlines" not in anim
+
+
+def test_premium_comic_poster_v2_jupiter_mars_charged_arena_scene_hardlock() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Jupiter",
+            planet_b="Mars",
+            aspect_type="square",
+            mode="tension",
+            editorial_profile="charged",
+            world_template_key="cosmic_zodiac_arena",
+            scene_template_key="mars_spartan_cliff_kick",
+            render_style_profile_key="premium_comic_poster_v2",
+            premium_art_direction=False,
+        )
+    )
+    raw = pack.image_prompts[0].lower()
+    assert pack.render_style_profile["key"] == "premium_comic_poster_v2"
+    assert raw.startswith("premium cinematic comic-poster illustration")
+    assert "poster-grade comic splash illustration" in raw
+    assert "high-drama heroic" in raw
+    assert "not photoreal, not 3d cgi, not game splash render" in raw
+    assert "[style hardlock v2 - premium poster mandate]" in raw
+    assert "no dense microtexture layering" in raw
+    assert "less detailed than characters" in raw
+    assert "coliseum" in raw
+    assert "battle" in raw
+    assert "[canon v1 base]" in raw
+    assert "[identity markers v1]" in raw
+    assert "[world template v1" in raw
+    assert "[scene template v1" in raw
+    assert "[render style v1 - high-priority visual finish]" in raw
+
+
+def test_v2_negative_prompt_is_deduped_compact_and_keeps_forbidden_categories() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Jupiter",
+            planet_b="Mars",
+            aspect_type="square",
+            mode="tension",
+            editorial_profile="charged",
+            world_template_key="cosmic_zodiac_arena",
+            scene_template_key="mars_spartan_cliff_kick",
+            render_style_profile_key="premium_comic_poster_v2",
+        )
+    )
+    neg = pack.negative_prompt
+    parts = [p.strip() for p in neg.split(",") if p.strip()]
+    norm = [" ".join(p.lower().split()) for p in parts]
+    assert len(norm) == len(set(norm))
+    assert len(neg) <= 1200
+    low = neg.lower()
+    assert "photoreal" in low
+    assert "cgi" in low
+    assert "game splash render" in low or "game render" in low
+    assert "microtexture" in low
+    assert "tiny crack" in low
+    assert "particles" in low
+    assert "nursery" in low
+    assert "kawaii" in low
+    assert "chibi" in low
+    assert "sticker" in low
+    assert "flat vector" in low
+    assert "architecture" in low
+    assert "weak bland composition" in low
 

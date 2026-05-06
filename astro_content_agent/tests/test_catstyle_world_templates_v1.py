@@ -5,16 +5,29 @@ import pytest
 
 from astro_content_agent.content.catstyle.world_templates_v1 import (
     DEFAULT_WORLD_TEMPLATE_KEY,
+    format_world_template_prompt_block,
     get_world_template,
     list_world_templates,
     normalize_world_template_key,
 )
+from astro_content_agent.services.content.catstyle_art_direction import resolve_art_energy
 
 
 def test_cosmic_zodiac_arena_exists() -> None:
     wt = get_world_template(DEFAULT_WORLD_TEMPLATE_KEY)
     assert wt.template_key == "cosmic_zodiac_arena"
     assert "disc" in wt.setting_line.lower() or "arena" in wt.setting_line.lower()
+    assert "coliseum" in wt.setting_line.lower()
+
+
+def test_cosmic_zodiac_arena_prompt_block_emphasizes_battle_scale() -> None:
+    wt = get_world_template("cosmic_zodiac_arena")
+    block = format_world_template_prompt_block(
+        wt, scene_energy=resolve_art_energy("charged", "tension")
+    ).lower()
+    assert "coliseum" in block
+    assert "battle" in block
+    assert "zodiac" in block
 
 
 def test_lookup_and_list() -> None:

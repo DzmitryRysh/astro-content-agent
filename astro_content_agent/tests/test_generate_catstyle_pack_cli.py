@@ -49,7 +49,7 @@ def test_cli_prints_pluto_venus_pack(catstyle_cli, capsys: pytest.CaptureFixture
     assert "Pluto" in out and "Venus" in out
     assert "conjunction" in out
     assert "Image prompt 1" in out or "--- Image prompt 1 ---" in out
-    assert "thick black outlines" in out.lower()
+    assert "premium cinematic comic-poster illustration" in out.lower()
 
 
 def test_cli_writes_json_when_output_provided(catstyle_cli, tmp_path: Path) -> None:
@@ -79,7 +79,7 @@ def test_cli_writes_json_when_output_provided(catstyle_cli, tmp_path: Path) -> N
     assert data["aspect_type"] == "square"
     assert data["mode"] == "mixed"
     assert isinstance(data["image_prompts"], list)
-    assert len(data["image_prompts"]) == 4
+    assert len(data["image_prompts"]) == 2
     assert "animation_prompt" in data and data["animation_prompt"]
     assert "negative_prompt" in data and data["negative_prompt"]
     assert "carousel_idea" in data and data["carousel_idea"]
@@ -301,8 +301,8 @@ def test_cli_rejects_invalid_render_style_profile(catstyle_cli, capsys: pytest.C
     assert "Unknown Catstyle render style profile" in capsys.readouterr().err
 
 
-def test_cli_default_variants_count_is_four(catstyle_cli, tmp_path: Path) -> None:
-    """Omitting --variants-count uses model default (4)."""
+def test_cli_default_variants_count_is_two(catstyle_cli, tmp_path: Path) -> None:
+    """Omitting --variants-count uses model default (2 hero prompts)."""
     out_file = tmp_path / "default_variants.json"
     old = sys.argv[:]
     try:
@@ -323,4 +323,4 @@ def test_cli_default_variants_count_is_four(catstyle_cli, tmp_path: Path) -> Non
     finally:
         sys.argv = old
     data = json.loads(out_file.read_text(encoding="utf-8"))
-    assert len(data["image_prompts"]) == 4
+    assert len(data["image_prompts"]) == 2

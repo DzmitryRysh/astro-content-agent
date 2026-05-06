@@ -112,9 +112,8 @@ def export_catstyle_image_prompts(
         (out / name).write_text(normalized, encoding="utf-8")
         files_written.append(name)
 
-    for i in range(1, 5):
-        text = image_prompts[i - 1] if i - 1 < len(image_prompts) else ""
-        _write_txt(f"prompt_{i}.txt", text)
+    for i, prompt_text in enumerate(image_prompts, start=1):
+        _write_txt(f"prompt_{i}.txt", prompt_text)
 
     _write_txt("animation_prompt.txt", str(pp.get("animation_prompt", "")))
     _write_txt("negative_prompt.txt", str(pp.get("negative_prompt", "")))

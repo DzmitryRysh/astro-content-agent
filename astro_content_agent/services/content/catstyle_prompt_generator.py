@@ -3,7 +3,16 @@ from __future__ import annotations
 
 from astro_content_agent.content.catstyle.aspect_library_v0 import ASPECT_CAT_INTERACTIONS, get_aspect_interaction
 from astro_content_agent.content.catstyle.character_skins_v0 import get_character_skin
-from astro_content_agent.content.catstyle.models import CatstylePromptPack, CatstylePromptRequest, PlanetCatCanon
+from astro_content_agent.content.catstyle.hero_shots_v1 import (
+    format_hero_shot_prompt_block,
+    shot_roles_for_variant_indices,
+)
+from astro_content_agent.content.catstyle.models import (
+    CatstylePromptPack,
+    CatstylePromptRequest,
+    CatstyleRenderStyleProfile,
+    PlanetCatCanon,
+)
 from astro_content_agent.content.catstyle.planet_canon_v1 import (
     get_planet_canon,
     normalize_planet_name as canon_normalize_planet_name,
@@ -37,18 +46,53 @@ from astro_content_agent.content.catstyle.transit_pair_seed_v0 import (
     orient_outer_personal,
 )
 
-_STYLE_CORE = (
-    "Simple adult-cartoon planet-cats with round bodies, thick black outlines, flat colors, minimal clutter, "
-    "expressive deadpan comic faces, dark starry night sky background, clear physical gesture showing "
-    "interaction between the two planet-cats. No text in image, no logos, no brands, no realistic rendering, "
-    "no anime style, no glossy luxury aesthetic, no excessive jewelry or fine detail clutter."
+_CATSTYLE_SUBJECT_GUARDS = (
+    "Planet-cats keep rounded comic-body proportions with expressive theatrical faces and silhouette-first readability "
+    "at thumbnail scale; follow each character's locked canon and identity-marker blocks below. "
+    "No text in image, no logos, no brands."
 )
 
 _NEGATIVE_BASE_CHUNKS = [
     "text, words, letters, captions, watermarks, logos, trademarks, QR codes",
-    "photorealistic, hyperreal skin, HDR glossy, anime sparkle eyes, luxury product render",
-    "crowded background, micro-details, filigree jewelry, chrome liquid, lens flare spam",
+    "photorealistic, hyperreal skin, photoreal materials, HDR glossy",
+    "3D CGI figurine finish, game splash render look, game-engine shading",
+    "microtexture noise, tiny crack noise, excess particles clutter",
+    "childish nursery style, kawaii, chibi, sticker mascot style",
+    "flat vector icon, mobile-game icon look, simplistic educational cartoon",
+    "cluttered architecture detail spam, busy background clutter, weak bland composition",
+    "disconnected sticker posing, over-rendered fur strands, over-rendered material noise",
 ]
+
+
+def _image_prompt_lead(render_prof: CatstyleRenderStyleProfile) -> str:
+    """Opening sentences: render-profile priority before canon/world/scene (must not contradict premium finish)."""
+    return f"{render_prof.image_prompt_opening_line.strip()} {_CATSTYLE_SUBJECT_GUARDS}".strip()
+
+
+def _image_prompt_opening_prefix(render_prof: CatstyleRenderStyleProfile) -> str:
+    """Opening lead plus optional v2 style-hardlock mandate (deterministic, highest priority before Aspect line)."""
+    base = _image_prompt_lead(render_prof)
+    hb = render_prof.style_hardlock_block
+    if hb and str(hb).strip():
+        return f"{base} [STYLE HARDLOCK v2 - premium poster mandate] {hb.strip()}".strip()
+    return base
+
+
+def _animation_prompt_body(
+    pa: str,
+    pb: str,
+    aspect_type: str,
+    anim_skin: str,
+    render_prof: CatstyleRenderStyleProfile,
+) -> str:
+    """Loop prompt aligned with the same render finish as still frames (no legacy flat-cartoon lead-in)."""
+    prefix = _image_prompt_opening_prefix(render_prof)
+    return (
+        f"{prefix} "
+        f"Loopable 3–5s animation: {pa} and {pb} planet-cats, aspect {aspect_type}; minimal squash-and-stretch "
+        f"preserving silhouette reads; outlines stay crisp at loop resolution; environment honors locked world/scene "
+        f"when applicable (otherwise restrained cosmic void is acceptable); readable comic timing.{anim_skin}"
+    ).strip()
 
 def normalize_planet_name(name: str) -> str:
     """Canonical planet title (delegates to planet canon v1)."""
@@ -230,6 +274,7 @@ def _pack_from_deep(
     aspect_ix,
     skin_a: str | None,
     skin_b: str | None,
+    render_prof: CatstyleRenderStyleProfile,
     template_middle: str = "",
     render_middle: str = "",
     render_negative_additions: list[str] | None = None,
@@ -237,6 +282,7 @@ def _pack_from_deep(
     tension_scenes = list(aspect_ix.scene_ideas)
     comp_scenes = list(aspect_ix.compensation_scene_ideas)
     n = req.variants_count
+    shot_roles = shot_roles_for_variant_indices(n, req.shot_mode)
     line_a = _planet_cat_line(pa, canon_a, skin_a)
     line_b = _planet_cat_line(pb, canon_b, skin_b)
     anim_skin = _skin_animation_suffix(pa, pb, skin_a, skin_b)
@@ -253,24 +299,24 @@ def _pack_from_deep(
             pool = tension_scenes + comp_scenes
             base_scene = pool[i % len(pool)]
 
+        shot_blk = format_hero_shot_prompt_block(shot_roles[i])
+        shot_middle = (shot_blk + " ") if shot_blk else ""
+
         prompt = (
-            f"{_STYLE_CORE} "
+            f"{_image_prompt_opening_prefix(render_prof)} "
             f"Aspect type: {req.aspect_type}. "
             f"{line_a} "
             f"{line_b} "
             f"{template_middle}"
             f"{render_middle}"
+            f"{shot_middle}"
             f"Scene beat: {base_scene} "
             f"Story tension (cartoon metaphor): {aspect_ix.core_tension} "
             f"Constructive undertone available: {aspect_ix.constructive_channel}"
         ).strip()
         image_prompts.append(prompt)
 
-    animation_prompt = (
-        f"Loopable 3–5s animation, same catstyle: {pa} and {pb} planet-cats, aspect {req.aspect_type}, "
-        f"minimal squash-and-stretch on round bodies, thick outlines held crisp at small size, "
-        f"dark starry backdrop, readable silhouettes, comic timing;{anim_skin} {_STYLE_CORE}"
-    ).strip()
+    animation_prompt = _animation_prompt_body(pa, pb, req.aspect_type, anim_skin, render_prof)
 
     rn = list(render_negative_additions or [])
     negative_prompt = _merge_negative_prompt(_NEGATIVE_BASE_CHUNKS, list(aspect_ix.avoid_list) + rn)
@@ -287,6 +333,7 @@ def _pack_from_deep(
         animation_prompt=animation_prompt,
         negative_prompt=negative_prompt,
         carousel_idea=carousel_idea,
+        image_prompt_shot_roles=shot_roles,
     )
 
 
@@ -300,6 +347,7 @@ def _pack_from_seed(
     seed: CatstyleTransitPairSeed,
     skin_a: str | None,
     skin_b: str | None,
+    render_prof: CatstyleRenderStyleProfile,
     template_middle: str = "",
     render_middle: str = "",
     render_negative_additions: list[str] | None = None,
@@ -307,6 +355,7 @@ def _pack_from_seed(
     tension_scenes = list(seed.suggested_scene_angles)
     comp_scenes = [seed.constructive_channel, seed.visual_metaphor]
     n = req.variants_count
+    shot_roles = shot_roles_for_variant_indices(n, req.shot_mode)
     line_a = _planet_cat_line(pa, canon_a, skin_a)
     line_b = _planet_cat_line(pb, canon_b, skin_b)
     anim_skin = _skin_animation_suffix(pa, pb, skin_a, skin_b)
@@ -323,13 +372,17 @@ def _pack_from_seed(
             pool = tension_scenes + comp_scenes
             base_scene = pool[i % len(pool)]
 
+        shot_blk = format_hero_shot_prompt_block(shot_roles[i])
+        shot_middle = (shot_blk + " ") if shot_blk else ""
+
         prompt = (
-            f"{_STYLE_CORE} "
+            f"{_image_prompt_opening_prefix(render_prof)} "
             f"Aspect type: {req.aspect_type}. "
             f"{line_a} "
             f"{line_b} "
             f"{template_middle}"
             f"{render_middle}"
+            f"{shot_middle}"
             f"Scene beat: {base_scene} "
             f"Story tension (cartoon metaphor): {seed.core_tension} "
             f"Constructive undertone available: {seed.constructive_channel} "
@@ -337,11 +390,7 @@ def _pack_from_seed(
         ).strip()
         image_prompts.append(prompt)
 
-    animation_prompt = (
-        f"Loopable 3–5s animation, same catstyle: {pa} and {pb} planet-cats, aspect {req.aspect_type}, "
-        f"minimal squash-and-stretch on round bodies, thick outlines held crisp at small size, "
-        f"dark starry backdrop, readable silhouettes, comic timing;{anim_skin} {_STYLE_CORE}"
-    ).strip()
+    animation_prompt = _animation_prompt_body(pa, pb, req.aspect_type, anim_skin, render_prof)
 
     rn = list(render_negative_additions or [])
     negative_prompt = _merge_negative_prompt(_NEGATIVE_BASE_CHUNKS, list(seed.avoid) + rn)
@@ -358,6 +407,7 @@ def _pack_from_seed(
         animation_prompt=animation_prompt,
         negative_prompt=negative_prompt,
         carousel_idea=carousel_idea,
+        image_prompt_shot_roles=shot_roles,
     )
 
 
@@ -372,6 +422,7 @@ def _pack_from_fallback(
     personal: str,
     skin_a: str | None,
     skin_b: str | None,
+    render_prof: CatstyleRenderStyleProfile,
     template_middle: str = "",
     render_middle: str = "",
     render_negative_additions: list[str] | None = None,
@@ -388,6 +439,7 @@ def _pack_from_fallback(
     comp_scenes = [constructive, f"{outer} and {personal} co-build one tiny two-block tower."]
     avoid = ["gore", "real weapons", "readable text in frame", "photorealistic violence"]
     n = req.variants_count
+    shot_roles = shot_roles_for_variant_indices(n, req.shot_mode)
     line_a = _planet_cat_line(pa, canon_a, skin_a)
     line_b = _planet_cat_line(pb, canon_b, skin_b)
     anim_skin = _skin_animation_suffix(pa, pb, skin_a, skin_b)
@@ -404,24 +456,24 @@ def _pack_from_fallback(
             pool = tension_scenes + comp_scenes
             base_scene = pool[i % len(pool)]
 
+        shot_blk = format_hero_shot_prompt_block(shot_roles[i])
+        shot_middle = (shot_blk + " ") if shot_blk else ""
+
         prompt = (
-            f"{_STYLE_CORE} "
+            f"{_image_prompt_opening_prefix(render_prof)} "
             f"Aspect type: {req.aspect_type}. "
             f"{line_a} "
             f"{line_b} "
             f"{template_middle}"
             f"{render_middle}"
+            f"{shot_middle}"
             f"Scene beat: {base_scene} "
             f"Story tension (cartoon metaphor): {core} "
             f"Constructive undertone available: {constructive}"
         ).strip()
         image_prompts.append(prompt)
 
-    animation_prompt = (
-        f"Loopable 3–5s animation, same catstyle: {pa} and {pb} planet-cats, aspect {req.aspect_type}, "
-        f"minimal squash-and-stretch on round bodies, thick outlines held crisp at small size, "
-        f"dark starry backdrop, readable silhouettes, comic timing;{anim_skin} {_STYLE_CORE}"
-    ).strip()
+    animation_prompt = _animation_prompt_body(pa, pb, req.aspect_type, anim_skin, render_prof)
 
     rn = list(render_negative_additions or [])
     negative_prompt = _merge_negative_prompt(_NEGATIVE_BASE_CHUNKS, avoid + rn)
@@ -437,6 +489,7 @@ def _pack_from_fallback(
         animation_prompt=animation_prompt,
         negative_prompt=negative_prompt,
         carousel_idea=carousel_idea,
+        image_prompt_shot_roles=shot_roles,
     )
 
 
@@ -467,6 +520,7 @@ def generate_catstyle_prompt_pack(req: CatstylePromptRequest) -> CatstylePromptP
             aspect_ix=aspect_ix,
             skin_a=skin_a,
             skin_b=skin_b,
+            render_prof=render_prof,
             template_middle=template_middle,
             render_middle=render_middle,
             render_negative_additions=render_neg,
@@ -490,6 +544,7 @@ def generate_catstyle_prompt_pack(req: CatstylePromptRequest) -> CatstylePromptP
                 seed=seed,
                 skin_a=skin_a,
                 skin_b=skin_b,
+                render_prof=render_prof,
                 template_middle=template_middle,
                 render_middle=render_middle,
                 render_negative_additions=render_neg,
@@ -505,6 +560,7 @@ def generate_catstyle_prompt_pack(req: CatstylePromptRequest) -> CatstylePromptP
                 personal=personal,
                 skin_a=skin_a,
                 skin_b=skin_b,
+                render_prof=render_prof,
                 template_middle=template_middle,
                 render_middle=render_middle,
                 render_negative_additions=render_neg,

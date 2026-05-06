@@ -57,7 +57,7 @@ def _fake_pack_charged_with_secondary() -> CatstyleDailyPackResult:
         secondary_supportive_candidate=secondary,
         prompt_packs=[
             {
-                "image_prompts": ["p1", "p2", "p3", "p4"],
+                "image_prompts": ["p1", "p2"],
                 "animation_prompt": "anim",
                 "negative_prompt": "neg",
                 "carousel_idea": "car idea",
@@ -98,7 +98,7 @@ def _fake_pack_one() -> CatstyleDailyPackResult:
         secondary_supportive_candidate=None,
         prompt_packs=[
             {
-                "image_prompts": ["prompt a", "prompt b", "prompt c", "prompt d"],
+                "image_prompts": ["prompt a", "prompt b"],
                 "animation_prompt": "anim line",
                 "negative_prompt": "no text",
                 "carousel_idea": "carousel line",
@@ -131,7 +131,7 @@ def test_handoff_contains_prompts_checklist_and_summary() -> None:
     assert len(h.items) == 1
     it = h.items[0]
     assert it.candidate.planet_a == "Saturn"
-    assert it.image_prompts == ["prompt a", "prompt b", "prompt c", "prompt d"]
+    assert it.image_prompts == ["prompt a", "prompt b"]
     assert it.animation_prompt == "anim line"
     assert it.negative_prompt == "no text"
     assert it.carousel_idea == "carousel line"
@@ -165,7 +165,7 @@ def test_markdown_includes_required_sections() -> None:
         "## Carousel Idea (from prompt pack)",
         "## Caption Draft",
         "## Production Checklist",
-        "Generate 4 image options",
+        "Generate 2 premium hero images",
     ):
         assert needle in md
 
@@ -221,7 +221,7 @@ def test_supportive_handoff_uses_selected_aspect_not_main_charged() -> None:
         secondary_supportive_candidate=None,
         prompt_packs=[
             {
-                "image_prompts": ["a", "b", "c", "d"],
+                "image_prompts": ["a", "b"],
                 "animation_prompt": "x",
                 "negative_prompt": "y",
                 "carousel_idea": "z",

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from astro_content_agent.content.catstyle.models import CatstyleRenderStyleProfile
 
-DEFAULT_RENDER_STYLE_PROFILE_KEY = "premium_comic_poster_v1"
+DEFAULT_RENDER_STYLE_PROFILE_KEY = "premium_comic_poster_v2"
 
 RENDER_STYLE_PROFILES: dict[str, CatstyleRenderStyleProfile] = {
     "premium_comic_poster_v1": CatstyleRenderStyleProfile(
@@ -13,14 +13,21 @@ RENDER_STYLE_PROFILES: dict[str, CatstyleRenderStyleProfile] = {
             "Primary Catstyle finish target: cinematic comic splash-page / movie-poster illustration clarity "
             "with decisive staging and disciplined polish."
         ),
+        image_prompt_opening_line=(
+            "Premium cinematic comic-poster illustration of anthropomorphic planet-cats, polished comic rendering, "
+            "bold contour lines, controlled cel-shaded / painterly lighting, rich but clean detail, dramatic arena "
+            "staging, expressive faces, strong silhouette readability, poster-quality composition."
+        ),
         style_core_line=(
-            "Premium cinematic comic illustration with movie-poster / splash-panel presence - "
-            "reads like a finished high-quality comic one-sheet or collectible poster mock-up "
-            "(still stylized Catstyle planet-cats, never photoreal portraiture)."
+            "Premium cinematic comic POSTER illustration - splash-page energy with movie-poster-grade composition "
+            "and clean focal hierarchy; polished linework with controlled painterly texture reads "
+            "(rich yet disciplined, never mush); explicitly NOT flat mascot art, NOT children's book softness, "
+            "NOT kawaii simplification, NOT toy toddler-cartoon, NOT cheap chibi, NOT simple vector icon gloss."
         ),
         composition_line=(
-            "Poster-grade framing with decisive foreground / midground / background separation; "
-            "one focal interaction readable at thumbnail size; reject bland centered mascot tableau."
+            "Cinematic poster-grade framing with decisive foreground / midground / background separation; "
+            "one focal interaction readable at thumbnail size; reject bland centered mascot tableau and "
+            "empty-background characters floating like stickers."
         ),
         linework_line=(
             "Bold readable contour lines with comic illustration clarity - anchors silhouette reads "
@@ -52,6 +59,7 @@ RENDER_STYLE_PROFILES: dict[str, CatstyleRenderStyleProfile] = {
         ),
         must_have_lines=[
             "Finished cinematic comic illustration vibe across frame.",
+            "Premium comic-poster presentation with dramatic lighting and readable depth planes.",
             "One decisive hero beat moment (interaction staged intentionally).",
             "Strong silhouette legibility on both planet-cats at thumbnail.",
             "Polished digital painting finish balanced against cartoon abstraction.",
@@ -61,16 +69,32 @@ RENDER_STYLE_PROFILES: dict[str, CatstyleRenderStyleProfile] = {
             "Flat mascot clip-art blandness.",
             "Cheap nursery bedtime softness.",
             "Simple sticker centered-float posing.",
+            "Kawaii baby-face simplification or toddler toy vibe.",
+            "Cheap chibi proportions / oversized infant heads.",
             "Weak ambiguous compositions lacking focal thrust.",
             "Over-simplified mobile game idle icons.",
+            "Flat vector icon treatments without cinematic depth.",
             "Noisy hyper-microtexture overlays.",
             "Photoreal bodies/furs/skin shaders.",
             "Low-effort generic clipart vibes.",
         ],
         negative_prompt_additions=[
+            "simple flat children's cartoon",
+            "toddler-book illustration",
+            "sticker mascot style",
+            "cheap vector icon",
+            "low-detail kawaii look",
+            "nursery cartoon softness",
+            "flat-color-only rendering",
+            "empty simple background",
+            "overly minimal character rendering",
             "flat mascot sticker aesthetic",
             "cheap children's cartoon softness",
+            "kawaii simplified toddler cute overload",
+            "chibi proportions cheap novelty figure read",
+            "simple flat vector icon illustration without depth",
             "symmetrical dull sticker posing centered with empty backdrop",
+            "floating characters on empty void backdrop",
             "weak bland composition",
             "microscopic gritty noise texture",
             "muddy over-rendered detail piles",
@@ -83,12 +107,116 @@ RENDER_STYLE_PROFILES: dict[str, CatstyleRenderStyleProfile] = {
             "readable decisive staging."
         ),
     ),
+    "premium_comic_poster_v2": CatstyleRenderStyleProfile(
+        key="premium_comic_poster_v2",
+        label="Premium comic poster v2 (battle hardlock)",
+        description=(
+            "Strongest Catstyle premium battle-poster profile: collectible comic-cover / cinematic duel splash energy "
+            "with explicit anti-nursery / anti-sticker discipline and monumental arena staging bias."
+        ),
+        image_prompt_opening_line=(
+            "Premium cinematic comic-poster illustration — poster-grade comic splash illustration — high-drama heroic "
+            "comic-cover battle splash featuring anthropomorphic planet-cats; hand-painted stylized 2D/2.5D comic feel "
+            "(NOT photoreal, NOT 3D CGI, NOT game splash render), collectible-cover polish, monumental duel staging, "
+            "layered foreground/midground/background depth, dramatic focal and rim-impact lighting, bold authoritative "
+            "silhouettes, painterly cel-shaded polished comic rendering—prioritize premium battle poster reads over "
+            "cute mascot simplicity."
+        ),
+        style_hardlock_block=(
+            "Prioritize dramatic poster composition over cute simplicity—reject nursery-book softness, kawaii sticker "
+            "flattening, and bland mascot idle posing. Stage as premium comic cover / heroic battle splash: decisive "
+            "focal hierarchy, meaningful environment depth behind the duel (never empty flats), dynamic body-on-body "
+            "interaction with pose authority, cinematic rim or impact lighting sculpting forms—never floating mascots "
+            "on void backdrops or emoji-flat icon staging. Texture rule: use only large and medium texture groups "
+            "(no dense microtexture layering). Background rule: arena and zodiac floor stay epic but simplified and "
+            "less detailed than characters. Lighting rule: dramatic but clean; use separation, never overload."
+        ),
+        style_core_line=(
+            "Ultra-premium cinematic comic POSTER battle illustration—movie-one-sheet and collectible cover clarity "
+            "with heroic duel gravity; polished contours plus disciplined painterly cel modeling (rich planes, no mush); "
+            "explicitly NOT nursery softness, NOT kawaii cute flattening, NOT cheap chibi novelty, NOT flat mobile-game "
+            "icon gloss, NOT simplistic clip mascot staging."
+        ),
+        composition_line=(
+            "Poster-grade heroic framing: monumental scale read via FG/MG/BG layering—foreground bodies dominate with "
+            "authority; midground carries arena architecture weight; background opens into consequential cosmic depth; "
+            "reject centered sticker tableaus and empty minimalist staging."
+        ),
+        linework_line=(
+            "Bold authoritative contours anchoring heroic silhouette reads—comic illustration clarity without "
+            "devolving into flat emoji-outline boredom."
+        ),
+        shading_line=(
+            "Painterly cel discipline—directional modeling on round comic bodies with crisp plane shifts and stylized "
+            "hand-painted comic shading; avoid muddy baby-soft gradients, noisy grit stacks, and hyper-detailed AI texture."
+        ),
+        lighting_line=(
+            "High-drama keyed light plus cinematic rim and impact accents—battle splash readability without HDR "
+            "photoreal spam."
+        ),
+        environment_line=(
+            "World-scale heroic staging locked to template beats—arena/coliseum reads monumental (floating celestial "
+            "battle disk / cosmic coliseum rim), atmospheric depth (stars, nebula void, rim glow)—never toy sandbox "
+            "flatness."
+        ),
+        detail_line=(
+            "Purposeful heroic medium-detail only—emblems, armor stripes, arena sparks in controlled amounts; density "
+            "serves focal hierarchy, not ornamental clutter or micro-detail overload."
+        ),
+        color_line=(
+            "Vivid disciplined harmonic contrasts supporting duel focal thrust while honoring canon palettes."
+        ),
+        facial_expression_line=(
+            "Intense theatrical heroic acting—readable eyes/jaws/paws selling contest stakes with comic gravitas "
+            "(not infant cute mush)."
+        ),
+        must_have_lines=[
+            "Collectible comic-cover / battle splash poster energy.",
+            "Heroic cinematic staging with clear duel focal thrust.",
+            "Layered depth planes that sell monumental arena consequence.",
+            "Bold silhouette authority on both planet-cats at thumbnail.",
+            "Polished painterly cel comic finish with disciplined richness.",
+            "Canon + identity markers remain unmistakable—never generic animals.",
+        ],
+        avoid_lines=[
+            "Nursery bedtime softness or toddler-story easing.",
+            "Kawaii cute dominance flattening drama.",
+            "Sticker mascot center-float on empty backdrops.",
+            "Cheap chibi / emoji-flat icon reads.",
+            "Mobile-game idle icon bland staging.",
+            "Flat vector simplicity masquerading as polish.",
+            "Weak ambiguous compositions lacking heroic thrust.",
+            "Photoreal fur/skin/HDR portrait cues.",
+            "3D CGI figurine finish or glossy game-engine materials.",
+            "Hyper-detailed AI-render texture clutter and tiny crack noise.",
+            "Overcomplicated architecture that steals focus from characters.",
+        ],
+        negative_prompt_additions=[
+            "childish nursery illustration style",
+            "kawaii or chibi mascot flattening",
+            "sticker mascot center-float posing",
+            "flat vector / cheap icon / mobile-game icon look",
+            "photoreal / hyperreal / CGI / 3D game render finish",
+            "hyper-detailed microtexture noise and tiny crack clutter",
+            "excess sparks and particles clutter",
+            "over-rendered fur strands and material noise",
+            "cluttered architecture micro-detail spam",
+            "weak bland composition with disconnected characters",
+        ],
+        short_prompt_line=(
+            "V2 premium battle poster—heroic coliseum-scale duel splash, dramatic rim/impact light, anti-nursery discipline."
+        ),
+    ),
     "clean_cartoon_action_v1": CatstyleRenderStyleProfile(
         key="clean_cartoon_action_v1",
         label="Clean cartoon action v1",
         description=(
             "Secondary finish: smoother graphic cartoon action with cel clarity - "
             "less painterly texture noise than premium poster mode while staying cinematic."
+        ),
+        image_prompt_opening_line=(
+            "Clean premium cartoon-action illustration of anthropomorphic planet-cats, bold outlines, smooth cel "
+            "shading, simplified but polished forms, readable action, cinematic staging without noisy micro-texture."
         ),
         style_core_line=(
             "Cleaner graphic cartoon action illustration - premium cinematic staging "
@@ -136,6 +264,15 @@ RENDER_STYLE_PROFILES: dict[str, CatstyleRenderStyleProfile] = {
             "Flat sticker emptiness.",
         ],
         negative_prompt_additions=[
+            "simple flat children's cartoon",
+            "toddler-book illustration",
+            "sticker mascot style",
+            "cheap vector icon",
+            "low-detail kawaii look",
+            "nursery cartoon softness",
+            "flat-color-only rendering",
+            "empty simple background",
+            "overly minimal character rendering",
             "speckled gritty painterly noise texture",
             "hyper-detailed gritty arena clutter",
             "over-rendered rocky texture spam",
@@ -154,6 +291,7 @@ def _validate_registry(profiles: dict[str, CatstyleRenderStyleProfile]) -> None:
     text_fields = (
         "label",
         "description",
+        "image_prompt_opening_line",
         "style_core_line",
         "composition_line",
         "linework_line",

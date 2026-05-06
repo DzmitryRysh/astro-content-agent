@@ -10,8 +10,8 @@ from astro_content_agent.astro.ephemeris import PlanetPosition
 from astro_content_agent.services.content.catstyle_daily_pack import generate_catstyle_daily_pack
 
 NEXT_STEPS_CHECKLIST_V0: tuple[str, ...] = (
-    "Generate 4 image options from prompts",
-    "Pick best image",
+    "Generate 2 premium hero images from prompts (poster hero + alternate angle)",
+    "Pick best hero frame",
     "Animate in CapCut if reel",
     "Upload final image/video to Cloudinary",
     "Publish via existing Instagram flow",

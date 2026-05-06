@@ -10,25 +10,30 @@ WORLD_TEMPLATES: dict[str, CatstyleWorldTemplate] = {
         template_key="cosmic_zodiac_arena",
         display_name="Cosmic Zodiac Arena",
         description=(
-            "Original Catstyle cosmic duel-and-cooperation shell: disc arena floating in void with perimeter "
-            "zodiac wheel read - tournament-ring vibe without copying any franchise."
+            "Monumental cosmic coliseum shell: floating celestial battle arena disk with architectural zodiac ring "
+            "integration—tournament battle-ground scale (not toy sandbox platform); mythic consequential framing "
+            "without copying any franchise."
         ),
         environment_type="cosmic_arena_disc",
         energy_default="balanced",
         setting_line=(
-            "Shared universe shell: a stylized comic-fantasy COSMIC ARENA - circular battleground disc/platform "
-            "floating in deep space, slight dramatic tilted perspective, readable outer rim."
+            "Shared universe shell: a monumental COSMIC COLISEUM - floating celestial BATTLE ARENA disk in deep space "
+            "(grand duel-ring energy, not playground sandbox); dramatic tilted perspective so rim and buttresses read "
+            "epic; zodiac architecture integrated into the arena masonry lip."
         ),
         composition_line=(
-            "Frame both planet-cats ON the arena disc with strong depth - foreground bodies crisp, midground disc edge "
-            "readable, background opens into star nebula void."
+            "Frame planet-cats as heroic duelists ON the arena disk—foreground bodies mass large with authoritative "
+            "silhouettes; midground carries monumental curved coliseum rim + integrated zodiac band; background plunges "
+            "into layered star/nebula void for mythic scale (abstract constellation sparks may suggest cosmic spectacle "
+            "—never photoreal crowds)."
         ),
         horizon_line=(
-            "Low cosmic horizon follows disc curvature - void drops away beyond rim glow; no earth-bound skyline."
+            "Low cosmic horizon hugs monumental disk curvature—void plummets beyond rim glow into consequential depth; "
+            "no earth-bound skyline unless optional cue explicitly asks for distant Earth disk far background."
         ),
         floor_line=(
-            "Arena floor reads as one continuous comic disc - subtle rings or paving tiles OK if flat graphic; "
-            "avoid hyper-real marble noise."
+            "Arena floor reads as one heroic battle-scar comic disk—subtle rings, gouges, or paving tiles OK as graphic "
+            "reads; avoid hyper-real marble noise or toy playmat blandness."
         ),
         background_line=(
             "Background is cosmic void with layered stars, soft nebula milk, void gradients - premium comic poster sky "
@@ -39,12 +44,13 @@ WORLD_TEMPLATES: dict[str, CatstyleWorldTemplate] = {
             "if cartoon-readable."
         ),
         zodiac_ring_line=(
-            "Outer perimeter carries a ZODIAC WHEEL band - twelve simplified constellation glyphs as flat icons "
-            "(no readable words), repeating torus feel around arena lip."
+            "Outer perimeter reads as architectural ZODIAC COLOSSEUM BAND—twelve bold constellation glyphs locked into "
+            "arena masonry (flat comic icons, no readable words), torus integrated into coliseum lip like monumental ring "
+            "crown."
         ),
         interaction_read_charged=(
-            "Energy read: SHOWDOWN / DUEL / kinetic clash - arena frames conflict like an iconic tournament beat "
-            "(original staging only)."
+            "Energy read: COSMIC COLOSSEUM SHOWDOWN—heroic kinetic duel climax framed like collectible battle-cover splash "
+            "with monumental arena scale (original staging only)."
         ),
         interaction_read_supportive=(
             "Energy read: ALLIANCE / CO-CREATION / shared spotlight - same arena reads as collaboration stage, "
@@ -54,9 +60,11 @@ WORLD_TEMPLATES: dict[str, CatstyleWorldTemplate] = {
             "Energy read: MODERATED STAGE / negotiated space - balanced comic tension with clear focal hierarchy."
         ),
         optional_variants=[
-            "subtle aurora curtain behind rim",
-            "sparse floating rock shards far background",
-            "simple energy ribbon linking both cats toward center disc",
+            "subtle aurora curtain behind monumental rim",
+            "sparse floating rock shards far background suggesting cosmic siege debris",
+            "simple energy ribbon linking both cats toward center disc focal point",
+            "tiny Earth disk distant in void when framing calls for mortal-stakes gravitas",
+            "colossal buttress silhouettes supporting outer rim for mythic architecture read",
         ],
         avoid=[
             "copying recognizable franchise arenas or logos",
@@ -65,7 +73,7 @@ WORLD_TEMPLATES: dict[str, CatstyleWorldTemplate] = {
             "busy HUD sci-fi clutter",
         ],
         short_prompt_line=(
-            "Cosmic zodiac arena - tilted disc duel stage in star void with perimeter glyph ring (flat comic icons)."
+            "Monumental cosmic zodiac coliseum—floating celestial battle disk + architectural perimeter glyph ring."
         ),
     ),
 }

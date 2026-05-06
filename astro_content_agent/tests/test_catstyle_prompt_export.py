@@ -52,10 +52,10 @@ def _fake_pack_with_primary() -> CatstyleDailyPackResult:
         secondary_supportive_candidate=secondary,
         prompt_packs=[
             {
-                "image_prompts": ["alpha prompt", "beta prompt", "gamma", "delta"],
+                "image_prompts": ["alpha prompt", "beta prompt"],
                 "animation_prompt": "loop the cats",
                 "negative_prompt": "no logos",
-                "carousel_idea": "four beats then payoff",
+                "carousel_idea": "two hero beats then payoff",
             }
         ],
     )
@@ -88,17 +88,16 @@ def test_export_creates_dir_and_writes_prompt_files(tmp_path: Path) -> None:
     assert set(result.files_written) == {
         "prompt_1.txt",
         "prompt_2.txt",
-        "prompt_3.txt",
-        "prompt_4.txt",
         "animation_prompt.txt",
         "negative_prompt.txt",
         "carousel_idea.txt",
         "selected_aspect_summary.txt",
     }
     assert (out / "prompt_1.txt").read_text(encoding="utf-8").strip() == "alpha prompt"
+    assert (out / "prompt_2.txt").read_text(encoding="utf-8").strip() == "beta prompt"
     assert "loop the cats" in (out / "animation_prompt.txt").read_text(encoding="utf-8")
     assert "no logos" in (out / "negative_prompt.txt").read_text(encoding="utf-8")
-    assert "four beats" in (out / "carousel_idea.txt").read_text(encoding="utf-8")
+    assert "two hero beats" in (out / "carousel_idea.txt").read_text(encoding="utf-8")
     summary = (out / "selected_aspect_summary.txt").read_text(encoding="utf-8")
     assert "Jupiter" in summary and "Mars" in summary
     assert "Saturn" in summary and "Venus" in summary
@@ -115,7 +114,7 @@ def test_export_short_image_prompt_list_pads_empty_slots(tmp_path: Path) -> None
         result = export_catstyle_image_prompts(date(2026, 5, 2), tmp_path / "out")
     assert result.success
     assert (tmp_path / "out" / "prompt_1.txt").read_text(encoding="utf-8").strip() == "only one"
-    assert (tmp_path / "out" / "prompt_2.txt").read_text(encoding="utf-8").strip() == ""
+    assert not (tmp_path / "out" / "prompt_2.txt").exists()
 
 
 def test_export_no_candidates_returns_failure_without_crash(tmp_path: Path) -> None:

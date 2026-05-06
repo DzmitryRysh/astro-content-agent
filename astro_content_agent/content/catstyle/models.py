@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class PlanetCatProfile(BaseModel):
@@ -96,6 +96,10 @@ class CatstyleRenderStyleProfile(BaseModel):
     key: str
     label: str
     description: str
+    image_prompt_opening_line: str = Field(
+        ...,
+        description="First visual instruction for image prompts; must lead render priority before canon/world/scene.",
+    )
     style_core_line: str
     composition_line: str
     linework_line: str
@@ -109,6 +113,10 @@ class CatstyleRenderStyleProfile(BaseModel):
     avoid_lines: list[str] = Field(default_factory=list, min_length=1)
     negative_prompt_additions: list[str] = Field(default_factory=list, min_length=1)
     short_prompt_line: str
+    style_hardlock_block: str | None = Field(
+        default=None,
+        description="Optional high-priority mandate paragraph injected after opening (e.g. premium_comic_poster_v2).",
+    )
 
 
 class CatstyleSceneTemplate(BaseModel):
@@ -151,7 +159,7 @@ class CatstylePromptRequest(BaseModel):
     planet_b: str
     aspect_type: str
     mode: Literal["tension", "compensation", "mixed"]
-    variants_count: int = Field(default=4, ge=1, le=8)
+    variants_count: int = Field(default=2, ge=1, le=8)
     skin_a: str | None = Field(
         default=None,
         description="Optional character skin key for planet_a (v0: Mars, Jupiter, Saturn skins only).",
@@ -177,8 +185,15 @@ class CatstylePromptRequest(BaseModel):
         description="Optional scene beat template (identity markers and canon still apply).",
     )
     render_style_profile_key: str = Field(
-        default="premium_comic_poster_v1",
-        description="Catstyle render finish profile v1 (empty string resolves to premium_comic_poster_v1 in generator).",
+        default="premium_comic_poster_v2",
+        description=(
+            "Catstyle render finish profile key (empty string resolves to DEFAULT_RENDER_STYLE_PROFILE_KEY in generator). "
+            "Default v2 is strongest premium battle-poster hardlock; use premium_comic_poster_v1 for legacy parity."
+        ),
+    )
+    shot_mode: Literal["hero_pair", "standard"] = Field(
+        default="hero_pair",
+        description="hero_pair: deterministic hero_poster / alternate_action_angle framing when variants_count>=1.",
     )
 
 
@@ -203,6 +218,16 @@ class CatstylePromptPack(BaseModel):
         default=None,
         description="Serialized CatstyleRenderStyleProfile applied to image prompts and negative prompt.",
     )
+    image_prompt_shot_roles: list[str | None] = Field(
+        default_factory=list,
+        description="Parallel shot_role labels (hero_poster / alternate_action_angle) per image_prompt index.",
+    )
+
+    @model_validator(mode="after")
+    def _shot_roles_align_with_prompts(self) -> CatstylePromptPack:
+        if self.image_prompt_shot_roles and len(self.image_prompt_shot_roles) != len(self.image_prompts):
+            raise ValueError("image_prompt_shot_roles length must match image_prompts when non-empty.")
+        return self
 
 
 class CatstyleCandidate(BaseModel):

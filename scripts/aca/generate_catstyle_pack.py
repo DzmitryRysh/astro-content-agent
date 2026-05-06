@@ -101,7 +101,7 @@ def main() -> int:
     ap.add_argument("--planet-b", required=True, dest="planet_b")
     ap.add_argument("--aspect-type", required=True, dest="aspect_type")
     ap.add_argument("--mode", required=True, choices=["tension", "compensation", "mixed"])
-    ap.add_argument("--variants-count", type=int, default=4, dest="variants_count")
+    ap.add_argument("--variants-count", type=int, default=2, dest="variants_count")
     ap.add_argument(
         "--skin-a",
         default=None,
@@ -130,7 +130,14 @@ def main() -> int:
         "--render-style-profile",
         default=None,
         dest="render_style_profile",
-        help="Catstyle render style profile key v1 (default: premium_comic_poster_v1).",
+        help="Catstyle render style profile key (default: premium_comic_poster_v2; use premium_comic_poster_v1 for legacy).",
+    )
+    ap.add_argument(
+        "--shot-mode",
+        choices=("hero_pair", "standard"),
+        default=None,
+        dest="shot_mode",
+        help="hero_pair (default): paired hero_poster + alternate_action_angle framing; standard: legacy variant prompts.",
     )
     ap.add_argument("--output", type=Path, default=None, help="Write JSON artifact to this path")
     args = ap.parse_args()
@@ -163,6 +170,8 @@ def main() -> int:
         )
         if render_style is not None:
             req_kw["render_style_profile_key"] = render_style
+        if args.shot_mode is not None:
+            req_kw["shot_mode"] = args.shot_mode
         req = CatstylePromptRequest(**req_kw)
         pack = generate_catstyle_prompt_pack(req)
     except ValueError as e:

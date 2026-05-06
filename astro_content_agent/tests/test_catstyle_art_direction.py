@@ -82,6 +82,66 @@ def test_skin_block_emphasizes_hooks_and_is_scene_defining() -> None:
     assert "cliff edge silhouette" in low or "wind dust" in low
 
 
+def test_compose_v2_adds_heroic_presentation_pressure() -> None:
+    prof = build_catstyle_art_direction_profile(
+        editorial_profile="charged",
+        mode="tension",
+        planet_a="Jupiter",
+        planet_b="Mars",
+        skin_a=None,
+        skin_b=None,
+    )
+    out = compose_premium_catstyle_prompt(
+        "BASE SEMANTIC.",
+        prof,
+        render_style_profile_key="premium_comic_poster_v2",
+    ).lower()
+    assert "heroic presentation pressure" in out
+    assert "heroic silhouette dominance" in out
+    assert "backgrounds simplified relative to characters" in out
+
+
+def test_strengthen_negative_v2_adds_hardlock_childish_terms() -> None:
+    prof = CatstyleArtDirectionProfile(
+        energy="charged",
+        planet_a="Jupiter",
+        planet_b="Mars",
+        mode="tension",
+        editorial_profile="charged",
+        skin_a=None,
+        skin_b=None,
+    )
+    neg = strengthen_negative_prompt("seed,", prof, render_style_profile_key="premium_comic_poster_v2").lower()
+    assert "childish nursery / kawaii / chibi mascot look" in neg
+    assert "photoreal / hyperreal / cgi / 3d game render finish" in neg
+
+
+def test_apply_pack_with_render_v2_passes_through_art_direction_pressure() -> None:
+    prof = build_catstyle_art_direction_profile(
+        editorial_profile="charged",
+        mode="tension",
+        planet_a="Jupiter",
+        planet_b="Mars",
+        skin_a=None,
+        skin_b=None,
+    )
+    base = CatstylePromptPack(
+        image_prompts=["p1"],
+        animation_prompt="anim",
+        negative_prompt="neg",
+        carousel_idea="car",
+        world_template_profile={"template_key": "cosmic_zodiac_arena"},
+        scene_template_profile={"template_key": "mars_spartan_cliff_kick"},
+        render_style_profile={"key": "premium_comic_poster_v2"},
+        image_prompt_shot_roles=[None],
+    )
+    enriched = apply_art_direction_to_prompt_pack(base, prof)
+    low = enriched.image_prompts[0].lower()
+    assert "heroic presentation pressure" in low
+    neg = enriched.negative_prompt.lower()
+    assert "childish nursery / kawaii / chibi mascot look" in neg
+
+
 def test_negative_prompt_strengthens_anti_bland() -> None:
     prof = CatstyleArtDirectionProfile(
         energy="charged",
@@ -115,8 +175,10 @@ def test_apply_pack_sets_art_direction_metadata() -> None:
         carousel_idea="car",
         world_template_profile={"template_key": "cosmic_zodiac_arena"},
         scene_template_profile={"template_key": "mars_spartan_cliff_kick"},
+        image_prompt_shot_roles=[None],
     )
     enriched = apply_art_direction_to_prompt_pack(base, prof)
+    assert enriched.image_prompt_shot_roles == base.image_prompt_shot_roles
     assert enriched.art_direction_profile is not None
     assert enriched.art_direction_profile["version"] == "catstyle-art-direction-v0"
     assert enriched.art_direction_profile["energy"] == "charged"

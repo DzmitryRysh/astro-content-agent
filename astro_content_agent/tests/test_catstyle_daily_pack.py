@@ -48,7 +48,8 @@ def test_daily_pack_top_one_has_prompt_pack_and_metadata() -> None:
     assert pack.ranked_candidates_count >= 1
     assert pack.selected_count == 1
     assert len(pack.prompt_packs) == 1
-    assert len(pack.prompt_packs[0]["image_prompts"]) == 4
+    assert len(pack.prompt_packs[0]["image_prompts"]) == 2
+    assert pack.prompt_packs[0].get("image_prompt_shot_roles") == ["hero_poster", "alternate_action_angle"]
     cand = pack.selected_candidates[0]
     mode = cand["mode_recommendation"]
     joined = " ".join(pack.prompt_packs[0]["image_prompts"]).lower()
