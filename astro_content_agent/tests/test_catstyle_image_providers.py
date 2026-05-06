@@ -65,6 +65,18 @@ def test_stub_provider_writes_json_stub(tmp_path: Path) -> None:
     assert blob["note"] == "Stub only. No image API was called."
 
 
+def test_stub_provider_records_style_reference_path(tmp_path: Path) -> None:
+    p = StubCatstyleImageProvider()
+    out = tmp_path / "o"
+    out.mkdir()
+    job = {**_job(1), "style_reference_image_path": "C:/refs/pluto_mars_style.png"}
+    r = p.generate(job, out, overwrite=False)
+    assert r.status == "generated_stub"
+    assert r.metadata.get("style_reference_image_path") == "C:/refs/pluto_mars_style.png"
+    blob = json.loads((out / "generated_stub_01.txt").read_text(encoding="utf-8"))
+    assert blob["style_reference_image_path"] == "C:/refs/pluto_mars_style.png"
+
+
 def test_stub_provider_skips_existing_without_overwrite(tmp_path: Path) -> None:
     p = StubCatstyleImageProvider()
     out = tmp_path / "o"
@@ -124,8 +136,92 @@ def test_openai_writes_png_from_mocked_b64(tmp_path: Path, monkeypatch: pytest.M
     call_kw = mock_client.images.generate.call_args.kwargs
     assert call_kw["model"]
     assert "Avoid / negative guidance:" in call_kw["prompt"]
+    assert "image" not in call_kw
     assert "response_format" not in call_kw
     assert call_kw.get("output_format") == "png"
+
+
+def test_openai_uses_style_reference_when_provided(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-fake-key-for-unit-test")
+    get_settings.cache_clear()
+    mock_client = MagicMock()
+    mock_client.images.edit.return_value = SimpleNamespace(
+        data=[SimpleNamespace(b64_json=_MINI_PNG_B64, url=None)]
+    )
+    ref = tmp_path / "style_ref.png"
+    ref.write_bytes(b"not-a-real-png-but-path-exists")
+    p = OpenAICatstyleImageProvider(client=mock_client)
+    out = tmp_path / "g"
+    out.mkdir()
+    job = {**_openai_job(1), "style_reference_image_path": str(ref)}
+    r = p.generate(job, out, overwrite=False)
+    assert r.status == "generated"
+    assert r.metadata.get("style_reference_image_path") == str(ref.resolve())
+    mock_client.images.generate.assert_not_called()
+    mock_client.images.edit.assert_called_once()
+    call_kw = mock_client.images.edit.call_args.kwargs
+    assert call_kw["model"]
+    assert "Avoid / negative guidance:" in call_kw["prompt"]
+    assert call_kw.get("output_format") == "png"
+    assert call_kw.get("n") == 1
+    img_arg = call_kw.get("image")
+    assert img_arg is not None and hasattr(img_arg, "read")
+    dest = out / "out1.png"
+    assert dest.is_file()
+    assert dest.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
+
+
+def test_openai_style_reference_missing_file_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-fake-key-for-unit-test")
+    get_settings.cache_clear()
+    mock_client = MagicMock()
+    p = OpenAICatstyleImageProvider(client=mock_client)
+    job = {**_openai_job(1), "style_reference_image_path": str(tmp_path / "missing_ref.png")}
+    r = p.generate(job, tmp_path, overwrite=False)
+    assert r.status == "failed"
+    assert r.message and "style_reference_image_path not found" in r.message
+    mock_client.images.generate.assert_not_called()
+    mock_client.images.edit.assert_not_called()
+
+
+def test_openai_style_reference_unsupported_client_returns_clear_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-fake-key-for-unit-test")
+    get_settings.cache_clear()
+    mock_client = MagicMock()
+    secret_token = "sk-proj-abcdefghijklmnopqrstuvwxyz1234567890abcdef"
+    mock_client.images.edit.side_effect = TypeError(f"unexpected kwarg {secret_token}")
+    ref = tmp_path / "style_ref.png"
+    ref.write_bytes(b"x")
+    p = OpenAICatstyleImageProvider(client=mock_client)
+    job = {**_openai_job(1), "style_reference_image_path": str(ref)}
+    r = p.generate(job, tmp_path, overwrite=False)
+    assert r.status == "failed"
+    assert r.message and "style reference image generation is not supported by this OpenAI SDK/client path" in r.message
+    assert secret_token not in (r.message or "")
+    assert "REDACTED" in (r.message or "")
+    mock_client.images.generate.assert_not_called()
+
+
+def test_openai_style_reference_missing_edit_method_fails_clearly(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-fake-key-for-unit-test")
+    get_settings.cache_clear()
+    mock_client = MagicMock()
+    mock_client.images = MagicMock(spec=["generate"])
+    mock_client.images.generate.return_value = SimpleNamespace(
+        data=[SimpleNamespace(b64_json=_MINI_PNG_B64, url=None)]
+    )
+    ref = tmp_path / "style_ref.png"
+    ref.write_bytes(b"x")
+    p = OpenAICatstyleImageProvider(client=mock_client)
+    job = {**_openai_job(1), "style_reference_image_path": str(ref)}
+    r = p.generate(job, tmp_path, overwrite=False)
+    assert r.status == "failed"
+    assert r.message and "client.images.edit is not available" in r.message
+    mock_client.images.generate.assert_not_called()
 
 
 def test_openai_missing_api_key_returns_failed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

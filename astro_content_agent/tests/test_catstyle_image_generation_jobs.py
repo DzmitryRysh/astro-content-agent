@@ -1,6 +1,7 @@
 """Tests for Catstyle image generation jobs v0 (no APIs)."""
 from __future__ import annotations
 
+import json
 from datetime import date
 from pathlib import Path
 from unittest.mock import patch
@@ -48,7 +49,8 @@ def _fake_pack_one_primary() -> CatstyleDailyPackResult:
         secondary_supportive_candidate=secondary,
         prompt_packs=[
             {
-                "image_prompts": ["prompt line one", "prompt line two", "three", "four"],
+                "image_prompts": ["prompt line one", "prompt line two"],
+                "image_prompt_shot_roles": ["hero_poster", "alternate_action_angle"],
                 "animation_prompt": "anim body",
                 "negative_prompt": "neg body",
                 "carousel_idea": "carousel body",
@@ -84,7 +86,7 @@ def _fake_pack_empty() -> CatstyleDailyPackResult:
     )
 
 
-def test_build_jobs_four_prompts_all_pending(tmp_path: Path) -> None:
+def test_build_jobs_two_prompts_all_pending(tmp_path: Path) -> None:
     with patch(
         "astro_content_agent.services.content.catstyle_image_generation_jobs.generate_catstyle_daily_pack",
         return_value=_fake_pack_one_primary(),
@@ -95,10 +97,12 @@ def test_build_jobs_four_prompts_all_pending(tmp_path: Path) -> None:
             output_dir=tmp_path / "jobs",
         )
     assert isinstance(r, CatstyleImageGenerationJobsResult)
-    assert len(r.jobs) == 4
+    assert len(r.jobs) == 2
     assert all(j.status == "pending" for j in r.jobs)
     assert r.jobs[0].planet_a == "Jupiter" and r.jobs[0].planet_b == "Mars"
     assert r.jobs[0].prompt_index == 1
+    assert r.jobs[0].shot_role == "hero_poster"
+    assert r.jobs[1].shot_role == "alternate_action_angle"
     assert r.jobs[0].prompt_text == "prompt line one"
     assert r.jobs[0].negative_prompt == "neg body"
     assert r.jobs[0].animation_prompt == "anim body"
@@ -127,10 +131,13 @@ def test_variants_per_prompt_duplicates_jobs(tmp_path: Path) -> None:
             variants_per_prompt=2,
             output_dir=tmp_path / "v",
         )
-    assert len(r.jobs) == 8
+    assert len(r.jobs) == 4
     assert r.jobs[0].prompt_index == 1 and r.jobs[0].variant_index == 0
     assert r.jobs[1].prompt_index == 1 and r.jobs[1].variant_index == 1
     assert r.jobs[0].prompt_text == r.jobs[1].prompt_text
+    assert r.jobs[0].shot_role == "hero_poster" and r.jobs[1].shot_role == "hero_poster"
+    assert r.jobs[2].prompt_index == 2 and r.jobs[2].variant_index == 0
+    assert r.jobs[2].shot_role == "alternate_action_angle"
 
 
 def test_output_writes_manifest_and_prompt_files(tmp_path: Path) -> None:
@@ -142,7 +149,10 @@ def test_output_writes_manifest_and_prompt_files(tmp_path: Path) -> None:
         r = build_catstyle_image_generation_jobs(date(2026, 5, 2), output_dir=out)
     assert (out / "image_generation_jobs.json").is_file()
     assert (out / "job_01_prompt.txt").read_text(encoding="utf-8").strip() == "prompt line one"
-    assert (out / "job_04_prompt.txt").read_text(encoding="utf-8").strip() == "four"
+    assert (out / "job_02_prompt.txt").read_text(encoding="utf-8").strip() == "prompt line two"
+    manifest = json.loads((out / "image_generation_jobs.json").read_text(encoding="utf-8"))
+    assert manifest["jobs"][0]["shot_role"] == "hero_poster"
+    assert manifest["jobs"][1]["shot_role"] == "alternate_action_angle"
     assert "neg body" in (out / "negative_prompt.txt").read_text(encoding="utf-8")
     assert "anim body" in (out / "animation_prompt.txt").read_text(encoding="utf-8")
     summary = (out / "manifest_summary.txt").read_text(encoding="utf-8")
@@ -178,3 +188,19 @@ def test_pack_passes_skins_to_daily_pack(tmp_path: Path) -> None:
     m.assert_called_once()
     kw = m.call_args.kwargs
     assert kw.get("skin_b") == "spartan_king"
+
+
+def test_manifest_includes_style_reference_image_path(tmp_path: Path) -> None:
+    out = tmp_path / "jobs_ref"
+    with patch(
+        "astro_content_agent.services.content.catstyle_image_generation_jobs.generate_catstyle_daily_pack",
+        return_value=_fake_pack_one_primary(),
+    ):
+        r = build_catstyle_image_generation_jobs(
+            date(2026, 5, 2),
+            output_dir=out,
+            style_reference_image_path="C:/refs/pluto_mars_style.png",
+        )
+    assert r.jobs[0].style_reference_image_path == "C:/refs/pluto_mars_style.png"
+    manifest = json.loads((out / "image_generation_jobs.json").read_text(encoding="utf-8"))
+    assert manifest["jobs"][0]["style_reference_image_path"] == "C:/refs/pluto_mars_style.png"

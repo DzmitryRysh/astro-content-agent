@@ -91,3 +91,23 @@ def test_cli_writes_via_mock(jobs_cli, tmp_path: Path, capsys: pytest.CaptureFix
     assert "2026-05-02" in captured
     assert "jobs count" in captured.lower()
     assert "1" in captured
+
+
+def test_cli_passes_style_reference_image_arg(jobs_cli, tmp_path: Path) -> None:
+    out = tmp_path / "cli_out"
+    old = sys.argv[:]
+    try:
+        sys.argv = [
+            "build_catstyle_image_generation_jobs.py",
+            "--date",
+            "2026-05-02",
+            "--output-dir",
+            str(out),
+            "--style-reference-image",
+            str(tmp_path / "ref.png"),
+        ]
+        with patch.object(jobs_cli, "build_catstyle_image_generation_jobs", return_value=_minimal_result()) as m:
+            assert jobs_cli.main() == 0
+    finally:
+        sys.argv = old
+    assert m.call_args.kwargs.get("style_reference_image_path") == str(tmp_path / "ref.png")

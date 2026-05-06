@@ -34,6 +34,14 @@ class CatstyleImageGenJob(BaseModel):
     orb: float | None = None
     prompt_index: int = Field(ge=1, description="1-based index into the daily pack image_prompts list.")
     variant_index: int = Field(default=0, ge=0, description="0-based variant when variants_per_prompt > 1.")
+    shot_role: str | None = Field(
+        default=None,
+        description="hero_poster | alternate_action_angle when hero_pair shot_mode produced parallel roles.",
+    )
+    style_reference_image_path: str | None = Field(
+        default=None,
+        description="Optional local path to approved style reference image for providers that support image-conditioned generation.",
+    )
     prompt_text: str
     negative_prompt: str
     animation_prompt: str
@@ -143,6 +151,8 @@ def build_catstyle_image_generation_jobs(
     world_template_key: str | None = None,
     scene_template_key: str | None = None,
     render_style_profile_key: str | None = None,
+    shot_mode: str | None = None,
+    style_reference_image_path: str | None = None,
     *,
     compute_positions_fn: Callable[..., dict[str, PlanetPosition]] | None = None,
     orb_config: dict[str, tuple[float, float]] | None = None,
@@ -170,6 +180,13 @@ def build_catstyle_image_generation_jobs(
     if render_k == "":
         render_k = None
 
+    shot_m = str(shot_mode).strip().lower() if shot_mode else None
+    if shot_m == "":
+        shot_m = None
+    style_ref = str(style_reference_image_path).strip() if style_reference_image_path else None
+    if style_ref == "":
+        style_ref = None
+
     pack = generate_catstyle_daily_pack(
         day,
         top=top,
@@ -181,6 +198,7 @@ def build_catstyle_image_generation_jobs(
         world_template_key=world_k,
         scene_template_key=scene_k,
         render_style_profile_key=render_k,
+        shot_mode=shot_m,
         compute_positions_fn=compute_positions_fn,
         orb_config=orb_config,
     )
@@ -227,6 +245,11 @@ def build_catstyle_image_generation_jobs(
         str(render_style_profile["key"]) if render_style_profile and "key" in render_style_profile else None
     )
 
+    shot_roles_list_raw = pp.get("image_prompt_shot_roles")
+    shot_roles_list: list[str | None] = (
+        list(shot_roles_list_raw) if isinstance(shot_roles_list_raw, list) else []
+    )
+
     vpp = max(1, int(variants_per_prompt))
     pa = str(primary["planet_a"])
     pb = str(primary["planet_b"])
@@ -248,6 +271,9 @@ def build_catstyle_image_generation_jobs(
     seq = 0
     for pi, prompt_text in enumerate(image_prompts):
         prompt_index = pi + 1
+        shot_role = shot_roles_list[pi] if pi < len(shot_roles_list) else None
+        if isinstance(shot_role, str):
+            shot_role = shot_role.strip() or None
         for variant_index in range(vpp):
             seq += 1
             job_id = f"catstyle-{iso}-{seq:03d}"
@@ -273,6 +299,8 @@ def build_catstyle_image_generation_jobs(
                     orb=orb,
                     prompt_index=prompt_index,
                     variant_index=variant_index,
+                    shot_role=shot_role,
+                    style_reference_image_path=style_ref,
                     prompt_text=prompt_text,
                     negative_prompt=neg,
                     animation_prompt=anim,

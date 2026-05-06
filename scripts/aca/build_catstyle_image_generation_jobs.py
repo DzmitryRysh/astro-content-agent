@@ -71,6 +71,19 @@ def main() -> int:
         dest="render_style_profile",
         help="Optional Catstyle render style profile key v1 passed into daily pack prompts.",
     )
+    ap.add_argument(
+        "--shot-mode",
+        choices=("hero_pair", "standard"),
+        default=None,
+        dest="shot_mode",
+        help="Optional shot framing mode for daily pack (default request uses hero_pair).",
+    )
+    ap.add_argument(
+        "--style-reference-image",
+        default=None,
+        dest="style_reference_image",
+        help="Optional local reference image path for style anchoring (providers may or may not support image conditioning).",
+    )
     args = ap.parse_args()
 
     try:
@@ -95,6 +108,8 @@ def main() -> int:
             world_template_key=args.world_template,
             scene_template_key=args.scene_template,
             render_style_profile_key=args.render_style_profile,
+            shot_mode=args.shot_mode,
+            style_reference_image_path=args.style_reference_image,
         )
     except ValueError as e:
         print(str(e), file=sys.stderr)

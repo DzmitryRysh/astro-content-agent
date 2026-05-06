@@ -44,6 +44,34 @@ def _build_combined_prompt(job: dict[str, Any]) -> str:
     return main
 
 
+def _images_response_to_png_bytes(resp: Any) -> tuple[bytes | None, str | None]:
+    """Decode first image from Images API response (b64_json preferred, else URL download)."""
+    if not getattr(resp, "data", None) or len(resp.data) < 1:
+        return None, "OpenAI image API returned no image data."
+
+    item = resp.data[0]
+    raw_png: bytes | None = None
+    b64 = getattr(item, "b64_json", None)
+    if b64:
+        try:
+            raw_png = base64.b64decode(b64)
+        except Exception as exc:  # noqa: BLE001
+            return None, f"Failed to decode image bytes: {_sanitize_error_message(str(exc))}"
+    else:
+        url = getattr(item, "url", None)
+        if url:
+            try:
+                r = httpx.get(url, timeout=120.0)
+                r.raise_for_status()
+                raw_png = r.content
+            except Exception as exc:  # noqa: BLE001
+                return None, f"Failed to download image URL: {_sanitize_error_message(str(exc))}"
+
+    if not raw_png:
+        return None, "OpenAI image response had neither b64_json nor url."
+    return raw_png, None
+
+
 class CatstyleImageProviderResult(BaseModel):
     """Per-job outcome from a ``CatstyleImageProvider.generate`` call."""
 
@@ -78,6 +106,11 @@ class StubCatstyleImageProvider:
         job_id = str(job.get("job_id", "") or f"job-{seq}")
         suggested = str(job.get("suggested_output_name", "") or f"output_{seq}.png")
         prompt_index = int(job.get("prompt_index", seq))
+        style_reference_image_path = (
+            str(job.get("style_reference_image_path", "")).strip() or None
+            if job.get("style_reference_image_path") is not None
+            else None
+        )
         prompt_text = str(job.get("prompt_text", ""))
         preview = _preview(prompt_text)
 
@@ -97,6 +130,7 @@ class StubCatstyleImageProvider:
                     "note": STUB_NOTE,
                     "suggested_output_name": suggested,
                     "prompt_index": prompt_index,
+                    "style_reference_image_path": style_reference_image_path,
                 },
             )
 
@@ -107,6 +141,7 @@ class StubCatstyleImageProvider:
             "status": "generated_stub",
             "prompt_preview": preview,
             "note": STUB_NOTE,
+            "style_reference_image_path": style_reference_image_path,
         }
         stub_path.write_text(json.dumps(body, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         return CatstyleImageProviderResult(
@@ -121,6 +156,7 @@ class StubCatstyleImageProvider:
                 "note": STUB_NOTE,
                 "suggested_output_name": suggested,
                 "prompt_index": prompt_index,
+                "style_reference_image_path": style_reference_image_path,
             },
         )
 
@@ -158,6 +194,11 @@ class OpenAICatstyleImageProvider:
         settings = get_settings()
         model = (self._model_override or settings.openai_image_model).strip()
         size = (self._size_override or settings.catstyle_image_size).strip()
+        style_reference_image_path = (
+            str(job.get("style_reference_image_path", "")).strip() or None
+            if job.get("style_reference_image_path") is not None
+            else None
+        )
         preview = _preview(str(job.get("prompt_text", "")))
 
         meta_base = {
@@ -165,6 +206,7 @@ class OpenAICatstyleImageProvider:
             "size": size,
             "prompt_index": prompt_index,
             "suggested_output_name": suggested,
+            "style_reference_image_path": style_reference_image_path,
         }
 
         api_key = settings.openai_api_key
@@ -198,18 +240,72 @@ class OpenAICatstyleImageProvider:
                 metadata={**meta_base, "prompt_preview": preview},
             )
 
+        ref_path: Path | None = None
+        if style_reference_image_path:
+            ref_path = Path(style_reference_image_path).expanduser()
+            if not ref_path.is_absolute():
+                ref_path = (Path.cwd() / ref_path).resolve()
+            else:
+                ref_path = ref_path.resolve()
+            style_reference_image_path = str(ref_path)
+            meta_base["style_reference_image_path"] = style_reference_image_path
+            if not ref_path.is_file():
+                return CatstyleImageProviderResult(
+                    provider=self.provider_name,
+                    job_id=job_id,
+                    status="failed",
+                    message=f"style_reference_image_path not found: {ref_path}",
+                    metadata={**meta_base, "prompt_preview": preview},
+                )
+
         client = self._effective_client(str(api_key).strip())
+        resp: Any
         try:
-            # GPT image models (e.g. gpt-image-1): no response_format — base64 is default;
-            # use output_format instead (response_format is invalid for these models).
-            resp = client.images.generate(
-                model=model,
-                prompt=prompt,
-                size=size,  # type: ignore[arg-type]
-                n=1,
-                output_format="png",
-            )
-        except Exception as exc:  # noqa: BLE001 — surface safe summary only
+            if ref_path is not None:
+                edit_fn = getattr(client.images, "edit", None)
+                if edit_fn is None or not callable(edit_fn):
+                    return CatstyleImageProviderResult(
+                        provider=self.provider_name,
+                        job_id=job_id,
+                        status="failed",
+                        message=(
+                            "style reference image generation is not supported by this OpenAI SDK/client path: "
+                            "client.images.edit is not available."
+                        ),
+                        metadata={**meta_base, "prompt_preview": preview},
+                    )
+                with ref_path.open("rb") as image_file:
+                    resp = client.images.edit(
+                        model=model,
+                        image=image_file,
+                        prompt=prompt,
+                        size=size,  # type: ignore[arg-type]
+                        n=1,
+                        output_format="png",
+                    )
+            else:
+                # GPT image models (e.g. gpt-image-1): no response_format — base64 is default;
+                # use output_format instead (response_format is invalid for these models).
+                resp = client.images.generate(
+                    model=model,
+                    prompt=prompt,
+                    size=size,  # type: ignore[arg-type]
+                    n=1,
+                    output_format="png",
+                )
+        except TypeError as exc:
+            if ref_path is not None:
+                safe = _sanitize_error_message(str(exc))
+                return CatstyleImageProviderResult(
+                    provider=self.provider_name,
+                    job_id=job_id,
+                    status="failed",
+                    message=(
+                        "style reference image generation is not supported by this OpenAI SDK/client path: "
+                        f"{safe}"
+                    ),
+                    metadata={**meta_base, "prompt_preview": preview, "error_type": type(exc).__name__},
+                )
             safe = _sanitize_error_message(str(exc))
             return CatstyleImageProviderResult(
                 provider=self.provider_name,
@@ -218,54 +314,27 @@ class OpenAICatstyleImageProvider:
                 message=f"OpenAI image API error: {safe}",
                 metadata={**meta_base, "prompt_preview": preview, "error_type": type(exc).__name__},
             )
-
-        if not getattr(resp, "data", None) or len(resp.data) < 1:
+        except Exception as exc:  # noqa: BLE001 — surface safe summary only
+            safe = _sanitize_error_message(str(exc))
+            if ref_path is not None:
+                msg = f"OpenAI images.edit API error: {safe}"
+            else:
+                msg = f"OpenAI image API error: {safe}"
             return CatstyleImageProviderResult(
                 provider=self.provider_name,
                 job_id=job_id,
                 status="failed",
-                message="OpenAI image API returned no image data.",
-                metadata={**meta_base, "prompt_preview": preview},
+                message=msg,
+                metadata={**meta_base, "prompt_preview": preview, "error_type": type(exc).__name__},
             )
 
-        item = resp.data[0]
-        raw_png: bytes | None = None
-        b64 = getattr(item, "b64_json", None)
-        if b64:
-            try:
-                raw_png = base64.b64decode(b64)
-            except Exception as exc:  # noqa: BLE001
-                safe = _sanitize_error_message(str(exc))
-                return CatstyleImageProviderResult(
-                    provider=self.provider_name,
-                    job_id=job_id,
-                    status="failed",
-                    message=f"Failed to decode image bytes: {safe}",
-                    metadata={**meta_base, "prompt_preview": preview},
-                )
-        else:
-            url = getattr(item, "url", None)
-            if url:
-                try:
-                    r = httpx.get(url, timeout=120.0)
-                    r.raise_for_status()
-                    raw_png = r.content
-                except Exception as exc:  # noqa: BLE001
-                    safe = _sanitize_error_message(str(exc))
-                    return CatstyleImageProviderResult(
-                        provider=self.provider_name,
-                        job_id=job_id,
-                        status="failed",
-                        message=f"Failed to download image URL: {safe}",
-                        metadata={**meta_base, "prompt_preview": preview},
-                    )
-
-        if not raw_png:
+        raw_png, decode_err = _images_response_to_png_bytes(resp)
+        if decode_err or raw_png is None:
             return CatstyleImageProviderResult(
                 provider=self.provider_name,
                 job_id=job_id,
                 status="failed",
-                message="OpenAI image response had neither b64_json nor url.",
+                message=decode_err or "OpenAI image decode failed.",
                 metadata={**meta_base, "prompt_preview": preview},
             )
 
