@@ -8,6 +8,7 @@ from unittest.mock import patch
 import pytest
 
 from astro_content_agent.content.catstyle.models import CatstyleDailyPackResult
+from astro_content_agent.content.catstyle.render_style_profiles_v1 import get_render_style_profile
 from astro_content_agent.services.content.catstyle_image_generation_jobs import (
     CatstyleImageGenerationJobsResult,
     build_catstyle_image_generation_jobs,
@@ -63,6 +64,7 @@ def _fake_pack_one_primary() -> CatstyleDailyPackResult:
                 },
                 "world_template_profile": {"template_key": "cosmic_zodiac_arena", "display_name": "Cosmic Zodiac Arena"},
                 "scene_template_profile": {"template_key": "mars_spartan_cliff_kick", "display_name": "Kick"},
+                "render_style_profile": get_render_style_profile("premium_comic_poster_v1").model_dump(mode="json"),
             }
         ],
     )
@@ -107,6 +109,8 @@ def test_build_jobs_four_prompts_all_pending(tmp_path: Path) -> None:
     assert r.jobs[0].scene_template_key == "mars_spartan_cliff_kick"
     assert r.jobs[0].world_template_profile is not None
     assert r.jobs[0].scene_template_profile is not None
+    assert r.jobs[0].render_style_profile_key == "premium_comic_poster_v1"
+    assert r.jobs[0].render_style_profile is not None
     assert r.jobs[0].selection_score == 43
     assert r.jobs[0].orb == pytest.approx(1.2)
     assert r.jobs[0].job_id == "catstyle-2026-05-02-001"

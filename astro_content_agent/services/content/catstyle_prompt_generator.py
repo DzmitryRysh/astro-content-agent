@@ -16,6 +16,11 @@ from astro_content_agent.content.catstyle.scene_templates_v1 import (
     format_scene_template_prompt_block,
     validate_explicit_scene_template,
 )
+from astro_content_agent.content.catstyle.render_style_profiles_v1 import (
+    DEFAULT_RENDER_STYLE_PROFILE_KEY,
+    format_render_style_prompt_block,
+    get_render_style_profile,
+)
 from astro_content_agent.content.catstyle.world_templates_v1 import (
     DEFAULT_WORLD_TEMPLATE_KEY,
     format_world_template_prompt_block,
@@ -38,6 +43,12 @@ _STYLE_CORE = (
     "interaction between the two planet-cats. No text in image, no logos, no brands, no realistic rendering, "
     "no anime style, no glossy luxury aesthetic, no excessive jewelry or fine detail clutter."
 )
+
+_NEGATIVE_BASE_CHUNKS = [
+    "text, words, letters, captions, watermarks, logos, trademarks, QR codes",
+    "photorealistic, hyperreal skin, HDR glossy, anime sparkle eyes, luxury product render",
+    "crowded background, micro-details, filigree jewelry, chrome liquid, lens flare spam",
+]
 
 def normalize_planet_name(name: str) -> str:
     """Canonical planet title (delegates to planet canon v1)."""
@@ -95,11 +106,50 @@ def _attach_template_profiles(
     *,
     world_template_profile: dict | None,
     scene_template_profile: dict | None,
+    render_style_profile: dict | None,
 ) -> CatstylePromptPack:
     data = pack.model_dump(mode="json")
     data["world_template_profile"] = world_template_profile
     data["scene_template_profile"] = scene_template_profile
+    data["render_style_profile"] = render_style_profile
     return CatstylePromptPack.model_validate(data)
+
+
+def _dedupe_negative_phrases(phrases: list[str]) -> str:
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for phrase in phrases:
+        raw = phrase.strip()
+        if not raw:
+            continue
+        norm = " ".join(raw.lower().split())
+        if norm in seen:
+            continue
+        seen.add(norm)
+        ordered.append(raw)
+    return ", ".join(ordered)
+
+
+def _merge_negative_prompt(base_comma_chunks: list[str], extra_phrases: list[str]) -> str:
+    pieces: list[str] = []
+    for chunk in base_comma_chunks:
+        for part in chunk.split(","):
+            t = part.strip()
+            if t:
+                pieces.append(t)
+    for phrase in extra_phrases:
+        t = phrase.strip()
+        if t:
+            pieces.append(t)
+    return _dedupe_negative_phrases(pieces)
+
+
+def _resolve_render_style(req: CatstylePromptRequest):
+    raw = (req.render_style_profile_key or "").strip()
+    key = raw or DEFAULT_RENDER_STYLE_PROFILE_KEY
+    profile = get_render_style_profile(key)
+    render_middle = format_render_style_prompt_block(profile).strip() + " "
+    return profile, profile.model_dump(mode="json"), render_middle
 
 
 def _validate_skins_for_pair(pa: str, pb: str, skin_a: str | None, skin_b: str | None) -> None:
@@ -181,6 +231,8 @@ def _pack_from_deep(
     skin_a: str | None,
     skin_b: str | None,
     template_middle: str = "",
+    render_middle: str = "",
+    render_negative_additions: list[str] | None = None,
 ) -> CatstylePromptPack:
     tension_scenes = list(aspect_ix.scene_ideas)
     comp_scenes = list(aspect_ix.compensation_scene_ideas)
@@ -207,6 +259,7 @@ def _pack_from_deep(
             f"{line_a} "
             f"{line_b} "
             f"{template_middle}"
+            f"{render_middle}"
             f"Scene beat: {base_scene} "
             f"Story tension (cartoon metaphor): {aspect_ix.core_tension} "
             f"Constructive undertone available: {aspect_ix.constructive_channel}"
@@ -219,12 +272,8 @@ def _pack_from_deep(
         f"dark starry backdrop, readable silhouettes, comic timing;{anim_skin} {_STYLE_CORE}"
     ).strip()
 
-    negative_chunks = [
-        "text, words, letters, captions, watermarks, logos, trademarks, QR codes",
-        "photorealistic, hyperreal skin, HDR glossy, anime sparkle eyes, luxury product render",
-        "crowded background, micro-details, filigree jewelry, chrome liquid, lens flare spam",
-    ]
-    negative_prompt = ", ".join(negative_chunks + aspect_ix.avoid_list)
+    rn = list(render_negative_additions or [])
+    negative_prompt = _merge_negative_prompt(_NEGATIVE_BASE_CHUNKS, list(aspect_ix.avoid_list) + rn)
 
     carousel_idea = (
         f"Carousel outline (cover + {n} art slides): cover shows {pa}+{pb} round cats under stars with clear "
@@ -252,6 +301,8 @@ def _pack_from_seed(
     skin_a: str | None,
     skin_b: str | None,
     template_middle: str = "",
+    render_middle: str = "",
+    render_negative_additions: list[str] | None = None,
 ) -> CatstylePromptPack:
     tension_scenes = list(seed.suggested_scene_angles)
     comp_scenes = [seed.constructive_channel, seed.visual_metaphor]
@@ -278,6 +329,7 @@ def _pack_from_seed(
             f"{line_a} "
             f"{line_b} "
             f"{template_middle}"
+            f"{render_middle}"
             f"Scene beat: {base_scene} "
             f"Story tension (cartoon metaphor): {seed.core_tension} "
             f"Constructive undertone available: {seed.constructive_channel} "
@@ -291,12 +343,8 @@ def _pack_from_seed(
         f"dark starry backdrop, readable silhouettes, comic timing;{anim_skin} {_STYLE_CORE}"
     ).strip()
 
-    negative_chunks = [
-        "text, words, letters, captions, watermarks, logos, trademarks, QR codes",
-        "photorealistic, hyperreal skin, HDR glossy, anime sparkle eyes, luxury product render",
-        "crowded background, micro-details, filigree jewelry, chrome liquid, lens flare spam",
-    ]
-    negative_prompt = ", ".join(negative_chunks + list(seed.avoid))
+    rn = list(render_negative_additions or [])
+    negative_prompt = _merge_negative_prompt(_NEGATIVE_BASE_CHUNKS, list(seed.avoid) + rn)
 
     carousel_idea = (
         f"Carousel outline (cover + {n} art slides): cover shows {pa}+{pb} round cats under stars with clear "
@@ -325,6 +373,8 @@ def _pack_from_fallback(
     skin_a: str | None,
     skin_b: str | None,
     template_middle: str = "",
+    render_middle: str = "",
+    render_negative_additions: list[str] | None = None,
 ) -> CatstylePromptPack:
     core = f"{outer} social rhythm meets {personal} everyday stakes—generic transit beat v0 (seed TBD)."
     constructive = f"Shared constructive beat: {outer} and {personal} negotiate one clear cartoon gesture."
@@ -360,6 +410,7 @@ def _pack_from_fallback(
             f"{line_a} "
             f"{line_b} "
             f"{template_middle}"
+            f"{render_middle}"
             f"Scene beat: {base_scene} "
             f"Story tension (cartoon metaphor): {core} "
             f"Constructive undertone available: {constructive}"
@@ -372,12 +423,8 @@ def _pack_from_fallback(
         f"dark starry backdrop, readable silhouettes, comic timing;{anim_skin} {_STYLE_CORE}"
     ).strip()
 
-    negative_chunks = [
-        "text, words, letters, captions, watermarks, logos, trademarks, QR codes",
-        "photorealistic, hyperreal skin, HDR glossy, anime sparkle eyes, luxury product render",
-        "crowded background, micro-details, filigree jewelry, chrome liquid, lens flare spam",
-    ]
-    negative_prompt = ", ".join(negative_chunks + avoid)
+    rn = list(render_negative_additions or [])
+    negative_prompt = _merge_negative_prompt(_NEGATIVE_BASE_CHUNKS, avoid + rn)
 
     carousel_idea = (
         f"Carousel outline (cover + {n} art slides): cover shows {pa}+{pb} round cats under stars with clear "
@@ -406,6 +453,9 @@ def generate_catstyle_prompt_pack(req: CatstylePromptRequest) -> CatstylePromptP
     world_block, scene_block, world_prof, scene_prof = _resolve_world_scene_blocks(req, pa, pb)
     template_middle = _join_world_scene_middle(world_block, scene_block)
 
+    render_prof, render_prof_dict, render_middle = _resolve_render_style(req)
+    render_neg = list(render_prof.negative_prompt_additions)
+
     aspect_ix = get_aspect_interaction(pa, pb)
     if aspect_ix is not None:
         pack = _pack_from_deep(
@@ -418,6 +468,8 @@ def generate_catstyle_prompt_pack(req: CatstylePromptRequest) -> CatstylePromptP
             skin_a=skin_a,
             skin_b=skin_b,
             template_middle=template_middle,
+            render_middle=render_middle,
+            render_negative_additions=render_neg,
         )
     else:
         oriented = orient_outer_personal(pa, pb)
@@ -439,6 +491,8 @@ def generate_catstyle_prompt_pack(req: CatstylePromptRequest) -> CatstylePromptP
                 skin_a=skin_a,
                 skin_b=skin_b,
                 template_middle=template_middle,
+                render_middle=render_middle,
+                render_negative_additions=render_neg,
             )
         else:
             pack = _pack_from_fallback(
@@ -452,9 +506,16 @@ def generate_catstyle_prompt_pack(req: CatstylePromptRequest) -> CatstylePromptP
                 skin_a=skin_a,
                 skin_b=skin_b,
                 template_middle=template_middle,
+                render_middle=render_middle,
+                render_negative_additions=render_neg,
             )
 
-    pack = _attach_template_profiles(pack, world_template_profile=world_prof, scene_template_profile=scene_prof)
+    pack = _attach_template_profiles(
+        pack,
+        world_template_profile=world_prof,
+        scene_template_profile=scene_prof,
+        render_style_profile=render_prof_dict,
+    )
     return _finalize_pack_with_art_direction(pack, req, pa, pb, skin_a, skin_b)
 
 

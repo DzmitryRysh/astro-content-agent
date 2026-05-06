@@ -270,6 +270,7 @@ def apply_art_direction_to_prompt_pack(pack: CatstylePromptPack, profile: Catsty
         art_direction_profile=meta,
         world_template_profile=pack.world_template_profile,
         scene_template_profile=pack.scene_template_profile,
+        render_style_profile=pack.render_style_profile,
     )
 
 

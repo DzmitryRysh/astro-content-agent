@@ -60,6 +60,14 @@ class CatstyleImageGenJob(BaseModel):
         default=None,
         description="Copied serialized CatstyleSceneTemplate when applied to the prompt pack.",
     )
+    render_style_profile_key: str | None = Field(
+        default=None,
+        description="From prompt pack render_style_profile.key when present.",
+    )
+    render_style_profile: dict[str, Any] | None = Field(
+        default=None,
+        description="Copied serialized CatstyleRenderStyleProfile when applied to the prompt pack.",
+    )
 
 
 class CatstyleImageGenerationJobsResult(BaseModel):
@@ -134,6 +142,7 @@ def build_catstyle_image_generation_jobs(
     skin_b: str | None = None,
     world_template_key: str | None = None,
     scene_template_key: str | None = None,
+    render_style_profile_key: str | None = None,
     *,
     compute_positions_fn: Callable[..., dict[str, PlanetPosition]] | None = None,
     orb_config: dict[str, tuple[float, float]] | None = None,
@@ -157,6 +166,10 @@ def build_catstyle_image_generation_jobs(
     if scene_k == "":
         scene_k = None
 
+    render_k = str(render_style_profile_key).strip() if render_style_profile_key else None
+    if render_k == "":
+        render_k = None
+
     pack = generate_catstyle_daily_pack(
         day,
         top=top,
@@ -167,6 +180,7 @@ def build_catstyle_image_generation_jobs(
         skin_b=skin_b_c,
         world_template_key=world_k,
         scene_template_key=scene_k,
+        render_style_profile_key=render_k,
         compute_positions_fn=compute_positions_fn,
         orb_config=orb_config,
     )
@@ -205,6 +219,12 @@ def build_catstyle_image_generation_jobs(
     scene_template_profile = s_prof if isinstance(s_prof, dict) else None
     scene_template_key = (
         str(scene_template_profile["template_key"]) if scene_template_profile and "template_key" in scene_template_profile else None
+    )
+
+    rs_prof = pp.get("render_style_profile")
+    render_style_profile = rs_prof if isinstance(rs_prof, dict) else None
+    render_style_profile_key = (
+        str(render_style_profile["key"]) if render_style_profile and "key" in render_style_profile else None
     )
 
     vpp = max(1, int(variants_per_prompt))
@@ -264,6 +284,8 @@ def build_catstyle_image_generation_jobs(
                     scene_template_key=scene_template_key,
                     world_template_profile=world_template_profile,
                     scene_template_profile=scene_template_profile,
+                    render_style_profile_key=render_style_profile_key,
+                    render_style_profile=render_style_profile,
                 )
             )
 

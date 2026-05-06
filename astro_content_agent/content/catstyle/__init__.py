@@ -4,9 +4,15 @@ from astro_content_agent.content.catstyle.models import (
     AspectCatInteraction,
     CatstylePromptPack,
     CatstylePromptRequest,
+    CatstyleRenderStyleProfile,
     PlanetCatCanon,
     PlanetCatProfile,
     PlanetIdentityMarkerProfile,
+)
+from astro_content_agent.content.catstyle.render_style_profiles_v1 import (
+    get_render_style_profile,
+    list_render_style_profiles,
+    normalize_render_style_profile_key,
 )
 from astro_content_agent.content.catstyle.planet_bible_v0 import PLANET_CAT_PROFILES
 from astro_content_agent.content.catstyle.planet_canon_v1 import (
@@ -27,6 +33,7 @@ __all__ = [
     "AspectCatInteraction",
     "CatstylePromptPack",
     "CatstylePromptRequest",
+    "CatstyleRenderStyleProfile",
     "PLANET_CAT_CANONS",
     "PLANET_CAT_PROFILES",
     "PLANET_IDENTITY_MARKER_PROFILES",
@@ -36,6 +43,9 @@ __all__ = [
     "format_identity_markers_prompt_block",
     "get_planet_canon",
     "get_planet_identity_marker_profile",
+    "get_render_style_profile",
     "list_planet_canons",
     "list_planet_identity_marker_profiles",
+    "list_render_style_profiles",
+    "normalize_render_style_profile_key",
 ]
