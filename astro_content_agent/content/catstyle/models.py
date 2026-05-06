@@ -90,6 +90,27 @@ class CatstyleWorldTemplate(BaseModel):
     short_prompt_line: str
 
 
+class CatstyleRenderStyleProfile(BaseModel):
+    """Deterministic render finish / illustration quality targets (render style profiles v1)."""
+
+    key: str
+    label: str
+    description: str
+    style_core_line: str
+    composition_line: str
+    linework_line: str
+    shading_line: str
+    lighting_line: str
+    environment_line: str
+    detail_line: str
+    color_line: str
+    facial_expression_line: str
+    must_have_lines: list[str] = Field(default_factory=list, min_length=1)
+    avoid_lines: list[str] = Field(default_factory=list, min_length=1)
+    negative_prompt_additions: list[str] = Field(default_factory=list, min_length=1)
+    short_prompt_line: str
+
+
 class CatstyleSceneTemplate(BaseModel):
     """Deterministic hero beat / camera frame layered on world + canon (scene templates v1)."""
 
@@ -155,6 +176,10 @@ class CatstylePromptRequest(BaseModel):
         default=None,
         description="Optional scene beat template (identity markers and canon still apply).",
     )
+    render_style_profile_key: str = Field(
+        default="premium_comic_poster_v1",
+        description="Catstyle render finish profile v1 (empty string resolves to premium_comic_poster_v1 in generator).",
+    )
 
 
 class CatstylePromptPack(BaseModel):
@@ -173,6 +198,10 @@ class CatstylePromptPack(BaseModel):
     scene_template_profile: dict | None = Field(
         default=None,
         description="Serialized CatstyleSceneTemplate when a scene beat was applied.",
+    )
+    render_style_profile: dict | None = Field(
+        default=None,
+        description="Serialized CatstyleRenderStyleProfile applied to image prompts and negative prompt.",
     )
 
 

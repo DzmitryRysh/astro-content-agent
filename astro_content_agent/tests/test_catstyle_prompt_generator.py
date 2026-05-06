@@ -610,3 +610,120 @@ def test_incompatible_scene_template_raises() -> None:
             )
         )
 
+
+def test_default_render_style_is_premium_poster() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    req = CatstylePromptRequest(
+        planet_a="Moon",
+        planet_b="Uranus",
+        aspect_type="opposition",
+        mode="tension",
+        premium_art_direction=False,
+    )
+    assert req.render_style_profile_key == "premium_comic_poster_v1"
+
+
+def test_prompt_includes_render_style_block_default_profile() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Pluto",
+            planet_b="Venus",
+            aspect_type="conjunction",
+            mode="tension",
+            premium_art_direction=False,
+        )
+    )
+    raw = pack.image_prompts[0].lower()
+    assert "[render style v1 - high-priority visual finish]" in raw
+    assert pack.render_style_profile is not None
+    assert pack.render_style_profile["key"] == "premium_comic_poster_v1"
+
+
+def test_premium_render_style_keywords_movie_poster_lighting() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Jupiter",
+            planet_b="Mars",
+            aspect_type="square",
+            mode="tension",
+            render_style_profile_key="premium_comic_poster_v1",
+        )
+    )
+    raw = pack.image_prompts[0].lower()
+    assert "premium cinematic comic" in raw
+    assert "movie-poster" in raw or "movie poster" in raw.replace("-", " ")
+    assert "bold" in raw and "contour" in raw
+    assert "rim light" in raw or "rim-light" in raw.replace(" ", "-")
+
+
+def test_negative_prompt_includes_render_style_anti_flat_additions() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Moon",
+            planet_b="Uranus",
+            aspect_type="square",
+            mode="tension",
+        )
+    )
+    neg = pack.negative_prompt.lower()
+    assert "flat mascot sticker aesthetic" in neg or "flat mascot" in neg
+    assert "photorealistic" in neg or "photoreal" in neg
+
+
+def test_clean_cartoon_render_style_differs_from_premium() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Jupiter",
+            planet_b="Mars",
+            aspect_type="square",
+            mode="tension",
+            premium_art_direction=False,
+            render_style_profile_key="clean_cartoon_action_v1",
+        )
+    )
+    raw = pack.image_prompts[0].lower()
+    assert "[render style v1 - high-priority visual finish]" in raw
+    assert "cel" in raw or "graphic cartoon action" in raw
+    assert pack.render_style_profile is not None
+    assert pack.render_style_profile["key"] == "clean_cartoon_action_v1"
+
+
+def test_invalid_render_style_profile_raises() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    with pytest.raises(ValueError, match="Unknown Catstyle render style profile"):
+        generate_catstyle_prompt_pack(
+            CatstylePromptRequest(
+                planet_a="Jupiter",
+                planet_b="Mars",
+                aspect_type="square",
+                mode="tension",
+                render_style_profile_key="bogus_render_style",
+            )
+        )
+
+
+def test_prompt_pack_model_dump_includes_render_style_profile() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Pluto",
+            planet_b="Moon",
+            aspect_type="conjunction",
+            mode="tension",
+        )
+    )
+    blob = pack.model_dump(mode="json")
+    assert blob.get("render_style_profile") is not None
+    assert blob["render_style_profile"]["key"] == "premium_comic_poster_v1"
+

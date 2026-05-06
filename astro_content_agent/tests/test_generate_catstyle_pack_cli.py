@@ -253,6 +253,54 @@ def test_cli_rejects_invalid_scene_template(catstyle_cli, capsys: pytest.Capture
     assert "Unknown Catstyle scene template" in capsys.readouterr().err
 
 
+def test_cli_accepts_render_style_profile(catstyle_cli, capsys: pytest.CaptureFixture[str]) -> None:
+    old = sys.argv[:]
+    try:
+        sys.argv = [
+            "generate_catstyle_pack.py",
+            "--planet-a",
+            "Pluto",
+            "--planet-b",
+            "Mars",
+            "--aspect-type",
+            "square",
+            "--mode",
+            "tension",
+            "--variants-count",
+            "1",
+            "--render-style-profile",
+            "clean_cartoon_action_v1",
+        ]
+        assert catstyle_cli.main() == 0
+    finally:
+        sys.argv = old
+    out = capsys.readouterr().out.lower()
+    assert "[render style v1" in out
+    assert "render style:" in out
+
+
+def test_cli_rejects_invalid_render_style_profile(catstyle_cli, capsys: pytest.CaptureFixture[str]) -> None:
+    old = sys.argv[:]
+    try:
+        sys.argv = [
+            "generate_catstyle_pack.py",
+            "--planet-a",
+            "Pluto",
+            "--planet-b",
+            "Mars",
+            "--aspect-type",
+            "square",
+            "--mode",
+            "tension",
+            "--render-style-profile",
+            "not_a_render_style",
+        ]
+        assert catstyle_cli.main() == 1
+    finally:
+        sys.argv = old
+    assert "Unknown Catstyle render style profile" in capsys.readouterr().err
+
+
 def test_cli_default_variants_count_is_four(catstyle_cli, tmp_path: Path) -> None:
     """Omitting --variants-count uses model default (4)."""
     out_file = tmp_path / "default_variants.json"

@@ -30,6 +30,7 @@ def generate_catstyle_daily_pack(
     skin_b: str | None = None,
     world_template_key: str | None = None,
     scene_template_key: str | None = None,
+    render_style_profile_key: str | None = None,
     *,
     compute_positions_fn: Callable[..., dict[str, PlanetPosition]] | None = None,
     orb_config: dict[str, tuple[float, float]] | None = None,
@@ -41,6 +42,7 @@ def generate_catstyle_daily_pack(
 
     Optional ``skin_a`` / ``skin_b`` are passed through to ``CatstylePromptRequest`` (character_skins v0).
     Optional ``world_template_key`` / ``scene_template_key`` map to world/scene templates v1 when set.
+    Optional ``render_style_profile_key`` selects render finish v1 (omit for model default premium poster).
     """
     skin_a_c = str(skin_a).strip() if skin_a else None
     skin_b_c = str(skin_b).strip() if skin_b else None
@@ -55,6 +57,10 @@ def generate_catstyle_daily_pack(
         world_k = None
     if scene_k == "":
         scene_k = None
+
+    render_k = str(render_style_profile_key).strip() if render_style_profile_key else None
+    if render_k == "":
+        render_k = None
 
     mode = str(scan_mode).strip().lower()
     if mode not in ("noon", "day-window"):
@@ -89,7 +95,7 @@ def generate_catstyle_daily_pack(
     sel_dicts: list[dict] = []
     packs: list[dict] = []
     for c in selected:
-        req = CatstylePromptRequest(
+        req_kw: dict = dict(
             planet_a=c.planet_a,
             planet_b=c.planet_b,
             aspect_type=c.aspect_type,
@@ -101,6 +107,9 @@ def generate_catstyle_daily_pack(
             world_template_key=world_k,
             scene_template_key=scene_k,
         )
+        if render_k is not None:
+            req_kw["render_style_profile_key"] = render_k
+        req = CatstylePromptRequest(**req_kw)
         pack = generate_catstyle_prompt_pack(req)
         sel_dicts.append(candidate_to_editorial_dict(c, profile))
         packs.append(pack.model_dump(mode="json"))

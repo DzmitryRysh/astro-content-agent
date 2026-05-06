@@ -29,6 +29,7 @@ def _artifact_dict(
     skin_b: str | None,
     world_template_key: str | None,
     scene_template_key: str | None,
+    render_style_profile_key: str | None,
 ) -> dict:
     blob: dict = {
         "planet_a": planet_a,
@@ -52,6 +53,10 @@ def _artifact_dict(
         blob["world_template_profile"] = pack.world_template_profile
     if pack.scene_template_profile is not None:
         blob["scene_template_profile"] = pack.scene_template_profile
+    if render_style_profile_key:
+        blob["render_style_profile_key"] = render_style_profile_key
+    if pack.render_style_profile is not None:
+        blob["render_style_profile"] = pack.render_style_profile
     return blob
 
 
@@ -68,6 +73,9 @@ def _print_pack_readable(
         sk = (pack.scene_template_profile or {}).get("template_key", "(none)")
         print(f"  World tmpl:   {wk}")
         print(f"  Scene tmpl:   {sk}")
+    if pack.render_style_profile:
+        rk = (pack.render_style_profile or {}).get("key", "(none)")
+        print(f"  Render style: {rk}")
     print(f"  Aspect:       {aspect_type}")
     print(f"  Mode:         {mode}")
     print(f"  Variants:     {len(pack.image_prompts)}")
@@ -118,6 +126,12 @@ def main() -> int:
         dest="scene_template",
         help="Catstyle scene template key v1 (optional explicit hero beat).",
     )
+    ap.add_argument(
+        "--render-style-profile",
+        default=None,
+        dest="render_style_profile",
+        help="Catstyle render style profile key v1 (default: premium_comic_poster_v1).",
+    )
     ap.add_argument("--output", type=Path, default=None, help="Write JSON artifact to this path")
     args = ap.parse_args()
 
@@ -129,11 +143,14 @@ def main() -> int:
         world_template = None
     if scene_template == "":
         scene_template = None
+    render_style = str(args.render_style_profile).strip() if args.render_style_profile else None
+    if render_style == "":
+        render_style = None
 
     try:
         pa = normalize_planet_name(args.planet_a)
         pb = normalize_planet_name(args.planet_b)
-        req = CatstylePromptRequest(
+        req_kw = dict(
             planet_a=args.planet_a,
             planet_b=args.planet_b,
             aspect_type=args.aspect_type,
@@ -144,6 +161,9 @@ def main() -> int:
             world_template_key=world_template,
             scene_template_key=scene_template,
         )
+        if render_style is not None:
+            req_kw["render_style_profile_key"] = render_style
+        req = CatstylePromptRequest(**req_kw)
         pack = generate_catstyle_prompt_pack(req)
     except ValueError as e:
         print(str(e), file=sys.stderr)
@@ -164,6 +184,7 @@ def main() -> int:
             skin_b=skin_b,
             world_template_key=world_template,
             scene_template_key=scene_template,
+            render_style_profile_key=render_style,
         )
         out_path.write_text(json.dumps(blob, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         print(f"Wrote artifact: {out_path}")

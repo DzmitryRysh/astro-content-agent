@@ -65,6 +65,12 @@ def main() -> int:
         dest="scene_template",
         help="Optional Catstyle scene template key v1 passed into daily pack prompts.",
     )
+    ap.add_argument(
+        "--render-style-profile",
+        default=None,
+        dest="render_style_profile",
+        help="Optional Catstyle render style profile key v1 passed into daily pack prompts.",
+    )
     args = ap.parse_args()
 
     try:
@@ -88,6 +94,7 @@ def main() -> int:
             skin_b=args.skin_b,
             world_template_key=args.world_template,
             scene_template_key=args.scene_template,
+            render_style_profile_key=args.render_style_profile,
         )
     except ValueError as e:
         print(str(e), file=sys.stderr)
