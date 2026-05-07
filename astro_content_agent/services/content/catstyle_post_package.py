@@ -99,7 +99,9 @@ def _classify_aspect_copy_profile(
     Deterministic aspect-aware Russian copy family (v1).
 
     Returns one of: ``jupiter_mars_tension``, ``pluto_mars_square_tension``,
-    ``venus_pluto_opposition_tension``, ``generic``.
+    ``venus_pluto_opposition_tension``, ``moon_saturn_square_tension``,
+    ``venus_mars_square_tension``, ``mercury_neptune_square_tension``,
+    ``sun_uranus_square_tension``, ``jupiter_saturn_square_tension``, ``generic``.
     """
     pa, pb, asp, mode = _aspect_identity_from_sources(selected, jobs)
     pair = _norm_pair(pa, pb)
@@ -117,6 +119,21 @@ def _classify_aspect_copy_profile(
 
     if pair == frozenset({"venus", "pluto"}) and aspect_l == "opposition" and mode_l == "tension":
         return "venus_pluto_opposition_tension"
+
+    if pair == frozenset({"moon", "saturn"}) and aspect_l == "square" and mode_l == "tension":
+        return "moon_saturn_square_tension"
+
+    if pair == frozenset({"venus", "mars"}) and aspect_l == "square" and mode_l == "tension":
+        return "venus_mars_square_tension"
+
+    if pair == frozenset({"mercury", "neptune"}) and aspect_l == "square" and mode_l == "tension":
+        return "mercury_neptune_square_tension"
+
+    if pair == frozenset({"sun", "uranus"}) and aspect_l == "square" and mode_l == "tension":
+        return "sun_uranus_square_tension"
+
+    if pair == frozenset({"jupiter", "saturn"}) and aspect_l == "square" and mode_l == "tension":
+        return "jupiter_saturn_square_tension"
 
     return "generic"
 
@@ -221,6 +238,178 @@ def _ru_venus_pluto_opposition_tension() -> tuple[str, str, str, str, str]:
         "☐ Один ясный посыл — не расплывчатая мистика ради хайпа.\n"
         "☐ Карусель читается без текста на арте.\n"
         "☐ Юмор/дисклеймер на месте по правилам канала."
+    )
+    return hook, caption, carousel, compensation, checklist
+
+
+def _ru_moon_saturn_square_tension() -> tuple[str, str, str, str, str]:
+    hook = (
+        "Луна в квадрате к Сатурну: внутренний ребёнок просит плед, "
+        "внутренний взрослый уже достал таблицу штрафов."
+    )
+    caption = (
+        "Эмоциональный холодный фронт: Луна хочет безопасности, мягкости и честного «мне больно», "
+        "а Сатурн требует рамок, контроля и отчёта по ответственности. "
+        "Не трагедия, а напряжение между уязвимостью и дисциплиной. "
+        "Сарказм можно, самоиздевательство — в архив. "
+        "Задача не заморозить чувства, а дать им форму, в которой ты не разваливаешься."
+    )
+    carousel = (
+        "Слайд 1 — Обложка: контраст мягкости и жёсткого контура, без текста на арте.\n"
+        "Слайд 2 — Луна: «мне нужна опора» — чувствительность, честность, контакт.\n"
+        "Слайд 3 — Сатурн: «держим форму» — границы, структура, взрослая ответственность.\n"
+        "Слайд 4 — Вывод: чувство не враг дисциплины, если у дисциплины есть человеческий голос."
+    )
+    compensation = (
+        "Компенсация:\n"
+        "• не наказывай себя за чувства, даже если они мешают графику;\n"
+        "• назови одну реальную потребность прямо и без стыда;\n"
+        "• выбери одно маленькое взрослое действие на сегодня;\n"
+        "• добавь рутину отдыха/тела, чтобы нервная система не жила в режиме экзамена."
+    )
+    checklist = (
+        "Чеклист:\n"
+        "☐ Назвал чувство и не превратил его в самокритику.\n"
+        "☐ Зафиксировал одну реальную потребность.\n"
+        "☐ Сделал одно маленькое взрослое действие.\n"
+        "☐ Дал телу базовый режим: сон / еда / пауза."
+    )
+    return hook, caption, carousel, compensation, checklist
+
+
+def _ru_venus_mars_square_tension() -> tuple[str, str, str, str, str]:
+    hook = (
+        "Венера спорит с Марсом: флирт ещё подаёт десерт, "
+        "а Марс уже стучит вилкой по столу «давай сейчас»."
+    )
+    caption = (
+        "Квадрат с искрами: Венера тянет к контакту, удовольствию и красивой подаче, "
+        "Марс требует скорости, жара и немедленного действия. "
+        "Химия есть, но это не лицензия на хаос. "
+        "Ирония в том, что нетерпение легко выдаёт себя за страсть, "
+        "а потом оставляет уборку тем, кто хотел просто нормальной близости."
+    )
+    carousel = (
+        "Слайд 1 — Обложка: притяжение и искра в одном кадре, без текста на арте.\n"
+        "Слайд 2 — Венера: шарм, контакт, удовольствие без войны.\n"
+        "Слайд 3 — Марс: жар, напор, «сейчас или никогда».\n"
+        "Слайд 4 — Вывод: желание — это топливо, не оправдание для разрушения сцены."
+    )
+    compensation = (
+        "Компенсация:\n"
+        "• не путай химию с разрешением устраивать хаос;\n"
+        "• замедли один импульс перед действием;\n"
+        "• сформулируй один честный запрос вместо пассивной агрессии;\n"
+        "• переведи жар в движение, спорт или творческое действие."
+    )
+    checklist = (
+        "Чеклист:\n"
+        "☐ Отделил притяжение от импульсивной атаки.\n"
+        "☐ Замедлил один «срочно» импульс.\n"
+        "☐ Сказал один честный запрос словами.\n"
+        "☐ Канализировал энергию в движение/творчество."
+    )
+    return hook, caption, carousel, compensation, checklist
+
+
+def _ru_mercury_neptune_square_tension() -> tuple[str, str, str, str, str]:
+    hook = (
+        "Меркурий в квадрате к Нептуну: слова красивые, "
+        "сигнал плавает, а дедлайн внезапно уходит в мифологию."
+    )
+    caption = (
+        "Туманная коммуникация: Меркурий хочет фактов, ясности и точных вопросов, "
+        "Нептун тянет в символы, фантазии и комфортный «потом разберёмся». "
+        "Опасность не в мечте, а в том, что обещания становятся акварелью без контуров. "
+        "Полезное правило дня: если нельзя проверить, не надо делать вид, что это уже правда."
+    )
+    carousel = (
+        "Слайд 1 — Обложка: ясная линия против туманного слоя, без текста на арте.\n"
+        "Слайд 2 — Меркурий: факт, вопрос, проверка.\n"
+        "Слайд 3 — Нептун: образ, интуиция, риск красивой путаницы.\n"
+        "Слайд 4 — Вывод: мечтать можно, но договорённости любят конкретику."
+    )
+    compensation = (
+        "Компенсация:\n"
+        "• запиши ключевое письменно, не доверяй «я помню»;\n"
+        "• проверь факты до вывода;\n"
+        "• отложи крупные заключения, пока туман не спадёт;\n"
+        "• задай один прямой вопрос вместо трёх намёков."
+    )
+    checklist = (
+        "Чеклист:\n"
+        "☐ Всё важное зафиксировано письменно.\n"
+        "☐ Проверил факты, а не только ощущения.\n"
+        "☐ Не сделал больших выводов в тумане.\n"
+        "☐ Задал один прямой вопрос."
+    )
+    return hook, caption, carousel, compensation, checklist
+
+
+def _ru_sun_uranus_square_tension() -> tuple[str, str, str, str, str]:
+    hook = (
+        "Солнце в квадрате к Урану: роль трещит, "
+        "а правда в стиле «я вообще-то не про это» требует микрофон."
+    )
+    caption = (
+        "Электрическое напряжение идентичности: Солнце хочет центр и цельное самовыражение, "
+        "Уран рвёт сценарий ради свободы, неожиданности и странной честности. "
+        "Драма не обязательна, но соблазн «сжечь всё ради вдоха» очень реален. "
+        "Умный ход — менять систему сознательно, а не устраивать фейерверк из биографии."
+    )
+    carousel = (
+        "Слайд 1 — Обложка: стабильный центр и электрический разрыв, без текста на арте.\n"
+        "Слайд 2 — Солнце: уверенность, авторство, связный голос.\n"
+        "Слайд 3 — Уран: свобода, сюрприз, разрыв старой роли.\n"
+        "Слайд 4 — Вывод: революция эффективнее, когда у неё есть инженерный план."
+    )
+    compensation = (
+        "Компенсация:\n"
+        "• измени одну вещь сознательно, а не десять в панике;\n"
+        "• не сжигай всю сцену ради одного вдоха свободы;\n"
+        "• дай бунту умный канал: проект, формат, правило эксперимента;\n"
+        "• зафиксируй, что именно ты освобождаешь и зачем."
+    )
+    checklist = (
+        "Чеклист:\n"
+        "☐ Сделал одно осознанное изменение.\n"
+        "☐ Не разрушил рабочее ради мгновенного эффекта.\n"
+        "☐ Направил бунт в конкретный канал.\n"
+        "☐ Понимаю «что/зачем» в этом обновлении."
+    )
+    return hook, caption, carousel, compensation, checklist
+
+
+def _ru_jupiter_saturn_square_tension() -> tuple[str, str, str, str, str]:
+    hook = (
+        "Юпитер спорит с Сатурном: горизонт уже зовёт в экспансию, "
+        "а календарь сухо спрашивает «чем докажешь?»."
+    )
+    caption = (
+        "Квадрат роста и рамки: Юпитер хочет масштаб, веру и большой вектор, "
+        "Сатурн требует доказательств, дисциплины и границ по времени. "
+        "Без зрелости это качели между фейковым оптимизмом и параличом страха. "
+        "С иронией, но по-взрослому: мечта должна пережить встречу с таблицей задач."
+    )
+    carousel = (
+        "Слайд 1 — Обложка: большой горизонт и строгая конструкция, без текста на арте.\n"
+        "Слайд 2 — Юпитер: смысл, рост, «давай шире».\n"
+        "Слайд 3 — Сатурн: проверка, дедлайн, «покажи основу».\n"
+        "Слайд 4 — Вывод: масштаб работает, когда у него есть несущие стены."
+    )
+    compensation = (
+        "Компенсация:\n"
+        "• сократи мечту до одного измеримого следующего шага;\n"
+        "• поставь одну чёткую границу ресурсов;\n"
+        "• назначь один дедлайн и критерий результата;\n"
+        "• без фальшивого оптимизма и без паралича страхом."
+    )
+    checklist = (
+        "Чеклист:\n"
+        "☐ Есть один измеримый следующий шаг.\n"
+        "☐ Определена одна рабочая граница.\n"
+        "☐ Поставлен один дедлайн.\n"
+        "☐ Тон без самообмана и без катастрофизации."
     )
     return hook, caption, carousel, compensation, checklist
 
@@ -394,6 +583,16 @@ def build_catstyle_post_package(
         hook, caption, carousel, compensation, checklist = _ru_pluto_mars_square_tension()
     elif profile_key == "venus_pluto_opposition_tension":
         hook, caption, carousel, compensation, checklist = _ru_venus_pluto_opposition_tension()
+    elif profile_key == "moon_saturn_square_tension":
+        hook, caption, carousel, compensation, checklist = _ru_moon_saturn_square_tension()
+    elif profile_key == "venus_mars_square_tension":
+        hook, caption, carousel, compensation, checklist = _ru_venus_mars_square_tension()
+    elif profile_key == "mercury_neptune_square_tension":
+        hook, caption, carousel, compensation, checklist = _ru_mercury_neptune_square_tension()
+    elif profile_key == "sun_uranus_square_tension":
+        hook, caption, carousel, compensation, checklist = _ru_sun_uranus_square_tension()
+    elif profile_key == "jupiter_saturn_square_tension":
+        hook, caption, carousel, compensation, checklist = _ru_jupiter_saturn_square_tension()
     else:
         hook, caption, carousel, compensation, checklist = _ru_generic(pa_e, pb_e, asp_e)
 
