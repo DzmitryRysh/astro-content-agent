@@ -1,0 +1,282 @@
+"""Catstyle Manual Review v1 — deterministic local artifact for human producers before IG publishing."""
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Any, Literal
+
+from pydantic import BaseModel, Field
+
+from astro_content_agent.services.content.catstyle_post_package_quality import (
+    CatstylePostPackageQualityResult,
+    check_catstyle_post_package,
+)
+
+MANUAL_REVIEW_VERSION = "catstyle-manual-review-v1"
+
+SUGGESTED_DECISIONS: list[dict[str, str]] = [
+    {
+        "value": "approve",
+        "description": "Ship as-is after any tiny polish (typos, line breaks). Images and copy are good enough to post manually.",
+    },
+    {
+        "value": "revise_text",
+        "description": "Keep the approved images; rewrite hook, caption, compensation, and/or carousel text before publishing.",
+    },
+    {
+        "value": "regenerate_images",
+        "description": "Copy direction is acceptable; rerun image generation or pick alternates, then re-run post package + QC.",
+    },
+    {
+        "value": "reject",
+        "description": "Do not publish this package. Restart from prompts, references, or aspect selection.",
+    },
+]
+
+REVIEW_QUESTIONS: list[str] = [
+    # Изображение
+    "Основная картинка сильнее альтернативной?",
+    "Символы планет видны, но не перегружены?",
+    "Маркеры Юпитера и Марса выглядят правильно?",
+    "Картинка избегает CGI/game-render/детского mascot-стиля?",
+    "Зодиакальная арена читается без визуального мусора?",
+    "Композиция достаточно сильная для первого слайда Instagram?",
+    # Текст
+    "Hook короткий и острый?",
+    "Caption звучит как Catstyle: космично, дерзко, чуть саркастично, но полезно?",
+    "Компенсация практичная, а не generic?",
+    "Текст карусели можно использовать?",
+    # Публикация
+    "Package quality готов?",
+    "Ты бы опубликовал это вручную сегодня?",
+    "Что нужно поправить перед публикацией?",
+]
+
+
+def load_catstyle_post_package_json(package_dir: Path | str) -> dict[str, Any]:
+    """Load ``post_package.json`` from a Catstyle post package directory."""
+    root = Path(package_dir).expanduser().resolve()
+    jp = root / "post_package.json"
+    if not jp.is_file():
+        raise FileNotFoundError(f"Missing post_package.json in {root}")
+    raw = jp.read_text(encoding="utf-8-sig")
+    data = json.loads(raw)
+    if not isinstance(data, dict):
+        raise ValueError("post_package.json root must be a JSON object.")
+    return data
+
+
+class CatstyleManualReview(BaseModel):
+    """Human-facing review worksheet derived from ``post_package.json`` + optional QC."""
+
+    version: str = MANUAL_REVIEW_VERSION
+    date: str
+    package_dir: str
+    quality_status: Literal["ready", "needs_attention"]
+    quality_score: int = Field(ge=0, le=100)
+    quality_errors: list[str] = Field(default_factory=list)
+    quality_warnings: list[str] = Field(default_factory=list)
+    recommended_primary_image: str | None = None
+    generated_image_paths: list[str] = Field(default_factory=list)
+    style_reference_image_path: str | None = None
+    hook: str = ""
+    caption: str = ""
+    compensation: str = ""
+    checklist: str = ""
+    carousel_slide_text: str = ""
+    review_questions: list[str] = Field(default_factory=list)
+    suggested_decisions: list[dict[str, str]] = Field(default_factory=list)
+    approval_status: Literal["pending_review", "approve", "revise_text", "regenerate_images", "reject"] = (
+        "pending_review"
+    )
+    reviewer_notes: str = ""
+
+
+def build_catstyle_manual_review(
+    package_dir: Path | str,
+    *,
+    quality_result: CatstylePostPackageQualityResult | None = None,
+) -> CatstyleManualReview:
+    """Build a manual review record from ``post_package.json`` and the quality gate."""
+    root = Path(package_dir).expanduser().resolve()
+    pkg = load_catstyle_post_package_json(root)
+
+    qc = quality_result if quality_result is not None else check_catstyle_post_package(root)
+
+    date = str(pkg.get("date") or "").strip()
+    if not date:
+        raise ValueError("post_package.json missing required field: date")
+
+    gen_paths = pkg.get("generated_image_paths")
+    paths_out: list[str] = []
+    if isinstance(gen_paths, list):
+        paths_out = [str(x) for x in gen_paths if isinstance(x, str) and str(x).strip()]
+
+    primary = pkg.get("recommended_primary_image")
+    primary_out = str(primary).strip() if isinstance(primary, str) and primary.strip() else None
+
+    style_ref = pkg.get("style_reference_image_path")
+    style_out = str(style_ref).strip() if isinstance(style_ref, str) and style_ref.strip() else None
+
+    car = pkg.get("carousel_slide_text")
+    carousel = str(car) if isinstance(car, str) else ""
+
+    def _str_field(key: str) -> str:
+        v = pkg.get(key)
+        return str(v) if isinstance(v, str) else ""
+
+    return CatstyleManualReview(
+        date=date,
+        package_dir=str(root),
+        quality_status=qc.status,
+        quality_score=qc.score,
+        quality_errors=list(qc.errors),
+        quality_warnings=list(qc.warnings),
+        recommended_primary_image=primary_out,
+        generated_image_paths=paths_out,
+        style_reference_image_path=style_out,
+        hook=_str_field("hook"),
+        caption=_str_field("caption"),
+        compensation=_str_field("compensation"),
+        checklist=_str_field("checklist"),
+        carousel_slide_text=carousel,
+        review_questions=list(REVIEW_QUESTIONS),
+        suggested_decisions=list(SUGGESTED_DECISIONS),
+        approval_status="pending_review",
+        reviewer_notes="",
+    )
+
+
+def render_catstyle_manual_review_markdown(review: CatstyleManualReview) -> str:
+    """Readable Markdown worksheet for producers."""
+    lines: list[str] = [
+        f"# Catstyle manual review — {review.date}",
+        "",
+        "## Package summary",
+        "",
+        f"- **Package directory:** `{review.package_dir}`",
+        f"- **Recommended primary image:** {review.recommended_primary_image or '_(none)_'}",
+        f"- **Style reference:** {review.style_reference_image_path or '_(none)_'}",
+        "",
+        "## Quality summary",
+        "",
+        f"- **Status:** {review.quality_status}",
+        f"- **Score:** {review.quality_score}",
+        "",
+    ]
+    lines.extend(["### Quality errors", ""])
+    if review.quality_errors:
+        for e in review.quality_errors:
+            lines.append(f"- {e}")
+    else:
+        lines.append("- _(none)_")
+    lines.extend(["", "### Quality warnings", ""])
+    if review.quality_warnings:
+        for w in review.quality_warnings:
+            lines.append(f"- {w}")
+    else:
+        lines.append("- _(none)_")
+
+    lines.extend(
+        [
+            "",
+            "## Generated images",
+            "",
+        ]
+    )
+    if review.generated_image_paths:
+        for p in review.generated_image_paths:
+            lines.append(f"- `{p}`")
+    else:
+        lines.append("- _(none listed)_")
+
+    lines.extend(
+        [
+            "",
+            "## Hook",
+            "",
+            review.hook or "_(empty)_",
+            "",
+            "## Caption",
+            "",
+            review.caption or "_(empty)_",
+            "",
+            "## Compensation",
+            "",
+            review.compensation or "_(empty)_",
+            "",
+            "## Post checklist (from package)",
+            "",
+            review.checklist or "_(empty)_",
+            "",
+            "## Carousel text",
+            "",
+            review.carousel_slide_text or "_(empty)_",
+            "",
+            "## Review questions",
+            "",
+        ]
+    )
+    for i, q in enumerate(review.review_questions, start=1):
+        lines.append(f"{i}. {q}")
+        lines.append("   - [ ] Заметки: _______________________________________________")
+    lines.extend(
+        [
+            "",
+            "## Suggested decisions (reference)",
+            "",
+        ]
+    )
+    for sd in review.suggested_decisions:
+        lines.append(f"- **`{sd['value']}`:** {sd['description']}")
+    lines.extend(
+        [
+            "",
+            "## Decision",
+            "",
+            f"- **approval_status (current):** `{review.approval_status}`",
+            "",
+            "### Заметки рецензента",
+            "",
+            "_(пусто — заполнить после ревью)_",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def write_catstyle_manual_review(
+    review: CatstyleManualReview,
+    output_dir: Path | str,
+    *,
+    overwrite: bool = False,
+) -> list[str]:
+    """Write ``manual_review.json`` (UTF-8) and ``manual_review.md`` (UTF-8 with BOM)."""
+    out = Path(output_dir).expanduser().resolve()
+    out.mkdir(parents=True, exist_ok=True)
+
+    targets: dict[str, tuple[str, str]] = {
+        "manual_review.json": ("utf-8", json.dumps(review.model_dump(mode="json"), indent=2, ensure_ascii=False) + "\n"),
+        "manual_review.md": ("utf-8-sig", render_catstyle_manual_review_markdown(review).rstrip("\n") + "\n"),
+    }
+
+    written: list[str] = []
+    for name, (enc, body) in targets.items():
+        dest = out / name
+        if dest.exists() and not overwrite:
+            raise FileExistsError(f"Refusing to overwrite existing file (use --overwrite): {dest}")
+        dest.write_text(body, encoding=enc)
+        written.append(name)
+    return written
+
+
+__all__ = [
+    "MANUAL_REVIEW_VERSION",
+    "REVIEW_QUESTIONS",
+    "SUGGESTED_DECISIONS",
+    "CatstyleManualReview",
+    "build_catstyle_manual_review",
+    "load_catstyle_post_package_json",
+    "render_catstyle_manual_review_markdown",
+    "write_catstyle_manual_review",
+]
