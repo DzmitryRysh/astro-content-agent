@@ -62,34 +62,63 @@ def _infer_shot_mode(manifest: dict[str, Any], jobs: list[dict[str, Any]]) -> st
     return "standard"
 
 
-def _is_jupiter_mars_tension_pack(selected: dict[str, Any] | None, jobs: list[dict[str, Any]]) -> bool:
-    def check(pa: str | None, pb: str | None, asp: str | None, mode: str | None) -> bool:
-        if not pa or not pb:
-            return False
-        a, b = pa.lower(), pb.lower()
-        planets = {a, b} == {"jupiter", "mars"}
-        aspect = (asp or "").lower()
-        mode_l = (mode or "").lower()
-        aspect_hard = aspect in ("square", "opposition")
-        mode_tension = mode_l == "tension"
-        return planets and (aspect_hard or mode_tension)
+def _aspect_identity_from_sources(
+    selected: dict[str, Any] | None, jobs: list[dict[str, Any]]
+) -> tuple[str | None, str | None, str | None, str | None]:
+    """Return ``planet_a``, ``planet_b``, ``aspect_type``, ``mode`` preserving manifest/job casing."""
+    if selected:
+        pa = str(selected.get("planet_a") or "").strip() or None
+        pb = str(selected.get("planet_b") or "").strip() or None
+        asp = str(selected.get("aspect_type") or "").strip() or None
+        mode = str(selected.get("mode_recommendation") or "").strip() or None
+        if pa and pb:
+            return pa, pb, asp, mode
+    if jobs:
+        j = jobs[0]
+        pa = str(j.get("planet_a") or "").strip() or None
+        pb = str(j.get("planet_b") or "").strip() or None
+        asp = str(j.get("aspect_type") or "").strip() or None
+        mode = str(j.get("mode") or "").strip() or None
+        return pa, pb, asp, mode
+    return None, None, None, None
 
-    if selected and check(
-        str(selected.get("planet_a") or "") or None,
-        str(selected.get("planet_b") or "") or None,
-        str(selected.get("aspect_type") or "") or None,
-        str(selected.get("mode_recommendation") or "") or None,
-    ):
-        return True
-    for j in jobs[:1]:
-        if check(
-            str(j.get("planet_a") or "") or None,
-            str(j.get("planet_b") or "") or None,
-            str(j.get("aspect_type") or "") or None,
-            str(j.get("mode") or "") or None,
-        ):
-            return True
-    return False
+
+def _norm_pair(pa: str | None, pb: str | None) -> frozenset[str] | None:
+    if not pa or not pb:
+        return None
+    a, b = pa.strip().lower(), pb.strip().lower()
+    if not a or not b:
+        return None
+    return frozenset({a, b})
+
+
+def _classify_aspect_copy_profile(
+    selected: dict[str, Any] | None, jobs: list[dict[str, Any]]
+) -> str:
+    """
+    Deterministic aspect-aware Russian copy family (v1).
+
+    Returns one of: ``jupiter_mars_tension``, ``pluto_mars_square_tension``,
+    ``venus_pluto_opposition_tension``, ``generic``.
+    """
+    pa, pb, asp, mode = _aspect_identity_from_sources(selected, jobs)
+    pair = _norm_pair(pa, pb)
+    if pair is None:
+        return "generic"
+    aspect_l = (asp or "").lower()
+    mode_l = (mode or "").lower()
+
+    if pair == frozenset({"jupiter", "mars"}):
+        if aspect_l in ("square", "opposition") or mode_l == "tension":
+            return "jupiter_mars_tension"
+
+    if pair == frozenset({"pluto", "mars"}) and aspect_l == "square" and mode_l == "tension":
+        return "pluto_mars_square_tension"
+
+    if pair == frozenset({"venus", "pluto"}) and aspect_l == "opposition" and mode_l == "tension":
+        return "venus_pluto_opposition_tension"
+
+    return "generic"
 
 
 def _ru_jupiter_mars_square() -> tuple[str, str, str, str, str]:
@@ -123,6 +152,75 @@ def _ru_jupiter_mars_square() -> tuple[str, str, str, str, str]:
         "☐ Сформулировал один измеримый результат.\n"
         "☐ Отделил импульс от «докажу-что-я-могу-сломать».\n"
         "☐ Дал энергии канал: спорт / глубокая работа / план на 3 шага."
+    )
+    return hook, caption, carousel, compensation, checklist
+
+
+def _ru_pluto_mars_square_tension() -> tuple[str, str, str, str, str]:
+    hook = (
+        "Плутон против Марса: контроль против удара в лоб. "
+        "Марс уже занёс кулак — Плутон уже подкопал под фундамент."
+    )
+    caption = (
+        "Квадрат со вкусом стратегического сноса: Марс орёт «ударить сейчас», "
+        "Плутон шепчет «я перехвачу всю подковёрную механику». Это не театр злодеев — "
+        "это давление, где сырая сила хочет доказаться разрушением, "
+        "а глубина тянет удержать процесс целиком. "
+        "Остроумие бесплатно, последствия — по расписанию дисциплины."
+    )
+    carousel = (
+        "Слайд 1 — Обложка: два планетных кота в жёстком напряжении, без текста на арте.\n"
+        "Слайд 2 — Марс: «бей сейчас» — импульс, жар, удар без паузы.\n"
+        "Слайд 3 — Плутон: «держу систему» — скрытые рычаги, контроль, трансформация через давление.\n"
+        "Слайд 4 — Вывод: сила без точки приложения — шум; точка приложения без меры — дорого."
+    )
+    compensation = (
+        "Компенсация (если квадрат давит в лоб):\n"
+        "• не доказывай мощь через уничтожение — выбери одно контролируемое действие;\n"
+        "• один измеримый шаг вместо серии «для эффекта»;\n"
+        "• переведи жару в фокусную работу, тело или конкретную стратегию с ясным критерием «готово»;\n"
+        "• если лезет «сломаю ради статуса» — смени канал до охлаждения."
+    )
+    checklist = (
+        "Чеклист перед постом:\n"
+        "☐ Одно действие без демонстрации разрушительной силы.\n"
+        "☐ Ясный измеримый результат.\n"
+        "☐ Импульс отделён от «разнесу ради доказательства».\n"
+        "☐ Энергия ушла в работу / тело / план с контрольной точкой."
+    )
+    return hook, caption, carousel, compensation, checklist
+
+
+def _ru_venus_pluto_opposition_tension() -> tuple[str, str, str, str, str]:
+    hook = (
+        "Венера против Плутона: притяжение на виду, власть — в глубине. "
+        "Венера хочет контакта и красоты без лишней боли, Плутон — правды и полного рычага."
+    )
+    caption = (
+        "Оппозиция в духе «магнитизм под давлением»: Венера тянет к удовольствию, такту и лёгкому «давай приятно», "
+        "Плутон включает контроль, глубину и соблазн тотальной правки чужой реальности. "
+        "Без морали на три страницы: просто острое напоминание, что интенсивность легко принять за любовь к себе, "
+        "если не проверить цену входа. Сарказм — как специя; границы — как страховка."
+    )
+    carousel = (
+        "Слайд 1 — Обложка: контраст шарма и давления, без текста на арте.\n"
+        "Слайд 2 — Венера: контакт, эстетика, желание близости без перегруза драмой.\n"
+        "Слайд 3 — Плутон: проверка на искренность, власть игры, соблазн «забрать сцену целиком».\n"
+        "Слайд 4 — Вывод: страсть без ясности превращается в сериал с плохим сценарием."
+    )
+    compensation = (
+        "Компенсация:\n"
+        "• не обменивай самооценку на интенсивность «это же судьба»;\n"
+        "• одна честная граница — без театра и без шантажа себе;\n"
+        "• переведи притяжение и давление в творчество, заземление в теле или один спокойный разговор по фактам;\n"
+        "• если лезет одержимость проверкой — верни фокус на действие, которое не унижает ни одну сторону."
+    )
+    checklist = (
+        "Чеклист:\n"
+        "☐ Тон поста попадает в пару Венера–Плутон без морализаторства.\n"
+        "☐ Один ясный посыл — не расплывчатая мистика ради хайпа.\n"
+        "☐ Карусель читается без текста на арте.\n"
+        "☐ Юмор/дисклеймер на месте по правилам канала."
     )
     return hook, caption, carousel, compensation, checklist
 
@@ -191,12 +289,20 @@ class CatstylePostPackage(BaseModel):
     version: str = POST_PACKAGE_VERSION
     date: str
     aspect_summary: str | None = None
+    planet_a: str | None = Field(default=None, description="Primary aspect planet A (echoed from manifest/jobs).")
+    planet_b: str | None = Field(default=None, description="Primary aspect planet B (echoed from manifest/jobs).")
+    aspect_type: str | None = Field(default=None, description="Major aspect type for the primary pair.")
+    mode: str | None = Field(default=None, description="Catstyle mode for the primary pair (e.g. tension).")
     editorial_profile: str
     world_template: str | None = None
     scene_template: str | None = None
     render_style_profile: str | None = None
     shot_mode: str | None = None
     style_reference_image_path: str | None = None
+    manual_aspect_override: dict[str, Any] | None = Field(
+        default=None,
+        description="Echo of manifest manual_aspect_override when jobs used explicit aspect selection (v1).",
+    )
     image_jobs_summary: list[dict[str, Any]] = Field(default_factory=list)
     generated_image_paths: list[str] = Field(default_factory=list)
     recommended_primary_image: str | None = None
@@ -233,6 +339,17 @@ def build_catstyle_post_package(
     aspect_summary = _aspect_summary(selected)
     shot_mode = _infer_shot_mode(raw, jobs)
 
+    mo_raw = raw.get("manual_aspect_override")
+    manual_aspect_override_out: dict[str, Any] | None = None
+    if isinstance(mo_raw, dict) and mo_raw.get("enabled") is True:
+        manual_aspect_override_out = {
+            "enabled": True,
+            "planet_a": str(mo_raw.get("planet_a") or ""),
+            "planet_b": str(mo_raw.get("planet_b") or ""),
+            "aspect_type": str(mo_raw.get("aspect_type") or ""),
+            "mode": str(mo_raw.get("mode") or ""),
+        }
+
     def _key_opt(gen):
         k = next(gen, None)
         return k if k else None
@@ -268,13 +385,17 @@ def build_catstyle_post_package(
 
     gen_paths, primary = _collect_generated_paths(jobs, gen_path)
 
-    pa_g = str(selected.get("planet_a")) if selected else None
-    pb_g = str(selected.get("planet_b")) if selected else None
-    asp_g = str(selected.get("aspect_type")) if selected else None
-    if _is_jupiter_mars_tension_pack(selected, jobs):
+    pa_e, pb_e, asp_e, mode_e = _aspect_identity_from_sources(selected, jobs)
+
+    profile_key = _classify_aspect_copy_profile(selected, jobs)
+    if profile_key == "jupiter_mars_tension":
         hook, caption, carousel, compensation, checklist = _ru_jupiter_mars_square()
+    elif profile_key == "pluto_mars_square_tension":
+        hook, caption, carousel, compensation, checklist = _ru_pluto_mars_square_tension()
+    elif profile_key == "venus_pluto_opposition_tension":
+        hook, caption, carousel, compensation, checklist = _ru_venus_pluto_opposition_tension()
     else:
-        hook, caption, carousel, compensation, checklist = _ru_generic(pa_g, pb_g, asp_g)
+        hook, caption, carousel, compensation, checklist = _ru_generic(pa_e, pb_e, asp_e)
 
     # Prefer first job carousel_idea as EN snippet hint only when generic? User asked deterministic Russian — keep Russian carousel.
     # Optionally append job carousel as metadata line in markdown only.
@@ -282,12 +403,17 @@ def build_catstyle_post_package(
     return CatstylePostPackage(
         date=date,
         aspect_summary=aspect_summary,
+        planet_a=pa_e,
+        planet_b=pb_e,
+        aspect_type=asp_e,
+        mode=mode_e,
         editorial_profile=editorial_profile,
         world_template=wt,
         scene_template=st,
         render_style_profile=rsp,
         shot_mode=shot_mode,
         style_reference_image_path=style_ref,
+        manual_aspect_override=manual_aspect_override_out,
         image_jobs_summary=image_jobs_summary,
         generated_image_paths=gen_paths,
         recommended_primary_image=primary,
@@ -308,6 +434,18 @@ def render_catstyle_post_package_markdown(pkg: CatstylePostPackage) -> str:
         f"- **Manifest:** `{pkg.source_manifest_path}`",
         f"- **Editorial profile:** {pkg.editorial_profile}",
         f"- **Aspect summary:** {pkg.aspect_summary or '_(none)_'}",
+        f"- **Planet pair:** {pkg.planet_a or '_(none)_'} / {pkg.planet_b or '_(none)_'}",
+        f"- **Aspect type:** {pkg.aspect_type or '_(none)_'}",
+        f"- **Mode:** {pkg.mode or '_(none)_'}",
+    ]
+    if pkg.manual_aspect_override:
+        mo = pkg.manual_aspect_override
+        lines.append(
+            f"- **Manual aspect override:** `{mo.get('planet_a')}` `{mo.get('aspect_type')}` `{mo.get('planet_b')}` "
+            f"(mode=`{mo.get('mode')}`)"
+        )
+    lines.extend(
+        [
         f"- **World template:** {pkg.world_template or '_(none)_'}",
         f"- **Scene template:** {pkg.scene_template or '_(none)_'}",
         f"- **Render style profile:** {pkg.render_style_profile or '_(none)_'}",
@@ -316,7 +454,8 @@ def render_catstyle_post_package_markdown(pkg: CatstylePostPackage) -> str:
         f"- **Recommended primary image:** {pkg.recommended_primary_image or '_(not found on disk)_'}",
         "",
         "## Generated image paths",
-    ]
+        ]
+    )
     if pkg.generated_image_paths:
         for p in pkg.generated_image_paths:
             lines.append(f"- `{p}`")

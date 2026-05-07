@@ -11,6 +11,8 @@ from astro_content_agent.services.content.catstyle_manual_review import (
     REVIEW_QUESTIONS,
     SUGGESTED_DECISIONS,
     build_catstyle_manual_review,
+    build_review_questions,
+    render_catstyle_manual_review_markdown,
     write_catstyle_manual_review,
 )
 from astro_content_agent.services.content.catstyle_post_package_quality import (
@@ -49,6 +51,41 @@ def _write_post_package(tmp_path: Path, *, hook: str = "Хук.") -> Path:
     return pkg_dir
 
 
+def test_build_manual_review_manual_aspect_override_fields(tmp_path: Path) -> None:
+    pkg_dir = _write_post_package(tmp_path)
+    path = pkg_dir / "post_package.json"
+    pkg = json.loads(path.read_text(encoding="utf-8"))
+    pkg["aspect_summary"] = "Moon square Saturn (режим: tension, score=0)"
+    pkg["manual_aspect_override"] = {
+        "enabled": True,
+        "planet_a": "Moon",
+        "planet_b": "Saturn",
+        "aspect_type": "square",
+        "mode": "tension",
+    }
+    path.write_text(json.dumps(pkg, ensure_ascii=False), encoding="utf-8")
+
+    r = build_catstyle_manual_review(pkg_dir)
+    assert r.aspect_summary and "Moon" in r.aspect_summary
+    assert r.manual_aspect_override is not None
+    assert r.manual_aspect_override["aspect_type"] == "square"
+    assert any("Луны" in q and "Сатурна" in q for q in r.review_questions)
+    md = render_catstyle_manual_review_markdown(r)
+    assert "Manual aspect override" in md
+
+
+def test_marker_question_venus_pluto_from_package_planet_fields(tmp_path: Path) -> None:
+    pkg_dir = _write_post_package(tmp_path)
+    path = pkg_dir / "post_package.json"
+    pkg = json.loads(path.read_text(encoding="utf-8"))
+    pkg["planet_a"] = "Venus"
+    pkg["planet_b"] = "Pluto"
+    path.write_text(json.dumps(pkg, ensure_ascii=False), encoding="utf-8")
+    r = build_catstyle_manual_review(pkg_dir)
+    marker_q = next(q for q in r.review_questions if q.startswith("Маркеры "))
+    assert "Венеры" in marker_q and "Плутона" in marker_q
+
+
 def test_build_includes_quality_and_images(tmp_path: Path) -> None:
     pkg_dir = _write_post_package(tmp_path)
     qc = CatstylePostPackageQualityResult(
@@ -69,6 +106,7 @@ def test_build_includes_quality_and_images(tmp_path: Path) -> None:
     assert len(r.generated_image_paths) == 2
     assert r.style_reference_image_path == "references/style.png"
     assert r.recommended_primary_image
+    assert r.review_questions == build_review_questions("Jupiter", "Mars")
     assert r.review_questions == REVIEW_QUESTIONS
     assert len(r.suggested_decisions) == len(SUGGESTED_DECISIONS)
     assert {d["value"] for d in r.suggested_decisions} == {"approve", "revise_text", "regenerate_images", "reject"}

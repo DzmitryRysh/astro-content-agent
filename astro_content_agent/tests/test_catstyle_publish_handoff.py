@@ -7,8 +7,17 @@ from pathlib import Path
 
 import pytest
 
-from astro_content_agent.services.content.catstyle_manual_review import MANUAL_REVIEW_VERSION
-from astro_content_agent.services.content.catstyle_post_package import POST_PACKAGE_VERSION
+from astro_content_agent.services.content.catstyle_manual_review import (
+    MANUAL_REVIEW_VERSION,
+    approve_catstyle_manual_review,
+    build_catstyle_manual_review,
+    write_catstyle_manual_review,
+)
+from astro_content_agent.services.content.catstyle_post_package import (
+    POST_PACKAGE_VERSION,
+    build_catstyle_post_package,
+    write_catstyle_post_package,
+)
 from astro_content_agent.services.content.catstyle_publish_handoff import (
     PUBLISH_HANDOFF_VERSION,
     CatstylePublishHandoffError,
@@ -110,6 +119,74 @@ def test_approved_build_and_write(tmp_path: Path) -> None:
     assert "ready_for_manual_publish" in md
     blob = json.loads((out / "publish_handoff.json").read_text(encoding="utf-8"))
     assert blob["publish_status"] == "ready_for_manual_publish"
+
+
+def test_handoff_caption_final_reflects_aspect_aware_post_package(tmp_path: Path) -> None:
+    """Publish handoff copies caption from post_package built with Venus–Pluto opposition template."""
+    manifest = {
+        "version": "catstyle-image-generation-jobs-v0",
+        "date": "2026-08-12",
+        "editorial_profile": "charged",
+        "selected_candidate": {
+            "planet_a": "Pluto",
+            "planet_b": "Venus",
+            "aspect_type": "opposition",
+            "mode_recommendation": "tension",
+            "total_score": 0,
+        },
+        "jobs": [
+            {
+                "job_id": "j1",
+                "planet_a": "Pluto",
+                "planet_b": "Venus",
+                "aspect_type": "opposition",
+                "editorial_profile": "charged",
+                "mode": "tension",
+                "prompt_index": 1,
+                "variant_index": 0,
+                "shot_role": "hero_poster",
+                "suggested_output_name": "catstyle_2026-08-12_001_pluto_venus_opposition_tension.png",
+                "status": "pending",
+            },
+            {
+                "job_id": "j2",
+                "planet_a": "Pluto",
+                "planet_b": "Venus",
+                "aspect_type": "opposition",
+                "editorial_profile": "charged",
+                "mode": "tension",
+                "prompt_index": 2,
+                "variant_index": 0,
+                "shot_role": "alternate_action_angle",
+                "suggested_output_name": "catstyle_2026-08-12_002_pluto_venus_opposition_tension.png",
+                "status": "pending",
+            },
+        ],
+    }
+    mp = tmp_path / "jobs.json"
+    mp.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    gen = tmp_path / "gen_handoff"
+    gen.mkdir()
+    for name in (
+        "catstyle_2026-08-12_001_pluto_venus_opposition_tension.png",
+        "catstyle_2026-08-12_002_pluto_venus_opposition_tension.png",
+    ):
+        (gen / name).write_bytes(b"\x89PNG\r\n\x1a\n")
+
+    pkg = build_catstyle_post_package(mp, generated_images_dir=gen)
+    assert "Пакет Catstyle для ручной сборки" not in pkg.caption
+
+    pkg_dir = tmp_path / "full_pkg"
+    pkg_dir.mkdir()
+    write_catstyle_post_package(pkg, pkg_dir, overwrite=False)
+
+    mr = build_catstyle_manual_review(pkg_dir)
+    write_catstyle_manual_review(mr, pkg_dir, overwrite=False)
+    approve_catstyle_manual_review(pkg_dir, "approve", "ok")
+
+    h = build_catstyle_publish_handoff(pkg_dir)
+    assert "Венера" in h.caption_final and "Плутон" in h.caption_final
+    assert h.caption_final == pkg.caption.strip()
 
 
 def test_non_approve_fails(tmp_path: Path) -> None:

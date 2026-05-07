@@ -93,6 +93,8 @@ def test_package_json_fields_and_jupiter_mars_russian(tmp_path: Path) -> None:
     assert len(pkg.image_jobs_summary) == 2
     assert len(pkg.generated_image_paths) == 2
     assert pkg.recommended_primary_image == str(p1.resolve())
+    assert pkg.planet_a == "Jupiter" and pkg.planet_b == "Mars"
+    assert pkg.aspect_type == "square" and pkg.mode == "tension"
     assert pkg.hook.strip()
     assert pkg.caption.strip()
     assert pkg.carousel_slide_text.strip()
@@ -100,6 +102,136 @@ def test_package_json_fields_and_jupiter_mars_russian(tmp_path: Path) -> None:
     assert pkg.checklist.strip()
     assert "Юпитер" in pkg.hook or "Юпитер" in pkg.caption
     assert pkg.source_manifest_path == str(mp.resolve())
+
+
+def test_venus_pluto_opposition_tension_aspect_aware_copy(tmp_path: Path) -> None:
+    manifest = {
+        "version": "catstyle-image-generation-jobs-v0",
+        "date": "2026-08-10",
+        "editorial_profile": "charged",
+        "manual_aspect_override": {
+            "enabled": True,
+            "planet_a": "Venus",
+            "planet_b": "Pluto",
+            "aspect_type": "opposition",
+            "mode": "tension",
+        },
+        "selected_candidate": {
+            "planet_a": "Venus",
+            "planet_b": "Pluto",
+            "aspect_type": "opposition",
+            "mode_recommendation": "tension",
+            "total_score": 0,
+            "source": "manual_override",
+        },
+        "jobs": [
+            {
+                "job_id": "j1",
+                "planet_a": "Venus",
+                "planet_b": "Pluto",
+                "aspect_type": "opposition",
+                "editorial_profile": "charged",
+                "mode": "tension",
+                "prompt_index": 1,
+                "variant_index": 0,
+                "shot_role": "hero_poster",
+                "suggested_output_name": "catstyle_2026-08-10_001_venus_pluto_opposition_tension.png",
+                "status": "pending",
+            },
+            {
+                "job_id": "j2",
+                "planet_a": "Venus",
+                "planet_b": "Pluto",
+                "aspect_type": "opposition",
+                "editorial_profile": "charged",
+                "mode": "tension",
+                "prompt_index": 2,
+                "variant_index": 0,
+                "shot_role": "alternate_action_angle",
+                "suggested_output_name": "catstyle_2026-08-10_002_venus_pluto_opposition_tension.png",
+                "status": "pending",
+            },
+        ],
+    }
+    mp = _write_manifest(tmp_path, manifest)
+    gen = tmp_path / "gen_vp"
+    gen.mkdir()
+    for name in (
+        "catstyle_2026-08-10_001_venus_pluto_opposition_tension.png",
+        "catstyle_2026-08-10_002_venus_pluto_opposition_tension.png",
+    ):
+        (gen / name).write_bytes(b"\x89PNG\r\n\x1a\n")
+    pkg = build_catstyle_post_package(mp, generated_images_dir=gen)
+    assert "Пакет Catstyle для ручной сборки" not in pkg.caption
+    assert "Венера" in pkg.hook or "Венера" in pkg.caption
+    assert "Плутон" in pkg.hook or "Плутон" in pkg.caption
+    assert "магнитизм" in pkg.caption.lower()
+    assert "границ" in pkg.compensation.lower()
+
+
+def test_pluto_mars_square_tension_aspect_aware_copy(tmp_path: Path) -> None:
+    manifest = {
+        "date": "2026-08-11",
+        "editorial_profile": "charged",
+        "selected_candidate": {
+            "planet_a": "Mars",
+            "planet_b": "Pluto",
+            "aspect_type": "square",
+            "mode_recommendation": "tension",
+            "total_score": 40,
+        },
+        "jobs": [
+            {
+                "job_id": "j1",
+                "planet_a": "Mars",
+                "planet_b": "Pluto",
+                "aspect_type": "square",
+                "editorial_profile": "charged",
+                "mode": "tension",
+                "prompt_index": 1,
+                "variant_index": 0,
+                "suggested_output_name": "pm.png",
+                "status": "pending",
+            },
+        ],
+    }
+    mp = _write_manifest(tmp_path, manifest)
+    pkg = build_catstyle_post_package(mp)
+    assert "Пакет Catstyle для ручной сборки" not in pkg.caption
+    assert "Плутон" in pkg.hook or "Плутон" in pkg.caption
+    assert "Марс" in pkg.hook or "Марс" in pkg.caption
+    assert "контролируемое действие" in pkg.compensation.lower() or "контролируемое" in pkg.compensation.lower()
+
+
+def test_unsupported_aspect_moon_saturn_square_still_generic(tmp_path: Path) -> None:
+    manifest = {
+        "date": "2026-09-01",
+        "editorial_profile": "charged",
+        "selected_candidate": {
+            "planet_a": "Moon",
+            "planet_b": "Saturn",
+            "aspect_type": "square",
+            "mode_recommendation": "tension",
+            "total_score": 10,
+        },
+        "jobs": [
+            {
+                "job_id": "j1",
+                "planet_a": "Moon",
+                "planet_b": "Saturn",
+                "aspect_type": "square",
+                "editorial_profile": "charged",
+                "mode": "tension",
+                "prompt_index": 1,
+                "variant_index": 0,
+                "suggested_output_name": "ms.png",
+                "status": "pending",
+            },
+        ],
+    }
+    mp = _write_manifest(tmp_path, manifest)
+    pkg = build_catstyle_post_package(mp)
+    assert "Пакет Catstyle для ручной сборки поста" in pkg.caption
 
 
 def test_generic_pack_when_not_jupiter_mars_square(tmp_path: Path) -> None:
@@ -236,6 +368,8 @@ def test_human_text_files_utf8_sig_json_utf8_cyrillic(tmp_path: Path) -> None:
     parsed = json.loads(raw_text)
     assert "Юпитер" in parsed["hook"] or "Марс" in parsed["hook"]
     assert "Юпитер" in parsed["caption"] or "Марс" in parsed["caption"]
+    assert parsed.get("planet_a") == "Jupiter"
+    assert parsed.get("planet_b") == "Mars"
 
 
 def test_write_refuses_overwrite_without_flag(tmp_path: Path) -> None:
