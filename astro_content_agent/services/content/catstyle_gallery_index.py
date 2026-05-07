@@ -27,6 +27,9 @@ class CatstyleGalleryIndexEntry(BaseModel):
     source_post_package_path: str
     source_manual_review_path: str
     handoff_dir: str
+    publish_state: str | None = None
+    published_at: str | None = None
+    instagram_url: str | None = None
     planet_a: str | None = None
     planet_b: str | None = None
     aspect_type: str | None = None
@@ -117,6 +120,21 @@ def _is_ready_for_publish(handoff_obj: dict[str, Any]) -> bool:
     )
 
 
+def _load_publish_record_meta(handoff_dir: Path) -> dict[str, str | None]:
+    rp = handoff_dir / "publish_record.json"
+    if not rp.is_file():
+        return {"publish_state": None, "published_at": None, "instagram_url": None}
+    try:
+        rec = _read_json_object(rp)
+    except (OSError, json.JSONDecodeError, ValueError):
+        return {"publish_state": None, "published_at": None, "instagram_url": None}
+    return {
+        "publish_state": _clean_opt_str(rec.get("publish_state")),
+        "published_at": _clean_opt_str(rec.get("published_at")),
+        "instagram_url": _clean_opt_str(rec.get("instagram_url")),
+    }
+
+
 def _build_entry(handoff_path: Path) -> CatstyleGalleryIndexEntry | None:
     try:
         handoff_obj = _read_json_object(handoff_path)
@@ -137,6 +155,8 @@ def _build_entry(handoff_path: Path) -> CatstyleGalleryIndexEntry | None:
 
     meta = _extract_aspect_metadata(handoff_obj, handoff_path.parent)
 
+    published_meta = _load_publish_record_meta(handoff_path.parent)
+
     return CatstyleGalleryIndexEntry(
         date=date,
         publish_status=publish_status,
@@ -150,6 +170,9 @@ def _build_entry(handoff_path: Path) -> CatstyleGalleryIndexEntry | None:
         source_post_package_path=spp,
         source_manual_review_path=smr,
         handoff_dir=str(handoff_path.parent.resolve()),
+        publish_state=published_meta.get("publish_state"),
+        published_at=published_meta.get("published_at"),
+        instagram_url=published_meta.get("instagram_url"),
         planet_a=meta.get("planet_a"),
         planet_b=meta.get("planet_b"),
         aspect_type=meta.get("aspect_type"),
@@ -215,7 +238,8 @@ def render_catstyle_gallery_index_markdown(index: CatstyleGalleryIndex) -> str:
         "|---|---|---|---|---|---|",
     ]
     for e in index.entries:
-        status = f"{e.publish_status} / {e.approval_status}"
+        state = e.publish_state or e.publish_status
+        status = f"{state} / {e.approval_status}"
         lines.append(
             f"| {e.date} | {_aspect_cell(e)} | {status} | `{e.recommended_primary_image}` | "
             f"{e.caption_preview.replace('|', '/')} | `{e.handoff_dir}` |"
@@ -229,10 +253,13 @@ def render_catstyle_gallery_index_markdown(index: CatstyleGalleryIndex) -> str:
             [
                 f"### {i}. {e.date} — {_aspect_cell(e)}",
                 "",
+                f"- **publish_state:** `{e.publish_state or '_(none)_'}`",
                 f"- **publish_status:** `{e.publish_status}`",
                 f"- **approval_status:** `{e.approval_status}`",
+                f"- **published_at:** {e.published_at or '_(none)_'}",
                 f"- **reviewed_at:** {e.reviewed_at or '_(none)_'}",
                 f"- **created_at:** {e.created_at or '_(none)_'}",
+                f"- **instagram_url:** {e.instagram_url or '_(none)_'}",
                 f"- **primary image:** `{e.recommended_primary_image}`",
                 f"- **publish handoff path:** `{e.handoff_dir}`",
                 f"- **post package source:** `{e.source_post_package_path}`",

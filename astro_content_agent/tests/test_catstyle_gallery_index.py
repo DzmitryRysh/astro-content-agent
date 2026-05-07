@@ -125,3 +125,29 @@ def test_writes_gallery_index_json_and_md(tmp_path: Path) -> None:
     assert set(names) == {"gallery_index.json", "gallery_index.md"}
     assert (out / "gallery_index.json").is_file()
     assert (out / "gallery_index.md").is_file()
+
+
+def test_gallery_detects_publish_record_and_markdown_shows_published_manual(tmp_path: Path) -> None:
+    root = tmp_path / "catstyle_publish_handoffs"
+    hdir = _write_handoff(root, "2026-10-09")
+    rec = {
+        "version": "catstyle-published-record-v1",
+        "publish_state": "published_manual",
+        "published_at": "2026-10-09T19:30:00+00:00",
+        "handoff_dir": str(hdir.resolve()),
+        "source_publish_handoff_path": str((hdir / "publish_handoff.json").resolve()),
+        "recommended_primary_image": str((hdir / "hero.png").resolve()),
+        "caption_final": "Подпись",
+        "hook": "Хук",
+        "instagram_url": "https://instagram.com/p/demo",
+        "notes": "posted",
+    }
+    (hdir / "publish_record.json").write_text(json.dumps(rec, ensure_ascii=False), encoding="utf-8")
+    idx = build_catstyle_gallery_index(root)
+    assert idx.entries[0].publish_state == "published_manual"
+    assert idx.entries[0].published_at == "2026-10-09T19:30:00+00:00"
+    assert idx.entries[0].instagram_url == "https://instagram.com/p/demo"
+    out = tmp_path / "g"
+    write_catstyle_gallery_index(idx, out, overwrite=True)
+    md = (out / "gallery_index.md").read_text(encoding="utf-8-sig")
+    assert "published_manual" in md
