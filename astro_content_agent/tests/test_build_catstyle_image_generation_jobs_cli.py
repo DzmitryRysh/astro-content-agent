@@ -93,6 +93,55 @@ def test_cli_writes_via_mock(jobs_cli, tmp_path: Path, capsys: pytest.CaptureFix
     assert "1" in captured
 
 
+def test_cli_partial_manual_override_exits_error(jobs_cli, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    old = sys.argv[:]
+    try:
+        sys.argv = [
+            "build_catstyle_image_generation_jobs.py",
+            "--date",
+            "2026-05-02",
+            "--output-dir",
+            str(tmp_path / "out"),
+            "--planet-a",
+            "Pluto",
+        ]
+        assert jobs_cli.main() == 1
+    finally:
+        sys.argv = old
+    err = capsys.readouterr().err
+    assert "four flags" in err or "Manual aspect override" in err
+
+
+def test_cli_passes_manual_override_kwargs(jobs_cli, tmp_path: Path) -> None:
+    out = tmp_path / "cli_ov"
+    old = sys.argv[:]
+    try:
+        sys.argv = [
+            "build_catstyle_image_generation_jobs.py",
+            "--date",
+            "2026-05-02",
+            "--output-dir",
+            str(out),
+            "--planet-a",
+            "Pluto",
+            "--planet-b",
+            "Mars",
+            "--aspect-type",
+            "square",
+            "--mode",
+            "tension",
+        ]
+        with patch.object(jobs_cli, "build_catstyle_image_generation_jobs", return_value=_minimal_result()) as m:
+            assert jobs_cli.main() == 0
+    finally:
+        sys.argv = old
+    kw = m.call_args.kwargs
+    assert kw.get("planet_a_override") == "Pluto"
+    assert kw.get("planet_b_override") == "Mars"
+    assert kw.get("aspect_type_override") == "square"
+    assert kw.get("mode_override") == "tension"
+
+
 def test_cli_passes_style_reference_image_arg(jobs_cli, tmp_path: Path) -> None:
     out = tmp_path / "cli_out"
     old = sys.argv[:]

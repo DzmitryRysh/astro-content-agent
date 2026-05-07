@@ -11,7 +11,10 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 from astro_content_agent.astro.ephemeris import PlanetPosition
+from astro_content_agent.content.catstyle.models import CatstylePromptRequest
 from astro_content_agent.services.content.catstyle_daily_pack import generate_catstyle_daily_pack
+from astro_content_agent.services.content.catstyle_editorial_selection import normalize_editorial_profile
+from astro_content_agent.services.content.catstyle_prompt_generator import generate_catstyle_prompt_pack
 
 
 def _slug_part(s: str) -> str:
@@ -85,11 +88,83 @@ class CatstyleImageGenerationJobsResult(BaseModel):
     editorial_profile: str
     selected_candidate: dict[str, Any] | None = None
     secondary_supportive_candidate: dict[str, Any] | None = None
+    manual_aspect_override: dict[str, Any] | None = Field(
+        default=None,
+        description="When set, jobs were built from explicit planet/aspect/mode override (v1).",
+    )
     jobs: list[CatstyleImageGenJob] = Field(default_factory=list)
     output_dir: str | None = None
     manifest_path: str | None = None
     files_written: list[str] = Field(default_factory=list)
     message: str | None = None
+
+
+def _strip_opt(raw: str | None) -> str | None:
+    if raw is None:
+        return None
+    s = str(raw).strip()
+    return s if s else None
+
+
+def parse_manual_aspect_override_fields(
+    planet_a: str | None,
+    planet_b: str | None,
+    aspect_type: str | None,
+    mode: str | None,
+) -> tuple[str, str, str, str] | None:
+    """
+    Return ``(planet_a, planet_b, aspect_type_lowercase, mode_lowercase)`` when all four are set.
+
+    Return ``None`` when all are absent. Raise ``ValueError`` on partial input or invalid ``mode``.
+    """
+    pa = _strip_opt(planet_a)
+    pb = _strip_opt(planet_b)
+    asp = _strip_opt(aspect_type)
+    mo = _strip_opt(mode)
+    filled = sum(1 for x in (pa, pb, asp, mo) if x)
+    if filled == 0:
+        return None
+    if filled != 4:
+        missing: list[str] = []
+        if not pa:
+            missing.append("--planet-a")
+        if not pb:
+            missing.append("--planet-b")
+        if not asp:
+            missing.append("--aspect-type")
+        if not mo:
+            missing.append("--mode")
+        raise ValueError(
+            "Manual aspect override requires all four flags together: "
+            "--planet-a, --planet-b, --aspect-type, --mode. "
+            f"Missing or empty: {', '.join(missing)}."
+        )
+    mode_l = mo.lower()
+    if mode_l not in ("tension", "compensation", "mixed"):
+        raise ValueError(
+            "manual aspect override --mode must be one of: tension, compensation, mixed "
+            f"(got {mo!r})."
+        )
+    assert pa is not None and pb is not None and asp is not None
+    return (pa, pb, asp.lower(), mode_l)
+
+
+def _synthetic_primary_manual_override(pa: str, pb: str, asp: str, mode: str) -> dict[str, Any]:
+    return {
+        "planet_a": pa,
+        "planet_b": pb,
+        "aspect_type": asp,
+        "mode_recommendation": mode,
+        "total_score": 0,
+        "source": "manual_override",
+        "orb": None,
+        "editorial_selection_score": None,
+        "manual_aspect_override": True,
+    }
+
+
+def _manual_aspect_override_manifest_block(pa: str, pb: str, asp: str, mode: str) -> dict[str, Any]:
+    return {"enabled": True, "planet_a": pa, "planet_b": pb, "aspect_type": asp, "mode": mode}
 
 
 def _manifest_summary_text(
@@ -100,6 +175,7 @@ def _manifest_summary_text(
     secondary: dict[str, Any] | None,
     jobs: list[CatstyleImageGenJob],
     output_dir: Path,
+    manual_aspect_override: dict[str, Any] | None = None,
 ) -> str:
     lines: list[str] = [
         f"Catstyle image generation jobs v0 — {date}",
@@ -107,8 +183,21 @@ def _manifest_summary_text(
         f"Output directory: {output_dir}",
         f"Total jobs: {len(jobs)}",
         "",
-        "## Primary selected aspect",
     ]
+    if manual_aspect_override:
+        lines.extend(
+            [
+                "## Manual aspect override (v1)",
+                f"planet_a={manual_aspect_override.get('planet_a')}  planet_b={manual_aspect_override.get('planet_b')}  "
+                f"aspect_type={manual_aspect_override.get('aspect_type')}  mode={manual_aspect_override.get('mode')}",
+                "",
+            ]
+        )
+    lines.extend(
+        [
+            "## Primary selected aspect",
+        ]
+    )
     if primary:
         lines.append(
             f"{primary.get('planet_a')} {primary.get('aspect_type')} {primary.get('planet_b')}  "
@@ -153,12 +242,19 @@ def build_catstyle_image_generation_jobs(
     render_style_profile_key: str | None = None,
     shot_mode: str | None = None,
     style_reference_image_path: str | None = None,
+    planet_a_override: str | None = None,
+    planet_b_override: str | None = None,
+    aspect_type_override: str | None = None,
+    mode_override: str | None = None,
     *,
     compute_positions_fn: Callable[..., dict[str, PlanetPosition]] | None = None,
     orb_config: dict[str, tuple[float, float]] | None = None,
 ) -> CatstyleImageGenerationJobsResult:
     """
     Build deterministic image-generation job records from a Catstyle daily pack.
+
+    When ``planet_a_override``, ``planet_b_override``, ``aspect_type_override``, and ``mode_override``
+    are all set, skips sky-scan aspect selection and builds prompts directly for that aspect (v1).
 
     Does not call OpenAI, Cloudinary, or Instagram.
     """
@@ -187,38 +283,81 @@ def build_catstyle_image_generation_jobs(
     if style_ref == "":
         style_ref = None
 
-    pack = generate_catstyle_daily_pack(
-        day,
-        top=top,
-        scan_mode=scan_mode,
-        step_hours=step_hours,
-        editorial_profile=editorial_profile,
-        skin_a=skin_a_c,
-        skin_b=skin_b_c,
-        world_template_key=world_k,
-        scene_template_key=scene_k,
-        render_style_profile_key=render_k,
-        shot_mode=shot_m,
-        compute_positions_fn=compute_positions_fn,
-        orb_config=orb_config,
+    override_quad = parse_manual_aspect_override_fields(
+        planet_a_override,
+        planet_b_override,
+        aspect_type_override,
+        mode_override,
     )
+    manual_block: dict[str, Any] | None = None
+    secondary: dict[str, Any] | None = None
+    iso: str
+    profile: str
+    primary: dict[str, Any]
+    pp: dict[str, Any]
 
-    iso = pack.date
-    profile = pack.editorial_profile
-
-    if pack.selected_count == 0 or not pack.selected_candidates or not pack.prompt_packs:
-        return CatstyleImageGenerationJobsResult(
-            date=iso,
+    if override_quad is not None:
+        o_pa, o_pb, o_asp, o_mode = override_quad
+        profile = normalize_editorial_profile(editorial_profile)
+        iso = day.isoformat()
+        manual_block = _manual_aspect_override_manifest_block(o_pa, o_pb, o_asp, o_mode)
+        req_kw: dict[str, Any] = dict(
+            planet_a=o_pa,
+            planet_b=o_pb,
+            aspect_type=o_asp,
+            mode=o_mode,
+            variants_count=2,
+            skin_a=skin_a_c,
+            skin_b=skin_b_c,
             editorial_profile=profile,
-            selected_candidate=None,
-            secondary_supportive_candidate=pack.secondary_supportive_candidate,
-            jobs=[],
-            message="No Catstyle-selected candidates for this date/scan; no image jobs created.",
+            world_template_key=world_k,
+            scene_template_key=scene_k,
+        )
+        if shot_m is not None:
+            req_kw["shot_mode"] = shot_m
+        if render_k is not None:
+            req_kw["render_style_profile_key"] = render_k
+        try:
+            req = CatstylePromptRequest(**req_kw)
+            pack_obj = generate_catstyle_prompt_pack(req)
+        except ValueError as e:
+            raise ValueError(f"Cannot build prompts for manual aspect override: {e}") from e
+        pp = dict(pack_obj.model_dump(mode="json"))
+        primary = _synthetic_primary_manual_override(o_pa, o_pb, o_asp, o_mode)
+    else:
+        pack = generate_catstyle_daily_pack(
+            day,
+            top=top,
+            scan_mode=scan_mode,
+            step_hours=step_hours,
+            editorial_profile=editorial_profile,
+            skin_a=skin_a_c,
+            skin_b=skin_b_c,
+            world_template_key=world_k,
+            scene_template_key=scene_k,
+            render_style_profile_key=render_k,
+            shot_mode=shot_m,
+            compute_positions_fn=compute_positions_fn,
+            orb_config=orb_config,
         )
 
-    primary: dict[str, Any] = dict(pack.selected_candidates[0])
-    pp: dict[str, Any] = dict(pack.prompt_packs[0])
-    secondary = pack.secondary_supportive_candidate
+        iso = pack.date
+        profile = pack.editorial_profile
+
+        if pack.selected_count == 0 or not pack.selected_candidates or not pack.prompt_packs:
+            return CatstyleImageGenerationJobsResult(
+                date=iso,
+                editorial_profile=profile,
+                selected_candidate=None,
+                secondary_supportive_candidate=pack.secondary_supportive_candidate,
+                manual_aspect_override=None,
+                jobs=[],
+                message="No Catstyle-selected candidates for this date/scan; no image jobs created.",
+            )
+
+        primary = dict(pack.selected_candidates[0])
+        pp = dict(pack.prompt_packs[0])
+        secondary = pack.secondary_supportive_candidate
 
     image_prompts: list[str] = [str(p) for p in (pp.get("image_prompts") or [])]
     neg = str(pp.get("negative_prompt", ""))
@@ -322,7 +461,8 @@ def build_catstyle_image_generation_jobs(
             date=iso,
             editorial_profile=profile,
             selected_candidate=primary,
-            secondary_supportive_candidate=secondary,
+            secondary_supportive_candidate=dict(secondary) if secondary else None,
+            manual_aspect_override=manual_block,
             jobs=[],
             message="Primary prompt pack had no image_prompts lines; no jobs created.",
         )
@@ -344,6 +484,8 @@ def build_catstyle_image_generation_jobs(
             "secondary_supportive_candidate": secondary,
             "jobs": [j.model_dump(mode="json") for j in jobs],
         }
+        if manual_block is not None:
+            manifest["manual_aspect_override"] = manual_block
         mp = out / "image_generation_jobs.json"
         mp.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         manifest_path = str(mp)
@@ -369,6 +511,7 @@ def build_catstyle_image_generation_jobs(
             secondary=dict(secondary) if secondary else None,
             jobs=jobs,
             output_dir=out,
+            manual_aspect_override=manual_block,
         )
         (out / "manifest_summary.txt").write_text(summary, encoding="utf-8")
         files_written.append("manifest_summary.txt")
@@ -378,6 +521,7 @@ def build_catstyle_image_generation_jobs(
         editorial_profile=profile,
         selected_candidate=primary,
         secondary_supportive_candidate=dict(secondary) if secondary else None,
+        manual_aspect_override=manual_block,
         jobs=jobs,
         output_dir=out_resolved,
         manifest_path=manifest_path,
@@ -390,4 +534,5 @@ __all__ = [
     "CatstyleImageGenJob",
     "CatstyleImageGenerationJobsResult",
     "build_catstyle_image_generation_jobs",
+    "parse_manual_aspect_override_fields",
 ]

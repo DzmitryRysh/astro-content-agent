@@ -10,10 +10,13 @@ import pytest
 
 from astro_content_agent.content.catstyle.models import CatstyleDailyPackResult
 from astro_content_agent.content.catstyle.render_style_profiles_v1 import get_render_style_profile
+from astro_content_agent.content.catstyle.models import CatstylePromptPack
 from astro_content_agent.services.content.catstyle_image_generation_jobs import (
     CatstyleImageGenerationJobsResult,
     build_catstyle_image_generation_jobs,
+    parse_manual_aspect_override_fields,
 )
+from astro_content_agent.services.content.catstyle_post_package import build_catstyle_post_package
 
 
 def _fake_pack_one_primary() -> CatstyleDailyPackResult:
@@ -188,6 +191,124 @@ def test_pack_passes_skins_to_daily_pack(tmp_path: Path) -> None:
     m.assert_called_once()
     kw = m.call_args.kwargs
     assert kw.get("skin_b") == "spartan_king"
+
+
+def test_parse_manual_aspect_override_partial_raises() -> None:
+    with pytest.raises(ValueError, match="all four flags"):
+        parse_manual_aspect_override_fields("Pluto", None, "square", "tension")
+    with pytest.raises(ValueError, match="all four flags"):
+        parse_manual_aspect_override_fields(None, None, None, "tension")
+
+
+def test_parse_manual_aspect_override_invalid_mode() -> None:
+    with pytest.raises(ValueError, match="--mode must be one of"):
+        parse_manual_aspect_override_fields("Pluto", "Mars", "square", "bananas")
+
+
+def test_manual_override_build_jobs_and_manifest(tmp_path: Path) -> None:
+    fake = CatstylePromptPack(
+        image_prompts=["override prompt one", "override prompt two"],
+        image_prompt_shot_roles=["hero_poster", "alternate_action_angle"],
+        animation_prompt="anim",
+        negative_prompt="neg",
+        carousel_idea="car",
+    )
+    with patch(
+        "astro_content_agent.services.content.catstyle_image_generation_jobs.generate_catstyle_prompt_pack",
+        return_value=fake,
+    ) as m_pack:
+        with patch(
+            "astro_content_agent.services.content.catstyle_image_generation_jobs.generate_catstyle_daily_pack"
+        ) as m_daily:
+            r = build_catstyle_image_generation_jobs(
+                date(2026, 5, 2),
+                editorial_profile="charged",
+                output_dir=tmp_path / "ov",
+                planet_a_override="Pluto",
+                planet_b_override="Mars",
+                aspect_type_override="square",
+                mode_override="tension",
+            )
+    m_daily.assert_not_called()
+    m_pack.assert_called_once()
+    req = m_pack.call_args[0][0]
+    assert req.planet_a == "Pluto" and req.planet_b == "Mars"
+    assert req.aspect_type == "square" and req.mode == "tension"
+
+    assert len(r.jobs) == 2
+    assert r.jobs[0].planet_a == "Pluto" and r.jobs[0].planet_b == "Mars"
+    assert r.jobs[0].aspect_type == "square" and r.jobs[0].mode == "tension"
+    assert r.jobs[0].source == "manual_override"
+    assert r.selected_candidate is not None
+    assert r.selected_candidate.get("source") == "manual_override"
+    assert r.secondary_supportive_candidate is None
+    assert r.manual_aspect_override == {
+        "enabled": True,
+        "planet_a": "Pluto",
+        "planet_b": "Mars",
+        "aspect_type": "square",
+        "mode": "tension",
+    }
+
+    manifest = json.loads((tmp_path / "ov" / "image_generation_jobs.json").read_text(encoding="utf-8"))
+    assert manifest["manual_aspect_override"]["enabled"] is True
+    assert manifest["manual_aspect_override"]["planet_a"] == "Pluto"
+    assert manifest["selected_candidate"]["manual_aspect_override"] is True
+    assert manifest["secondary_supportive_candidate"] is None
+    summary = (tmp_path / "ov" / "manifest_summary.txt").read_text(encoding="utf-8")
+    assert "Manual aspect override" in summary
+
+
+def test_manual_override_post_package_roundtrip(tmp_path: Path) -> None:
+    fake = CatstylePromptPack(
+        image_prompts=["only"],
+        image_prompt_shot_roles=["hero_poster"],
+        animation_prompt="a",
+        negative_prompt="n",
+        carousel_idea="c",
+    )
+    out = tmp_path / "jobs_ov"
+    with patch(
+        "astro_content_agent.services.content.catstyle_image_generation_jobs.generate_catstyle_prompt_pack",
+        return_value=fake,
+    ):
+        build_catstyle_image_generation_jobs(
+            date(2026, 7, 15),
+            editorial_profile="charged",
+            output_dir=out,
+            planet_a_override="Venus",
+            planet_b_override="Pluto",
+            aspect_type_override="opposition",
+            mode_override="tension",
+        )
+    mp = out / "image_generation_jobs.json"
+    manifest = json.loads(mp.read_text(encoding="utf-8"))
+    job_file = str(manifest["jobs"][0]["suggested_output_name"])
+    gen = tmp_path / "gen_ov"
+    gen.mkdir()
+    (gen / job_file).write_bytes(b"\x89PNG\r\n\x1a\n")
+
+    pkg = build_catstyle_post_package(mp, generated_images_dir=gen)
+    assert pkg.manual_aspect_override is not None
+    assert pkg.manual_aspect_override["planet_a"] == "Venus"
+    assert pkg.manual_aspect_override["aspect_type"] == "opposition"
+    assert pkg.aspect_summary and "Venus" in pkg.aspect_summary
+
+
+def test_manual_override_real_prompt_pack_pluto_mars_square(tmp_path: Path) -> None:
+    """Integration: real deterministic prompt generator for a supported pair (no sky scan)."""
+    r = build_catstyle_image_generation_jobs(
+        date(2026, 5, 2),
+        editorial_profile="charged",
+        output_dir=tmp_path / "real",
+        planet_a_override="Pluto",
+        planet_b_override="Mars",
+        aspect_type_override="square",
+        mode_override="tension",
+    )
+    assert len(r.jobs) >= 1
+    assert r.jobs[0].prompt_text.strip()
+    assert r.manual_aspect_override is not None
 
 
 def test_manifest_includes_style_reference_image_path(tmp_path: Path) -> None:

@@ -84,6 +84,30 @@ def main() -> int:
         dest="style_reference_image",
         help="Optional local reference image path for style anchoring (providers may or may not support image conditioning).",
     )
+    ap.add_argument(
+        "--planet-a",
+        default=None,
+        dest="planet_a_override",
+        help="Manual aspect override v1: planet A (requires --planet-b, --aspect-type, --mode).",
+    )
+    ap.add_argument(
+        "--planet-b",
+        default=None,
+        dest="planet_b_override",
+        help="Manual aspect override v1: planet B.",
+    )
+    ap.add_argument(
+        "--aspect-type",
+        default=None,
+        dest="aspect_type_override",
+        help="Manual aspect override v1: aspect e.g. square, opposition, trine.",
+    )
+    ap.add_argument(
+        "--mode",
+        default=None,
+        dest="mode_override",
+        help="Manual aspect override v1: tension | compensation | mixed.",
+    )
     args = ap.parse_args()
 
     try:
@@ -110,6 +134,10 @@ def main() -> int:
             render_style_profile_key=args.render_style_profile,
             shot_mode=args.shot_mode,
             style_reference_image_path=args.style_reference_image,
+            planet_a_override=args.planet_a_override,
+            planet_b_override=args.planet_b_override,
+            aspect_type_override=args.aspect_type_override,
+            mode_override=args.mode_override,
         )
     except ValueError as e:
         print(str(e), file=sys.stderr)
@@ -122,6 +150,12 @@ def main() -> int:
     print("Catstyle image generation jobs")
     print(f"  date:              {result.date}")
     print(f"  editorial_profile: {result.editorial_profile}")
+    if result.manual_aspect_override:
+        mo = result.manual_aspect_override
+        print(
+            f"  manual override:   {mo.get('planet_a')} {mo.get('aspect_type')} {mo.get('planet_b')}  "
+            f"mode={mo.get('mode')}"
+        )
     if result.selected_candidate:
         c = result.selected_candidate
         print(
