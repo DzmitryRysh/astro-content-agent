@@ -33,3 +33,6 @@ catstyle_generated_images/
 
 # Catstyle local post packages (generated review bundles)
 catstyle_post_packages/
+
+# Catstyle publish handoffs (final manual-publish bundles)
+catstyle_publish_handoffs/
