@@ -356,13 +356,22 @@ def render_catstyle_post_package_markdown(pkg: CatstylePostPackage) -> str:
     return "\n".join(lines)
 
 
+_UTF8_SIG_TXT = frozenset(
+    ("post_package.md", "caption.txt", "hook.txt", "compensation.txt", "checklist.txt")
+)
+
+
 def write_catstyle_post_package(
     pkg: CatstylePostPackage,
     output_dir: Path | str,
     *,
     overwrite: bool = False,
 ) -> list[str]:
-    """Write ``post_package.json``, Markdown, and split text fields. Returns basenames written."""
+    """Write ``post_package.json``, Markdown, and split text fields. Returns basenames written.
+
+    Human-facing ``.md`` / ``.txt`` files use UTF-8 with BOM (``utf-8-sig``) so PowerShell
+    ``Get-Content`` decodes Cyrillic correctly by default on Windows. JSON stays UTF-8 without BOM.
+    """
     out = Path(output_dir).expanduser().resolve()
     out.mkdir(parents=True, exist_ok=True)
 
@@ -380,7 +389,8 @@ def write_catstyle_post_package(
         dest = out / name
         if dest.exists() and not overwrite:
             raise FileExistsError(f"Refusing to overwrite existing file (use --overwrite): {dest}")
-        dest.write_text(body, encoding="utf-8")
+        enc = "utf-8-sig" if name in _UTF8_SIG_TXT else "utf-8"
+        dest.write_text(body, encoding=enc)
         written.append(name)
     return written
 

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -174,8 +175,67 @@ def test_write_package_creates_all_files(tmp_path: Path) -> None:
     }
     raw = json.loads((out / "post_package.json").read_text(encoding="utf-8"))
     assert raw["version"] == POST_PACKAGE_VERSION
-    assert (out / "hook.txt").read_text(encoding="utf-8").strip()
-    assert (out / "post_package.md").read_text(encoding="utf-8").startswith("# Catstyle post package")
+    assert (out / "hook.txt").read_text(encoding="utf-8-sig").strip()
+    assert (out / "post_package.md").read_text(encoding="utf-8-sig").startswith("# Catstyle post package")
+
+
+def test_human_text_files_utf8_sig_json_utf8_cyrillic(tmp_path: Path) -> None:
+    """Windows-friendly BOM on .md/.txt; JSON UTF-8 without BOM; Cyrillic preserved."""
+    manifest = {
+        "version": "catstyle-image-generation-jobs-v0",
+        "date": "2026-05-02",
+        "editorial_profile": "charged",
+        "selected_candidate": {
+            "planet_a": "Jupiter",
+            "planet_b": "Mars",
+            "aspect_type": "square",
+            "mode_recommendation": "tension",
+            "total_score": 38,
+        },
+        "jobs": [
+            {
+                "job_id": "catstyle-2026-05-02-001",
+                "date": "2026-05-02",
+                "planet_a": "Jupiter",
+                "planet_b": "Mars",
+                "aspect_type": "square",
+                "editorial_profile": "charged",
+                "mode": "tension",
+                "prompt_index": 1,
+                "variant_index": 0,
+                "suggested_output_name": "x.png",
+                "status": "pending",
+            },
+        ],
+    }
+    mp = _write_manifest(tmp_path, manifest)
+    pkg = build_catstyle_post_package(mp)
+    out = tmp_path / "enc"
+    write_catstyle_post_package(pkg, out, overwrite=False)
+
+    bom = b"\xef\xbb\xbf"
+    for fname in (
+        "post_package.md",
+        "caption.txt",
+        "hook.txt",
+        "compensation.txt",
+        "checklist.txt",
+    ):
+        data = (out / fname).read_bytes()
+        assert data.startswith(bom), f"{fname} should start with UTF-8 BOM for PowerShell"
+        text_sig = (out / fname).read_text(encoding="utf-8-sig")
+        assert re.search(r"[\u0400-\u04FF]", text_sig), f"{fname} should contain Cyrillic"
+
+    hook_txt = (out / "hook.txt").read_text(encoding="utf-8-sig")
+    assert "Юпитер" in hook_txt and "Марс" in hook_txt
+
+    json_bytes = (out / "post_package.json").read_bytes()
+    assert not json_bytes.startswith(bom), "JSON should not use BOM"
+    raw_text = json_bytes.decode("utf-8")
+    assert "\\u04" not in raw_text, "Cyrillic should not be JSON unicode-escaped on disk"
+    parsed = json.loads(raw_text)
+    assert "Юпитер" in parsed["hook"] or "Марс" in parsed["hook"]
+    assert "Юпитер" in parsed["caption"] or "Марс" in parsed["caption"]
 
 
 def test_write_refuses_overwrite_without_flag(tmp_path: Path) -> None:
