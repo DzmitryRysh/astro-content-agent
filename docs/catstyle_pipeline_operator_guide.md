@@ -1,6 +1,6 @@
 # Catstyle Pipeline Operator Guide v1
 
-A concise manual for running the **deterministic local Catstyle production pipeline** from **PowerShell** on Windows. This pipeline turns **planet‑cat image jobs** plus **generated images** into a **manual Instagram‑ready publish handoff**. Nothing here talks to Instagram, Cloudinary, or automated publishing—the operator posts by hand.
+A concise manual for running the **deterministic local Catstyle production pipeline** from **PowerShell** on Windows. This pipeline turns **planet-cat image jobs** plus **generated images** into a **manual Instagram-ready publish handoff**. Nothing here talks to Instagram, Cloudinary, or automated publishing — the operator posts by hand.
 
 ---
 
@@ -10,7 +10,7 @@ A concise manual for running the **deterministic local Catstyle production pipel
 
 1. **Image generation jobs** (`image_generation_jobs.json`) describing prompts and outputs.
 2. **Generated images** on disk (e.g. PNGs from stub/OpenAI execution).
-3. **Post tooling** that bundles copy + paths into **`catstyle_post_packages/<date>/`**, checks quality, records manual review/approval, and optionally emits **`catstyle_publish_handoffs/<date>/`** for final paste‑into‑IG workflows.
+3. **Post tooling** that bundles copy + paths into **`catstyle_post_packages/<date>/`**, checks quality, records manual review/approval, and optionally emits **`catstyle_publish_handoffs/<date>/`** for final paste-into-IG workflows.
 
 All steps are **local**, **deterministic**, and safe to run without API keys **unless** you explicitly execute jobs with an OpenAI-backed provider.
 
@@ -154,7 +154,7 @@ Default output: **`catstyle_publish_handoffs\YYYY-MM-DD\`**.
 
 ### Orchestrator (package → QC → review → optional approve → handoff)
 
-See **sections 3–4** for **`run_catstyle_post_pipeline.py`**.
+See **sections 3-4** for **`run_catstyle_post_pipeline.py`**.
 
 ---
 
@@ -162,9 +162,9 @@ See **sections 3–4** for **`run_catstyle_post_pipeline.py`**.
 
 | Folder | Typical contents |
 |--------|------------------|
-| **`catstyle_image_jobs\<date>\`** | Job manifests (`image_generation_jobs.json`), prompts, executor outputs (`generated_images*`, stubs). Ignored by git—see `.gitignore`. |
+| **`catstyle_image_jobs\<date>\`** | Job manifests (`image_generation_jobs.json`), prompts, executor outputs (`generated_images*`, stubs). Ignored by git — see `.gitignore`. |
 | **`catstyle_post_packages\<date>\`** | `post_package.json`, `post_package.md`, text snippets, **`manual_review.json`**, **`manual_review.md`** after review build/approve. Usually ignored. |
-| **`catstyle_publish_handoffs\<date>\`** | Final **`publish_handoff.*`** + `caption_final.txt`, **`primary_image_path.txt`**, checklist—manual IG paste helpers. Usually ignored. |
+| **`catstyle_publish_handoffs\<date>\`** | Final **`publish_handoff.*`** + `caption_final.txt`, **`primary_image_path.txt`**, checklist — manual IG paste helpers. Usually ignored. |
 
 Exact layout may vary slightly if you pass **`--output-dir`** / **`--post-package-dir`** / **`--publish-handoff-dir`** on the respective scripts.
 
@@ -173,7 +173,7 @@ Exact layout may vary slightly if you pass **`--output-dir`** / **`--post-packag
 ## 7. Git rules
 
 - **Commit:** application **source**, **tests**, **docs** (including this guide), config templates **without secrets**.
-- **Usually do not commit:** **`catstyle_image_jobs/`**, **`catstyle_post_packages/`**, **`catstyle_publish_handoffs/`**, stub/generated image trees—these are in **`.gitignore`** so daily artifacts stay local.
+- **Usually do not commit:** **`catstyle_image_jobs/`**, **`catstyle_post_packages/`**, **`catstyle_publish_handoffs/`**, stub/generated image trees — these are in **`.gitignore`** so daily artifacts stay local.
 - **Never commit:** **`.env`**, API tokens, Cloudinary / OpenAI / Instagram credentials, private URLs with embedded secrets.
 
 Tracked **`references/`** style-reference PNGs are an exception by design (approved reusable assets).
@@ -186,8 +186,8 @@ Tracked **`references/`** style-reference PNGs are an exception by design (appro
 
 If **`Get-Content`** shows garbage instead of Russian:
 
-- Prefer **`utf-8-sig`**-saved producer files where implemented (BOM helps PowerShell pick UTF‑8).
-- Open files in an editor that shows UTF‑8.
+- Prefer **`utf-8-sig`**-saved producer files where implemented (BOM helps PowerShell pick UTF-8).
+- Open files in an editor that shows UTF-8.
 - Re-run **`build_catstyle_post_package`** after fixing encoding issues upstream.
 
 ### Missing primary image
@@ -198,13 +198,13 @@ Orchestrator / QC / publish handoff expect **`recommended_primary_image`** to ex
 
 Orchestrator will **not** approve or build publish handoff when QC is not **`ready`** or score/rules fail. Run **`check_catstyle_post_package.py`** with **`--json`**, fix warnings/errors (paths, Cyrillic/mojibake, hooks/captions, asset counts), then retry.
 
-### Non‑approved review blocks publish handoff
+### Non-approved review blocks publish handoff
 
 **`build_catstyle_publish_handoff.py`** requires **`approval_status == approve`** (and QC/copy gates). Approve via **`approve_catstyle_manual_review.py`** or **`run_catstyle_post_pipeline.py --approve`**.
 
-### Generated folders “missing” from `git status`
+### Generated folders "missing" from `git status`
 
-They are **ignored by `.gitignore`**—working as intended. Use Explorer or explicit paths to inspect **`catstyle_post_packages`** / **`catstyle_publish_handoffs`**.
+They are **ignored by `.gitignore`** — working as intended. Use Explorer or explicit paths to inspect **`catstyle_post_packages`** / **`catstyle_publish_handoffs`**.
 
 ---
 
