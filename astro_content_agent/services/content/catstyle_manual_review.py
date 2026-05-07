@@ -2,10 +2,13 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
+
+ALLOWED_APPROVAL_DECISIONS = frozenset({"approve", "revise_text", "regenerate_images", "reject"})
 
 from astro_content_agent.services.content.catstyle_post_package_quality import (
     CatstylePostPackageQualityResult,
@@ -90,6 +93,10 @@ class CatstyleManualReview(BaseModel):
         "pending_review"
     )
     reviewer_notes: str = ""
+    reviewed_at: str | None = Field(
+        default=None,
+        description="UTC ISO-8601 timestamp when approval was recorded (timezone-aware).",
+    )
 
 
 def build_catstyle_manual_review(
@@ -144,6 +151,7 @@ def build_catstyle_manual_review(
         suggested_decisions=list(SUGGESTED_DECISIONS),
         approval_status="pending_review",
         reviewer_notes="",
+        reviewed_at=None,
     )
 
 
@@ -229,16 +237,20 @@ def render_catstyle_manual_review_markdown(review: CatstyleManualReview) -> str:
     )
     for sd in review.suggested_decisions:
         lines.append(f"- **`{sd['value']}`:** {sd['description']}")
+    reviewed_line = review.reviewed_at if review.reviewed_at else "_(ещё не зафиксировано)_"
+    notes_body = review.reviewer_notes.strip() if review.reviewer_notes.strip() else "_(пусто)_"
+
     lines.extend(
         [
             "",
             "## Decision",
             "",
-            f"- **approval_status (current):** `{review.approval_status}`",
+            f"- **approval_status:** `{review.approval_status}`",
+            f"- **reviewed_at:** {reviewed_line}",
             "",
             "### Заметки рецензента",
             "",
-            "_(пусто — заполнить после ревью)_",
+            notes_body,
             "",
         ]
     )
@@ -270,12 +282,58 @@ def write_catstyle_manual_review(
     return written
 
 
+def load_catstyle_manual_review(package_dir: Path | str) -> CatstyleManualReview:
+    """Load ``manual_review.json`` from a Catstyle package directory."""
+    root = Path(package_dir).expanduser().resolve()
+    mr_path = root / "manual_review.json"
+    if not mr_path.is_file():
+        raise FileNotFoundError(f"Missing manual_review.json in {root}")
+    raw = mr_path.read_text(encoding="utf-8-sig")
+    data = json.loads(raw)
+    if not isinstance(data, dict):
+        raise ValueError("manual_review.json root must be a JSON object.")
+    return CatstyleManualReview.model_validate(data)
+
+
+def approve_catstyle_manual_review(
+    package_dir: Path | str,
+    decision: str,
+    reviewer_notes: str = "",
+    *,
+    overwrite: bool = True,
+) -> CatstyleManualReview:
+    """Update ``manual_review.json`` / ``manual_review.md`` with reviewer decision and UTC timestamp."""
+    root = Path(package_dir).expanduser().resolve()
+    key = str(decision).strip().lower()
+    if key not in ALLOWED_APPROVAL_DECISIONS:
+        raise ValueError(
+            f"Invalid decision {decision!r}. Allowed: {', '.join(sorted(ALLOWED_APPROVAL_DECISIONS))}."
+        )
+
+    review = load_catstyle_manual_review(root)
+    reviewed_iso = datetime.now(timezone.utc).isoformat()
+
+    updated = review.model_copy(
+        update={
+            "approval_status": key,  # type: ignore[arg-type]
+            "reviewer_notes": str(reviewer_notes) if reviewer_notes is not None else "",
+            "reviewed_at": reviewed_iso,
+        }
+    )
+
+    write_catstyle_manual_review(updated, root, overwrite=overwrite)
+    return updated
+
+
 __all__ = [
+    "ALLOWED_APPROVAL_DECISIONS",
     "MANUAL_REVIEW_VERSION",
     "REVIEW_QUESTIONS",
     "SUGGESTED_DECISIONS",
     "CatstyleManualReview",
+    "approve_catstyle_manual_review",
     "build_catstyle_manual_review",
+    "load_catstyle_manual_review",
     "load_catstyle_post_package_json",
     "render_catstyle_manual_review_markdown",
     "write_catstyle_manual_review",

@@ -74,6 +74,7 @@ def test_build_includes_quality_and_images(tmp_path: Path) -> None:
     assert {d["value"] for d in r.suggested_decisions} == {"approve", "revise_text", "regenerate_images", "reject"}
     assert r.approval_status == "pending_review"
     assert r.reviewer_notes == ""
+    assert r.reviewed_at is None
 
 
 def test_build_runs_quality_when_not_passed(tmp_path: Path) -> None:
@@ -93,6 +94,7 @@ def test_write_creates_json_and_md(tmp_path: Path) -> None:
     blob = json.loads((out / "manual_review.json").read_text(encoding="utf-8"))
     assert blob["version"] == MANUAL_REVIEW_VERSION
     assert blob["approval_status"] == "pending_review"
+    assert blob.get("reviewed_at") is None
     assert len(blob["review_questions"]) == len(REVIEW_QUESTIONS)
     assert "Подпись" in blob["caption"]
     md_raw = (out / "manual_review.md").read_bytes()
