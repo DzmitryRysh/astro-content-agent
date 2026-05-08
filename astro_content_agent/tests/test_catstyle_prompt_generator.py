@@ -825,6 +825,173 @@ def test_negative_prompt_includes_strengthened_anti_childish_flat_guidance() -> 
     assert "microtexture" in neg and "tiny crack" in neg
 
 
+def test_moon_saturn_prompt_preserves_distinct_identity_and_saturn_anti_fire() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Moon",
+            planet_b="Saturn",
+            aspect_type="square",
+            mode="tension",
+            premium_art_direction=False,
+        )
+    )
+    blob = " ".join(pack.image_prompts).lower()
+    assert "[planet canon v1 - moon]" in blob
+    assert "[planet canon v1 - saturn]" in blob
+    assert "soft" in blob and ("comfort" in blob or "safety" in blob)
+    assert "cold" in blob and ("stone" in blob or "iron" in blob)
+    assert "do not depict saturn with flames" in blob
+    assert "saturn must-not traits lock" in blob
+
+
+def test_moon_saturn_square_tension_includes_visual_correction_patch() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Moon",
+            planet_b="Saturn",
+            aspect_type="square",
+            mode="tension",
+            premium_art_direction=False,
+        )
+    )
+    blob = " ".join(pack.image_prompts).lower()
+    assert "[moon-saturn visual correction patch v1" in blob
+    assert "[aspect choreography v1 - square]" in blob
+    assert "strike/counterstrike" in blob or "tense collision" in blob
+    assert "pillow strike" in blob and "moonlight wave" in blob
+    assert ("stone block" in blob or "gravity press" in blob) and (
+        "freeze/frost field" in blob or "time-lock" in blob
+    )
+    assert "generic action-hero brawl" in blob or "fire ninja" in blob
+    assert "do not let saturn inherit mars visual traits" in blob
+    assert "vulnerability vs discipline" in blob
+    assert "stone gate of time and responsibility" in blob
+    assert "cozy doorway/window" in blob
+    assert "martial-arts duel choreography" in blob or "no martial-arts duel choreography" in blob
+    assert "not 3d cgi figurine" in blob
+
+
+def test_aspect_choreography_square_vs_trine_tone() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    square_pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Jupiter",
+            planet_b="Mercury",
+            aspect_type="square",
+            mode="tension",
+            premium_art_direction=False,
+        )
+    )
+    trine_pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Jupiter",
+            planet_b="Mercury",
+            aspect_type="trine",
+            mode="tension",
+            premium_art_direction=False,
+        )
+    )
+    sextile_pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Jupiter",
+            planet_b="Mercury",
+            aspect_type="sextile",
+            mode="tension",
+            premium_art_direction=False,
+        )
+    )
+    sq_blob = " ".join(square_pack.image_prompts).lower()
+    tri_blob = " ".join(trine_pack.image_prompts).lower()
+    sex_blob = " ".join(sextile_pack.image_prompts).lower()
+    assert "[aspect choreography v1 - square]" in sq_blob
+    assert "friction" in sq_blob or "strike/counterstrike" in sq_blob
+    assert "[aspect choreography v1 - trine]" in tri_blob
+    assert "dance-like harmony" in tri_blob or "synchronized movement" in tri_blob
+    assert "[aspect choreography v1 - sextile]" in sex_blob
+    assert "playful cooperation" in sex_blob or "coordinated exchange" in sex_blob
+
+
+def test_opposition_prompt_includes_conflict_choreography_not_trine_flow() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Saturn",
+            planet_b="Venus",
+            aspect_type="opposition",
+            mode="tension",
+            premium_art_direction=False,
+        )
+    )
+    blob = " ".join(pack.image_prompts).lower()
+    assert "[aspect choreography v1 - opposition]" in blob
+    assert ("mirrored duel" in blob or "push-pull" in blob) and "dance-like harmony" not in blob
+
+
+def test_mars_heavy_style_reference_finisher_decouple_guard_for_non_mars_pair() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Moon",
+            planet_b="Saturn",
+            aspect_type="square",
+            mode="tension",
+            mars_heavy_style_reference_finisher=True,
+            premium_art_direction=False,
+        )
+    )
+    blob = " ".join(pack.image_prompts).lower()
+    assert "[mars-heavy style reference decoupling v1]" in blob
+    assert "do not import mars choreography" in blob
+
+
+def test_mars_named_scene_template_triggers_decouple_for_saturn_mars_pair() -> None:
+    """mars_* scene with Mars actually in the pair should not inject decouple noise."""
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Saturn",
+            planet_b="Mars",
+            aspect_type="square",
+            mode="tension",
+            scene_template_key="mars_spartan_cliff_kick",
+            skin_b="spartan_king",
+            premium_art_direction=False,
+        )
+    )
+    blob = " ".join(pack.image_prompts).lower()
+    assert "[mars-heavy style reference decoupling v1]" not in blob
+
+
+
+def test_venus_pluto_prompt_keeps_distinct_planet_identities() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Venus",
+            planet_b="Pluto",
+            aspect_type="opposition",
+            mode="tension",
+            premium_art_direction=False,
+        )
+    )
+    blob = " ".join(pack.image_prompts).lower()
+    assert "[planet canon v1 - venus]" in blob
+    assert "[planet canon v1 - pluto]" in blob
+    assert "venus must-have traits lock" in blob
+    assert "pluto must-have traits lock" in blob
+    assert "charm" in blob or "beauty" in blob
+    assert "underworld" in blob or "subterranean" in blob or "depth" in blob
+
+
 def test_animation_prompt_uses_render_style_opening_not_legacy_style_core() -> None:
     from astro_content_agent.content.catstyle.models import CatstylePromptRequest
 

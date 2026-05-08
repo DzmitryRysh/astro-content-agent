@@ -11,10 +11,14 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 from astro_content_agent.astro.ephemeris import PlanetPosition
+from astro_content_agent.content.catstyle.approved_reference_registry import resolve_approved_reference
 from astro_content_agent.content.catstyle.models import CatstylePromptRequest
 from astro_content_agent.services.content.catstyle_daily_pack import generate_catstyle_daily_pack
 from astro_content_agent.services.content.catstyle_editorial_selection import normalize_editorial_profile
-from astro_content_agent.services.content.catstyle_prompt_generator import generate_catstyle_prompt_pack
+from astro_content_agent.services.content.catstyle_prompt_generator import (
+    generate_catstyle_prompt_pack,
+    normalize_planet_name,
+)
 
 
 def _slug_part(s: str) -> str:
@@ -97,6 +101,10 @@ class CatstyleImageGenerationJobsResult(BaseModel):
     manifest_path: str | None = None
     files_written: list[str] = Field(default_factory=list)
     message: str | None = None
+    style_reference_meta: dict[str, Any] | None = Field(
+        default=None,
+        description="How the style reference path was chosen: explicit CLI, approved registry v1, or none.",
+    )
 
 
 def _strip_opt(raw: str | None) -> str | None:
@@ -167,6 +175,38 @@ def _manual_aspect_override_manifest_block(pa: str, pb: str, asp: str, mode: str
     return {"enabled": True, "planet_a": pa, "planet_b": pb, "aspect_type": asp, "mode": mode}
 
 
+def _resolve_final_style_reference(
+    *,
+    explicit_path: str | None,
+    disable_approved_reference_auto: bool,
+    planet_a: str,
+    planet_b: str,
+    aspect_type: str,
+    mode: str,
+) -> tuple[str | None, dict[str, Any]]:
+    """Return ``(path_or_none, meta)`` for jobs/manifest (explicit CLI wins over registry)."""
+    if explicit_path:
+        return explicit_path, {
+            "source": "explicit",
+            "path": explicit_path,
+        }
+    if disable_approved_reference_auto:
+        return None, {
+            "source": "none",
+            "auto_resolve_disabled": True,
+        }
+    hit = resolve_approved_reference(planet_a, planet_b, aspect_type, mode)
+    if hit is not None:
+        return hit.image_path, {
+            "source": "approved_registry",
+            "path": hit.image_path,
+            "registry_key": hit.registry_key,
+            "label": hit.label,
+            "priority": hit.priority,
+        }
+    return None, {"source": "none"}
+
+
 def _manifest_summary_text(
     *,
     date: str,
@@ -176,6 +216,7 @@ def _manifest_summary_text(
     jobs: list[CatstyleImageGenJob],
     output_dir: Path,
     manual_aspect_override: dict[str, Any] | None = None,
+    style_reference: dict[str, Any] | None = None,
 ) -> str:
     lines: list[str] = [
         f"Catstyle image generation jobs v0 — {date}",
@@ -184,6 +225,23 @@ def _manifest_summary_text(
         f"Total jobs: {len(jobs)}",
         "",
     ]
+    if style_reference:
+        src = style_reference.get("source")
+        lines.extend(
+            [
+                "## Style reference (v1)",
+                f"source: {src}",
+            ]
+        )
+        if style_reference.get("path"):
+            lines.append(f"path: {style_reference.get('path')}")
+        if style_reference.get("registry_key"):
+            lines.append(f"registry_key: {style_reference.get('registry_key')}")
+        if style_reference.get("label"):
+            lines.append(f"label: {style_reference.get('label')}")
+        if style_reference.get("auto_resolve_disabled"):
+            lines.append("auto_resolve_disabled: true")
+        lines.append("")
     if manual_aspect_override:
         lines.extend(
             [
@@ -246,6 +304,7 @@ def build_catstyle_image_generation_jobs(
     planet_b_override: str | None = None,
     aspect_type_override: str | None = None,
     mode_override: str | None = None,
+    disable_approved_reference_auto: bool = False,
     *,
     compute_positions_fn: Callable[..., dict[str, PlanetPosition]] | None = None,
     orb_config: dict[str, tuple[float, float]] | None = None,
@@ -279,9 +338,9 @@ def build_catstyle_image_generation_jobs(
     shot_m = str(shot_mode).strip().lower() if shot_mode else None
     if shot_m == "":
         shot_m = None
-    style_ref = str(style_reference_image_path).strip() if style_reference_image_path else None
-    if style_ref == "":
-        style_ref = None
+    style_ref_cli = str(style_reference_image_path).strip() if style_reference_image_path else None
+    if style_ref_cli == "":
+        style_ref_cli = None
 
     override_quad = parse_manual_aspect_override_fields(
         planet_a_override,
@@ -295,15 +354,27 @@ def build_catstyle_image_generation_jobs(
     profile: str
     primary: dict[str, Any]
     pp: dict[str, Any]
+    style_reference_meta: dict[str, Any] | None = None
 
     if override_quad is not None:
         o_pa, o_pb, o_asp, o_mode = override_quad
+        pa_n = normalize_planet_name(o_pa)
+        pb_n = normalize_planet_name(o_pb)
         profile = normalize_editorial_profile(editorial_profile)
         iso = day.isoformat()
-        manual_block = _manual_aspect_override_manifest_block(o_pa, o_pb, o_asp, o_mode)
+        manual_block = _manual_aspect_override_manifest_block(pa_n, pb_n, o_asp, o_mode)
+        primary = _synthetic_primary_manual_override(pa_n, pb_n, o_asp, o_mode)
+        final_ref, style_reference_meta = _resolve_final_style_reference(
+            explicit_path=style_ref_cli,
+            disable_approved_reference_auto=disable_approved_reference_auto,
+            planet_a=pa_n,
+            planet_b=pb_n,
+            aspect_type=o_asp,
+            mode=o_mode,
+        )
         req_kw: dict[str, Any] = dict(
-            planet_a=o_pa,
-            planet_b=o_pb,
+            planet_a=pa_n,
+            planet_b=pb_n,
             aspect_type=o_asp,
             mode=o_mode,
             variants_count=2,
@@ -317,13 +388,17 @@ def build_catstyle_image_generation_jobs(
             req_kw["shot_mode"] = shot_m
         if render_k is not None:
             req_kw["render_style_profile_key"] = render_k
+        if final_ref:
+            pa_chk = pa_n.lower()
+            pb_chk = pb_n.lower()
+            if "mars" not in {pa_chk, pb_chk}:
+                req_kw["mars_heavy_style_reference_finisher"] = True
         try:
             req = CatstylePromptRequest(**req_kw)
             pack_obj = generate_catstyle_prompt_pack(req)
         except ValueError as e:
             raise ValueError(f"Cannot build prompts for manual aspect override: {e}") from e
         pp = dict(pack_obj.model_dump(mode="json"))
-        primary = _synthetic_primary_manual_override(o_pa, o_pb, o_asp, o_mode)
     else:
         pack = generate_catstyle_daily_pack(
             day,
@@ -353,11 +428,51 @@ def build_catstyle_image_generation_jobs(
                 manual_aspect_override=None,
                 jobs=[],
                 message="No Catstyle-selected candidates for this date/scan; no image jobs created.",
+                style_reference_meta=None,
             )
 
         primary = dict(pack.selected_candidates[0])
         pp = dict(pack.prompt_packs[0])
         secondary = pack.secondary_supportive_candidate
+
+        pa_sel = normalize_planet_name(str(primary["planet_a"]))
+        pb_sel = normalize_planet_name(str(primary["planet_b"]))
+        asp_sel = str(primary["aspect_type"])
+        mode_sel = str(primary["mode_recommendation"])
+        final_ref, style_reference_meta = _resolve_final_style_reference(
+            explicit_path=style_ref_cli,
+            disable_approved_reference_auto=disable_approved_reference_auto,
+            planet_a=pa_sel,
+            planet_b=pb_sel,
+            aspect_type=asp_sel,
+            mode=mode_sel,
+        )
+
+        if final_ref:
+            pa_chk = pa_sel.lower()
+            pb_chk = pb_sel.lower()
+            if "mars" not in {pa_chk, pb_chk}:
+                n_img = len(pp.get("image_prompts") or [])
+                req_kw_refresh: dict[str, Any] = dict(
+                    planet_a=pa_sel,
+                    planet_b=pb_sel,
+                    aspect_type=asp_sel,
+                    mode=mode_sel,
+                    variants_count=max(1, n_img),
+                    skin_a=skin_a_c,
+                    skin_b=skin_b_c,
+                    editorial_profile=profile,
+                    world_template_key=world_k,
+                    scene_template_key=scene_k,
+                    mars_heavy_style_reference_finisher=True,
+                )
+                if shot_m is not None:
+                    req_kw_refresh["shot_mode"] = shot_m
+                if render_k is not None:
+                    req_kw_refresh["render_style_profile_key"] = render_k
+                pp = generate_catstyle_prompt_pack(CatstylePromptRequest(**req_kw_refresh)).model_dump(
+                    mode="json"
+                )
 
     image_prompts: list[str] = [str(p) for p in (pp.get("image_prompts") or [])]
     neg = str(pp.get("negative_prompt", ""))
@@ -439,7 +554,7 @@ def build_catstyle_image_generation_jobs(
                     prompt_index=prompt_index,
                     variant_index=variant_index,
                     shot_role=shot_role,
-                    style_reference_image_path=style_ref,
+                    style_reference_image_path=final_ref,
                     prompt_text=prompt_text,
                     negative_prompt=neg,
                     animation_prompt=anim,
@@ -465,6 +580,7 @@ def build_catstyle_image_generation_jobs(
             manual_aspect_override=manual_block,
             jobs=[],
             message="Primary prompt pack had no image_prompts lines; no jobs created.",
+            style_reference_meta=style_reference_meta,
         )
 
     files_written: list[str] = []
@@ -486,6 +602,8 @@ def build_catstyle_image_generation_jobs(
         }
         if manual_block is not None:
             manifest["manual_aspect_override"] = manual_block
+        if style_reference_meta is not None:
+            manifest["style_reference"] = style_reference_meta
         mp = out / "image_generation_jobs.json"
         mp.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         manifest_path = str(mp)
@@ -512,6 +630,7 @@ def build_catstyle_image_generation_jobs(
             jobs=jobs,
             output_dir=out,
             manual_aspect_override=manual_block,
+            style_reference=style_reference_meta,
         )
         (out / "manifest_summary.txt").write_text(summary, encoding="utf-8")
         files_written.append("manifest_summary.txt")
@@ -527,6 +646,7 @@ def build_catstyle_image_generation_jobs(
         manifest_path=manifest_path,
         files_written=files_written,
         message=None,
+        style_reference_meta=style_reference_meta,
     )
 
 

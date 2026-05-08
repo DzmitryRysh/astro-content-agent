@@ -59,6 +59,7 @@ def _minimal_result() -> CatstyleImageGenerationJobsResult:
         jobs=[j],
         output_dir="/tmp/x",
         files_written=["image_generation_jobs.json", "job_01_prompt.txt"],
+        style_reference_meta={"source": "none"},
     )
 
 
@@ -160,3 +161,22 @@ def test_cli_passes_style_reference_image_arg(jobs_cli, tmp_path: Path) -> None:
     finally:
         sys.argv = old
     assert m.call_args.kwargs.get("style_reference_image_path") == str(tmp_path / "ref.png")
+
+
+def test_cli_passes_disable_approved_reference_auto(jobs_cli, tmp_path: Path) -> None:
+    out = tmp_path / "cli_dis"
+    old = sys.argv[:]
+    try:
+        sys.argv = [
+            "build_catstyle_image_generation_jobs.py",
+            "--date",
+            "2026-05-02",
+            "--output-dir",
+            str(out),
+            "--disable-approved-reference-auto",
+        ]
+        with patch.object(jobs_cli, "build_catstyle_image_generation_jobs", return_value=_minimal_result()) as m:
+            assert jobs_cli.main() == 0
+    finally:
+        sys.argv = old
+    assert m.call_args.kwargs.get("disable_approved_reference_auto") is True

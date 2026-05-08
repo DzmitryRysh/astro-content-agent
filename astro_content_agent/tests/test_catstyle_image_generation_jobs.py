@@ -1,7 +1,9 @@
 """Tests for Catstyle image generation jobs v0 (no APIs)."""
 from __future__ import annotations
 
+import importlib.util
 import json
+import sys
 from datetime import date
 from pathlib import Path
 from unittest.mock import patch
@@ -75,6 +77,44 @@ def _fake_pack_one_primary() -> CatstyleDailyPackResult:
     )
 
 
+def _fake_pack_moon_saturn_square_tension() -> CatstyleDailyPackResult:
+    primary = {
+        "planet_a": "Moon",
+        "planet_b": "Saturn",
+        "aspect_type": "square",
+        "mode_recommendation": "tension",
+        "total_score": 40,
+        "orb": 0.9,
+        "source": "seed",
+        "editorial_selection_score": 40,
+    }
+    return CatstyleDailyPackResult(
+        date="2026-05-03",
+        scan_mode="day-window",
+        step_hours=2,
+        editorial_profile="charged",
+        ranked_candidates_count=1,
+        selected_count=1,
+        ranked_candidates=[dict(primary)],
+        selected_candidates=[primary],
+        primary_candidate=primary,
+        secondary_supportive_candidate=None,
+        prompt_packs=[
+            {
+                "image_prompts": ["moon saturn prompt"],
+                "image_prompt_shot_roles": ["hero_poster"],
+                "animation_prompt": "anim",
+                "negative_prompt": "neg",
+                "carousel_idea": "car",
+                "art_direction_profile": None,
+                "world_template_profile": None,
+                "scene_template_profile": None,
+                "render_style_profile": get_render_style_profile("premium_comic_poster_v1").model_dump(mode="json"),
+            }
+        ],
+    )
+
+
 def _fake_pack_empty() -> CatstyleDailyPackResult:
     return CatstyleDailyPackResult(
         date="2026-06-01",
@@ -101,6 +141,10 @@ def test_build_jobs_two_prompts_all_pending(tmp_path: Path) -> None:
         )
     assert isinstance(r, CatstyleImageGenerationJobsResult)
     assert len(r.jobs) == 2
+    assert r.style_reference_meta is not None
+    assert r.style_reference_meta.get("source") == "approved_registry"
+    assert r.jobs[0].style_reference_image_path
+    assert "jupiter_mars_approved" in (r.jobs[0].style_reference_image_path or "").replace("\\", "/").lower()
     assert all(j.status == "pending" for j in r.jobs)
     assert r.jobs[0].planet_a == "Jupiter" and r.jobs[0].planet_b == "Mars"
     assert r.jobs[0].prompt_index == 1
@@ -154,6 +198,7 @@ def test_output_writes_manifest_and_prompt_files(tmp_path: Path) -> None:
     assert (out / "job_01_prompt.txt").read_text(encoding="utf-8").strip() == "prompt line one"
     assert (out / "job_02_prompt.txt").read_text(encoding="utf-8").strip() == "prompt line two"
     manifest = json.loads((out / "image_generation_jobs.json").read_text(encoding="utf-8"))
+    assert manifest["style_reference"]["source"] == "approved_registry"
     assert manifest["jobs"][0]["shot_role"] == "hero_poster"
     assert manifest["jobs"][1]["shot_role"] == "alternate_action_angle"
     assert "neg body" in (out / "negative_prompt.txt").read_text(encoding="utf-8")
@@ -161,6 +206,7 @@ def test_output_writes_manifest_and_prompt_files(tmp_path: Path) -> None:
     summary = (out / "manifest_summary.txt").read_text(encoding="utf-8")
     assert "Saturn" in summary and "Venus" in summary
     assert "Secondary supportive" in summary
+    assert "Style reference" in summary
     assert "image_generation_jobs.json" in r.files_written
     assert "manifest_summary.txt" in r.files_written
 
@@ -249,6 +295,9 @@ def test_manual_override_build_jobs_and_manifest(tmp_path: Path) -> None:
         "aspect_type": "square",
         "mode": "tension",
     }
+    assert r.style_reference_meta is not None
+    assert r.style_reference_meta.get("source") == "approved_registry"
+    assert "pluto_mars_approved" in (r.jobs[0].style_reference_image_path or "").replace("\\", "/").lower()
 
     manifest = json.loads((tmp_path / "ov" / "image_generation_jobs.json").read_text(encoding="utf-8"))
     assert manifest["manual_aspect_override"]["enabled"] is True
@@ -323,5 +372,139 @@ def test_manifest_includes_style_reference_image_path(tmp_path: Path) -> None:
             style_reference_image_path="C:/refs/pluto_mars_style.png",
         )
     assert r.jobs[0].style_reference_image_path == "C:/refs/pluto_mars_style.png"
+    assert r.style_reference_meta is not None
+    assert r.style_reference_meta.get("source") == "explicit"
     manifest = json.loads((out / "image_generation_jobs.json").read_text(encoding="utf-8"))
     assert manifest["jobs"][0]["style_reference_image_path"] == "C:/refs/pluto_mars_style.png"
+    assert manifest["style_reference"]["source"] == "explicit"
+
+
+def test_approved_reference_auto_resolves_moon_saturn(tmp_path: Path) -> None:
+    out = tmp_path / "jobs_ms"
+    with patch(
+        "astro_content_agent.services.content.catstyle_image_generation_jobs.generate_catstyle_daily_pack",
+        return_value=_fake_pack_moon_saturn_square_tension(),
+    ):
+        r = build_catstyle_image_generation_jobs(date(2026, 5, 3), output_dir=out)
+    assert r.style_reference_meta is not None
+    assert r.style_reference_meta.get("source") == "approved_registry"
+    assert r.style_reference_meta.get("registry_key") == "moon_saturn_square_tension_v1"
+    p = (r.jobs[0].style_reference_image_path or "").replace("\\", "/").lower()
+    assert "catstyle_moon_saturn_approved" in p
+
+
+def test_disable_approved_reference_auto_skips_registry(tmp_path: Path) -> None:
+    out = tmp_path / "jobs_noauto"
+    with patch(
+        "astro_content_agent.services.content.catstyle_image_generation_jobs.generate_catstyle_daily_pack",
+        return_value=_fake_pack_moon_saturn_square_tension(),
+    ):
+        r = build_catstyle_image_generation_jobs(
+            date(2026, 5, 3),
+            output_dir=out,
+            disable_approved_reference_auto=True,
+        )
+    assert r.jobs[0].style_reference_image_path is None
+    assert r.style_reference_meta is not None
+    assert r.style_reference_meta.get("source") == "none"
+    assert r.style_reference_meta.get("auto_resolve_disabled") is True
+
+
+def test_build_catstyle_image_generation_jobs_cli_shows_auto_resolved_reference(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    repo = Path(__file__).resolve().parents[2]
+    aca = str(repo / "scripts" / "aca")
+    if aca not in sys.path:
+        sys.path.insert(0, aca)
+    p = repo / "scripts" / "aca" / "build_catstyle_image_generation_jobs.py"
+    spec = importlib.util.spec_from_file_location("_build_catstyle_image_jobs_cli", p)
+    assert spec and spec.loader
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    old = sys.argv[:]
+    try:
+        with patch(
+            "astro_content_agent.services.content.catstyle_image_generation_jobs.generate_catstyle_daily_pack",
+            return_value=_fake_pack_moon_saturn_square_tension(),
+        ):
+            sys.argv = [
+                "build_catstyle_image_generation_jobs.py",
+                "--date",
+                "2026-05-03",
+                "--output-dir",
+                str(tmp_path / "cli_out"),
+            ]
+            assert mod.main() == 0
+    finally:
+        sys.argv = old
+    out = capsys.readouterr().out
+    assert "approved reference auto-resolved:" in out
+
+
+def test_build_catstyle_image_generation_jobs_cli_explicit_style_reference_line(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    repo = Path(__file__).resolve().parents[2]
+    aca = str(repo / "scripts" / "aca")
+    if aca not in sys.path:
+        sys.path.insert(0, aca)
+    p = repo / "scripts" / "aca" / "build_catstyle_image_generation_jobs.py"
+    spec = importlib.util.spec_from_file_location("_build_catstyle_image_jobs_cli2", p)
+    assert spec and spec.loader
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    old = sys.argv[:]
+    try:
+        with patch(
+            "astro_content_agent.services.content.catstyle_image_generation_jobs.generate_catstyle_daily_pack",
+            return_value=_fake_pack_one_primary(),
+        ):
+            sys.argv = [
+                "build_catstyle_image_generation_jobs.py",
+                "--date",
+                "2026-05-02",
+                "--output-dir",
+                str(tmp_path / "cli_exp"),
+                "--style-reference-image",
+                "D:/explicit/ref.png",
+            ]
+            assert mod.main() == 0
+    finally:
+        sys.argv = old
+    assert "explicit style reference:" in capsys.readouterr().out
+
+
+def test_build_catstyle_image_generation_jobs_cli_no_reference_when_disabled(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    repo = Path(__file__).resolve().parents[2]
+    aca = str(repo / "scripts" / "aca")
+    if aca not in sys.path:
+        sys.path.insert(0, aca)
+    p = repo / "scripts" / "aca" / "build_catstyle_image_generation_jobs.py"
+    spec = importlib.util.spec_from_file_location("_build_catstyle_image_jobs_cli3", p)
+    assert spec and spec.loader
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    old = sys.argv[:]
+    try:
+        with patch(
+            "astro_content_agent.services.content.catstyle_image_generation_jobs.generate_catstyle_daily_pack",
+            return_value=_fake_pack_moon_saturn_square_tension(),
+        ):
+            sys.argv = [
+                "build_catstyle_image_generation_jobs.py",
+                "--date",
+                "2026-05-03",
+                "--output-dir",
+                str(tmp_path / "cli_nr"),
+                "--disable-approved-reference-auto",
+            ]
+            assert mod.main() == 0
+    finally:
+        sys.argv = old
+    assert "no reference selected" in capsys.readouterr().out
