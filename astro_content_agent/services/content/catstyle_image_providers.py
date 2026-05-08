@@ -16,6 +16,8 @@ from astro_content_agent.services.ai.client import OpenAIClientFactory
 CatstyleImageProviderName = Literal["stub", "openai_image"]
 
 _PREVIEW_MAX = 480
+_PROVIDER_PROMPT_TRIM_TRIGGER = 31_900
+_PROVIDER_PROMPT_TARGET_MAX = 31_850
 
 
 def _preview(text: str) -> str:
@@ -42,6 +44,22 @@ def _build_combined_prompt(job: dict[str, Any]) -> str:
     if neg:
         return f"{main}\n\nAvoid / negative guidance: {neg}"
     return main
+
+
+def _fit_provider_prompt(prompt: str) -> str:
+    """
+    Final provider-boundary prompt guard.
+
+    Keeps the rich prompt intact unless it is near provider limits, then applies a
+    deterministic surgical trim to stay safely under OpenAI 32k limit.
+    """
+    s = " ".join((prompt or "").split())
+    if len(s) <= _PROVIDER_PROMPT_TRIM_TRIGGER:
+        return s
+    cut = s.rfind(". ", 0, _PROVIDER_PROMPT_TARGET_MAX)
+    if cut > int(_PROVIDER_PROMPT_TARGET_MAX * 0.92):
+        return s[:cut].rstrip() + "."
+    return s[:_PROVIDER_PROMPT_TARGET_MAX].rstrip()
 
 
 def _images_response_to_png_bytes(resp: Any) -> tuple[bytes | None, str | None]:
@@ -165,7 +183,6 @@ class OpenAICatstyleImageProvider:
     """Calls OpenAI Images API; saves PNGs locally only (no Cloudinary / Instagram)."""
 
     provider_name: str = "openai_image"
-
     def __init__(
         self,
         *,
@@ -207,6 +224,10 @@ class OpenAICatstyleImageProvider:
             "prompt_index": prompt_index,
             "suggested_output_name": suggested,
             "style_reference_image_path": style_reference_image_path,
+            "reference_used": False,
+            "reference_path": style_reference_image_path,
+            "reference_skip_reason": "no_reference_provided" if not style_reference_image_path else None,
+            "generation_mode": "text_generate",
         }
 
         api_key = settings.openai_api_key
@@ -231,13 +252,15 @@ class OpenAICatstyleImageProvider:
             )
 
         prompt = _build_combined_prompt(job)
+        prompt = _fit_provider_prompt(prompt)
+        final_prompt_length = len(prompt)
         if not prompt.strip():
             return CatstyleImageProviderResult(
                 provider=self.provider_name,
                 job_id=job_id,
                 status="failed",
                 message="Job has no prompt_text (empty after combining with negative_prompt).",
-                metadata={**meta_base, "prompt_preview": preview},
+                metadata={**meta_base, "prompt_preview": preview, "final_prompt_length": final_prompt_length},
             )
 
         ref_path: Path | None = None
@@ -249,17 +272,29 @@ class OpenAICatstyleImageProvider:
                 ref_path = ref_path.resolve()
             style_reference_image_path = str(ref_path)
             meta_base["style_reference_image_path"] = style_reference_image_path
+            meta_base["reference_path"] = style_reference_image_path
             if not ref_path.is_file():
                 return CatstyleImageProviderResult(
                     provider=self.provider_name,
                     job_id=job_id,
                     status="failed",
                     message=f"style_reference_image_path not found: {ref_path}",
-                    metadata={**meta_base, "prompt_preview": preview},
+                    metadata={
+                        **meta_base,
+                        "prompt_preview": preview,
+                        "reference_skip_reason": "reference_file_missing",
+                        "generation_mode": "text_generate",
+                        "reference_used": False,
+                        "final_prompt_length": final_prompt_length,
+                    },
                 )
+            meta_base["reference_skip_reason"] = None
+            meta_base["reference_used"] = True
+            meta_base["generation_mode"] = "image_edit"
 
         client = self._effective_client(str(api_key).strip())
         resp: Any
+        api_model = model
         try:
             if ref_path is not None:
                 edit_fn = getattr(client.images, "edit", None)
@@ -272,22 +307,27 @@ class OpenAICatstyleImageProvider:
                             "style reference image generation is not supported by this OpenAI SDK/client path: "
                             "client.images.edit is not available."
                         ),
-                        metadata={**meta_base, "prompt_preview": preview},
+                        metadata={
+                            **meta_base,
+                            "prompt_preview": preview,
+                            "reference_used": False,
+                            "reference_skip_reason": "images_edit_not_available",
+                            "final_prompt_length": final_prompt_length,
+                        },
                     )
                 with ref_path.open("rb") as image_file:
                     resp = client.images.edit(
-                        model=model,
+                        model=api_model,
                         image=image_file,
                         prompt=prompt,
                         size=size,  # type: ignore[arg-type]
                         n=1,
-                        output_format="png",
                     )
             else:
                 # GPT image models (e.g. gpt-image-1): no response_format — base64 is default;
                 # use output_format instead (response_format is invalid for these models).
                 resp = client.images.generate(
-                    model=model,
+                    model=api_model,
                     prompt=prompt,
                     size=size,  # type: ignore[arg-type]
                     n=1,
@@ -304,7 +344,12 @@ class OpenAICatstyleImageProvider:
                         "style reference image generation is not supported by this OpenAI SDK/client path: "
                         f"{safe}"
                     ),
-                    metadata={**meta_base, "prompt_preview": preview, "error_type": type(exc).__name__},
+                    metadata={
+                        **meta_base,
+                        "prompt_preview": preview,
+                        "error_type": type(exc).__name__,
+                        "final_prompt_length": final_prompt_length,
+                    },
                 )
             safe = _sanitize_error_message(str(exc))
             return CatstyleImageProviderResult(
@@ -312,7 +357,12 @@ class OpenAICatstyleImageProvider:
                 job_id=job_id,
                 status="failed",
                 message=f"OpenAI image API error: {safe}",
-                metadata={**meta_base, "prompt_preview": preview, "error_type": type(exc).__name__},
+                metadata={
+                    **meta_base,
+                    "prompt_preview": preview,
+                    "error_type": type(exc).__name__,
+                    "final_prompt_length": final_prompt_length,
+                },
             )
         except Exception as exc:  # noqa: BLE001 — surface safe summary only
             safe = _sanitize_error_message(str(exc))
@@ -325,7 +375,12 @@ class OpenAICatstyleImageProvider:
                 job_id=job_id,
                 status="failed",
                 message=msg,
-                metadata={**meta_base, "prompt_preview": preview, "error_type": type(exc).__name__},
+                metadata={
+                    **meta_base,
+                    "prompt_preview": preview,
+                    "error_type": type(exc).__name__,
+                    "final_prompt_length": final_prompt_length,
+                },
             )
 
         raw_png, decode_err = _images_response_to_png_bytes(resp)
@@ -335,7 +390,7 @@ class OpenAICatstyleImageProvider:
                 job_id=job_id,
                 status="failed",
                 message=decode_err or "OpenAI image decode failed.",
-                metadata={**meta_base, "prompt_preview": preview},
+                metadata={**meta_base, "prompt_preview": preview, "final_prompt_length": final_prompt_length},
             )
 
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -348,7 +403,11 @@ class OpenAICatstyleImageProvider:
             output_path=str(out_path.resolve()),
             output_filename=filename,
             message="Image saved locally for manual review.",
-            metadata={**meta_base, "prompt_preview": preview},
+            metadata={
+                **meta_base,
+                "prompt_preview": preview,
+                "final_prompt_length": final_prompt_length,
+            },
         )
 
 

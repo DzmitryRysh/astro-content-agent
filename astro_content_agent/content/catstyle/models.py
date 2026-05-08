@@ -191,9 +191,12 @@ class CatstylePromptRequest(BaseModel):
             "Default v2 is strongest premium battle-poster hardlock; use premium_comic_poster_v1 for legacy parity."
         ),
     )
-    shot_mode: Literal["hero_pair", "standard"] = Field(
+    shot_mode: Literal["hero_pair", "standard", "epic_arena_showdown"] = Field(
         default="hero_pair",
-        description="hero_pair: deterministic hero_poster / alternate_action_angle framing when variants_count>=1.",
+        description=(
+            "hero_pair: deterministic hero_poster / alternate_action_angle framing when variants_count>=1; "
+            "epic_arena_showdown: same role cadence plus explicit wide arena spectacle composition guidance."
+        ),
     )
     mars_heavy_style_reference_finisher: bool = Field(
         default=False,

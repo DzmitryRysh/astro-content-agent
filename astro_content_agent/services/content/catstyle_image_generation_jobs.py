@@ -107,6 +107,16 @@ class CatstyleImageGenerationJobsResult(BaseModel):
     )
 
 
+def _write_utf8_text(path: Path, body: str) -> None:
+    """Write UTF-8 text with trailing newline normalization."""
+    path.write_text((body or "").rstrip("\n") + "\n", encoding="utf-8")
+
+
+def _write_utf8_json(path: Path, payload: dict[str, Any]) -> None:
+    """Write UTF-8 JSON preserving Unicode glyphs."""
+    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
 def _strip_opt(raw: str | None) -> str | None:
     if raw is None:
         return None
@@ -605,22 +615,19 @@ def build_catstyle_image_generation_jobs(
         if style_reference_meta is not None:
             manifest["style_reference"] = style_reference_meta
         mp = out / "image_generation_jobs.json"
-        mp.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        _write_utf8_json(mp, manifest)
         manifest_path = str(mp)
         files_written.append("image_generation_jobs.json")
 
         width = max(2, len(str(len(jobs))))
         for i, job in enumerate(jobs, start=1):
             fname = f"job_{i:0{width}d}_prompt.txt"
-            (out / fname).write_text(
-                (job.prompt_text or "").rstrip("\n") + "\n",
-                encoding="utf-8",
-            )
+            _write_utf8_text(out / fname, job.prompt_text or "")
             files_written.append(fname)
 
-        (out / "negative_prompt.txt").write_text(neg.rstrip("\n") + "\n", encoding="utf-8")
+        _write_utf8_text(out / "negative_prompt.txt", neg)
         files_written.append("negative_prompt.txt")
-        (out / "animation_prompt.txt").write_text(anim.rstrip("\n") + "\n", encoding="utf-8")
+        _write_utf8_text(out / "animation_prompt.txt", anim)
         files_written.append("animation_prompt.txt")
         summary = _manifest_summary_text(
             date=iso,
@@ -632,7 +639,7 @@ def build_catstyle_image_generation_jobs(
             manual_aspect_override=manual_block,
             style_reference=style_reference_meta,
         )
-        (out / "manifest_summary.txt").write_text(summary, encoding="utf-8")
+        _write_utf8_text(out / "manifest_summary.txt", summary)
         files_written.append("manifest_summary.txt")
 
     return CatstyleImageGenerationJobsResult(

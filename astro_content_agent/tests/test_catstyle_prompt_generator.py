@@ -768,6 +768,159 @@ def test_shot_mode_standard_omits_shot_role_labels() -> None:
     assert "[shot role v1" not in joined
 
 
+def test_epic_arena_showdown_profile_includes_environment_scale_and_readable_subjects() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Moon",
+            planet_b="Saturn",
+            aspect_type="square",
+            mode="tension",
+            shot_mode="epic_arena_showdown",
+            world_template_key="cosmic_zodiac_arena",
+            premium_art_direction=False,
+        )
+    )
+    blob = " ".join(pack.image_prompts).lower()
+    assert "[shot/composition profile v4 - epic_arena_showdown]" in blob
+    assert "mythic showdown poster" in blob
+    assert "ceremonial cosmic arena" in blob
+    assert "environment is a co-star" in blob
+    assert "heroic medium-wide to wide cinematic composition" in blob
+    assert "pull the camera back slightly into wider poster framing" in blob
+    assert "characters occupy slightly less of the frame" in blob
+    assert "preserve negative space and breathing room around central action" in blob
+    assert "coliseum recedes into the distance" in blob
+    assert "arena walls rise behind the characters" in blob
+    assert "more visible arena floor and more upper architecture" in blob
+    assert "elevated rather than attached directly behind characters" in blob
+    assert "clearly readable zodiac floor ring" in blob
+    assert "layered coliseum walls" in blob
+    assert "visible upper arches" in blob
+    assert "deep stadium tiers/perspective" in blob
+    assert "additional side architectural structures" in blob
+    assert "stronger monumental arena feeling" in blob
+    assert "two large readable faction banners on opposite arena sides" in blob
+    assert "one side marker per planet" in blob
+    assert "clearly readable distant earth or earth-like blue-green planet" in blob
+    assert "visible cloud and/or continent pattern" in blob
+    assert "human-world impact cue" in blob
+    assert "smaller than characters but visually legible" in blob
+    assert "clearly above and behind the arena" in blob
+    assert "do not replace the earth impact cue with moon/jupiter/mars/saturn" in blob
+    assert "planet identity belongs on characters, banners, props, glyphs, and arena symbols" in blob
+    assert "for moon aspects specifically" in blob
+    assert "avoid ambiguous moon-like background orb" in blob
+    assert "large moon sky-body as the main celestial cue" in blob
+    assert "exact glyph + emblem recognizability lock for moon/saturn" in blob
+    assert "prefer moon banner exact glyph '☾'" in blob
+    assert "saturn banner exact glyph '♄'" in blob
+    assert "if saturn glyph rendering becomes unstable or unreadable" in blob
+    assert "ringed-planet silhouette / ringed sphere icon" in blob
+    assert "fake letters" in blob and "faux-alphabet glyphs" in blob
+    assert "smaller accessory glyphs/emblems are secondary only" in blob
+    assert "moon/saturn epic arena scale hard lock" in blob
+    assert "benchmark alignment note (approved jupiter/mars epic arena scale as distant composition reference target)" in blob
+    assert "pull the camera back further than baseline epic mode" in blob
+    assert "characters must occupy slightly less of the overall frame" in blob
+    assert "coliseum walls must recede clearly into the distance" in blob
+    assert "avoid compositions where arena walls feel pasted or attached flat immediately behind the characters" in blob
+    assert "[catstyle approved reference anchor v1 - moon/saturn square+tension]" in blob
+    assert "registry_key=moon_saturn_square_tension_v1" in blob
+    assert "[moon-saturn epic arena action staging v5 - balanced lock]" in blob
+    assert all(29000 <= len(p) <= 31800 for p in pack.image_prompts)
+    assert "premium cinematic comic-poster illustration" in blob
+    assert "high-drama heroic comic-cover battle splash" in blob
+    assert "polished 2d/2.5d comic" in blob
+    assert "collectible-cover polish" in blob
+    assert "dramatic focal and rim-impact lighting" in blob
+    assert "layered foreground/midground/background depth" in blob
+    assert "dark-but-vivid" in blob
+    assert "forbid muddy darkness" in blob
+    assert "not soft nursery art" in blob or "not cute nursery" in blob
+    assert "washed-out painterly blur" in blob or "not flat mascot" in blob
+    assert "saturn may use chain/control as saturnian restraint" in blob
+    assert "moon may hold, brace, swing, or strike with pillow energy" in blob
+    assert "exactly one earth-like sphere above and behind arena" in blob
+    assert "avoid duplicate earth-like globes" in blob
+    assert "ringed-planet silhouette / ringed sphere icon" in blob or "saturn banner exact glyph '♄'" in blob
+    assert "coliseum recedes into the distance" in blob
+    assert "more visible arena floor and more upper architecture" in blob
+    assert "movie-one-sheet readability" in blob
+    assert "controlled detail density" in blob
+    assert "first-glance cause/effect readability" in blob
+    assert "clear faces, readable poses, clean silhouette separation" in blob
+    assert "avoid tight crop and character-dominant framing" in blob
+    assert "vague background darkness" in blob
+    assert "disappearing coliseum" in blob
+    assert "tiny/barely readable earth cue" in blob
+    assert "only one visible side banner" in blob
+    assert "environment reduced to a backdrop afterthought" in blob
+
+
+def test_epic_arena_showdown_moon_saturn_soft_aspect_skips_hard_action_staging() -> None:
+    """Hard-aspect dynamic staging applies only to square/opposition."""
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Moon",
+            planet_b="Saturn",
+            aspect_type="trine",
+            mode="mixed",
+            shot_mode="epic_arena_showdown",
+            world_template_key="cosmic_zodiac_arena",
+            premium_art_direction=False,
+        )
+    )
+    blob = " ".join(pack.image_prompts).lower()
+    assert "[moon-saturn epic arena action staging v5" not in blob
+    assert "[moon-saturn final quality lock v2]" not in blob
+    assert "[catstyle approved reference anchor v1" not in blob
+
+
+def test_epic_arena_showdown_moon_saturn_square_mixed_has_staging_without_registry_anchor() -> None:
+    """Approved-reference anchor matches registry square+tension only."""
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Moon",
+            planet_b="Saturn",
+            aspect_type="square",
+            mode="mixed",
+            shot_mode="epic_arena_showdown",
+            world_template_key="cosmic_zodiac_arena",
+            premium_art_direction=False,
+        )
+    )
+    blob = " ".join(pack.image_prompts).lower()
+    assert "[moon-saturn epic arena action staging v5 - balanced lock]" in blob
+    assert "registry_key=moon_saturn_square_tension_v1" not in blob
+
+
+def test_epic_arena_showdown_moon_saturn_opposition_has_staging_without_square_tension_anchor() -> None:
+    """Hard-aspect staging applies; registry anchor only matches square+tension."""
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Moon",
+            planet_b="Saturn",
+            aspect_type="opposition",
+            mode="tension",
+            shot_mode="epic_arena_showdown",
+            world_template_key="cosmic_zodiac_arena",
+            premium_art_direction=False,
+        )
+    )
+    blob = " ".join(pack.image_prompts).lower()
+    assert "[moon-saturn epic arena action staging v5 - balanced lock]" in blob
+    assert "exactly one earth-like sphere above and behind arena" in blob
+    assert "registry_key=moon_saturn_square_tension_v1" not in blob
+
+
 def test_premium_render_style_opens_prompt_without_legacy_flat_cartoon_anchor() -> None:
     from astro_content_agent.content.catstyle.models import CatstylePromptRequest
 
@@ -873,6 +1026,13 @@ def test_moon_saturn_square_tension_includes_visual_correction_patch() -> None:
     assert "cozy doorway/window" in blob
     assert "martial-arts duel choreography" in blob or "no martial-arts duel choreography" in blob
     assert "not 3d cgi figurine" in blob
+    assert "[arena composition boost v1]" in blob
+    assert "medium-wide dramatic arena framing" in blob
+    assert "zodiac symbols around the ring" in blob
+    assert "curved coliseum wall" in blob
+    assert "arches/stadium tiers/layered architecture depth" in blob
+    assert "avoid overly tight crop on the two characters" in blob
+    assert "avoid background collapsing into vague darkness" in blob
 
 
 def test_aspect_choreography_square_vs_trine_tone() -> None:
@@ -1032,11 +1192,37 @@ def test_premium_comic_poster_v2_jupiter_mars_charged_arena_scene_hardlock() -> 
     assert "less detailed than characters" in raw
     assert "coliseum" in raw
     assert "battle" in raw
+    assert "[arena composition boost v1]" in raw
+    assert "readable arena floor plane" in raw
+    assert "curved coliseum wall" in raw
+    assert "zodiac symbols around the ring" in raw
+    assert "environmental breathing room" in raw
+    assert "not tight close-up" in raw
+    assert "not tiny distant characters" in raw
     assert "[canon v1 base]" in raw
     assert "[identity markers v1]" in raw
     assert "[world template v1" in raw
     assert "[scene template v1" in raw
     assert "[render style v1 - high-priority visual finish]" in raw
+
+
+def test_arena_composition_boost_block_present_for_non_hard_aspect_baseline() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Pluto",
+            planet_b="Venus",
+            aspect_type="conjunction",
+            mode="tension",
+            premium_art_direction=False,
+            shot_mode="standard",
+        )
+    )
+    blob = " ".join(pack.image_prompts).lower()
+    assert "[arena composition boost v1]" in blob
+    assert "medium-wide dramatic framing with environmental breathing room" in blob
+    assert "keep both planet-cats prominent" in blob
 
 
 def test_v2_negative_prompt_is_deduped_compact_and_keeps_forbidden_categories() -> None:

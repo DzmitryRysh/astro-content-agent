@@ -23,6 +23,14 @@ def test_shot_roles_standard_all_none() -> None:
     assert shot_roles_for_variant_indices(3, "standard") == [None, None, None]
 
 
+def test_shot_roles_epic_arena_showdown_alternates_like_hero_pair() -> None:
+    assert shot_roles_for_variant_indices(3, "epic_arena_showdown") == [
+        "hero_poster",
+        "alternate_action_angle",
+        "hero_poster",
+    ]
+
+
 def test_unknown_shot_mode_raises() -> None:
     with pytest.raises(ValueError, match="Unknown shot_mode"):
         shot_roles_for_variant_indices(2, "bogus")

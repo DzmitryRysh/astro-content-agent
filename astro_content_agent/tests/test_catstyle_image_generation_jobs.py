@@ -15,6 +15,7 @@ from astro_content_agent.content.catstyle.render_style_profiles_v1 import get_re
 from astro_content_agent.content.catstyle.models import CatstylePromptPack
 from astro_content_agent.services.content.catstyle_image_generation_jobs import (
     CatstyleImageGenerationJobsResult,
+    _write_utf8_text,
     build_catstyle_image_generation_jobs,
     parse_manual_aspect_override_fields,
 )
@@ -144,7 +145,7 @@ def test_build_jobs_two_prompts_all_pending(tmp_path: Path) -> None:
     assert r.style_reference_meta is not None
     assert r.style_reference_meta.get("source") == "approved_registry"
     assert r.jobs[0].style_reference_image_path
-    assert "jupiter_mars_approved" in (r.jobs[0].style_reference_image_path or "").replace("\\", "/").lower()
+    assert "jupiter_mars_square_tension_approved" in (r.jobs[0].style_reference_image_path or "").replace("\\", "/").lower()
     assert all(j.status == "pending" for j in r.jobs)
     assert r.jobs[0].planet_a == "Jupiter" and r.jobs[0].planet_b == "Mars"
     assert r.jobs[0].prompt_index == 1
@@ -390,7 +391,7 @@ def test_approved_reference_auto_resolves_moon_saturn(tmp_path: Path) -> None:
     assert r.style_reference_meta.get("source") == "approved_registry"
     assert r.style_reference_meta.get("registry_key") == "moon_saturn_square_tension_v1"
     p = (r.jobs[0].style_reference_image_path or "").replace("\\", "/").lower()
-    assert "catstyle_moon_saturn_approved" in p
+    assert "catstyle_moon_saturn_square_tension_approved" in p
 
 
 def test_disable_approved_reference_auto_skips_registry(tmp_path: Path) -> None:
@@ -508,3 +509,38 @@ def test_build_catstyle_image_generation_jobs_cli_no_reference_when_disabled(
     finally:
         sys.argv = old
     assert "no reference selected" in capsys.readouterr().out
+
+
+def test_moon_saturn_prompt_text_keeps_unicode_glyphs_no_mojibake(tmp_path: Path) -> None:
+    out = tmp_path / "glyph_jobs"
+    r = build_catstyle_image_generation_jobs(
+        date(2026, 5, 8),
+        output_dir=out,
+        planet_a_override="Moon",
+        planet_b_override="Saturn",
+        aspect_type_override="square",
+        mode_override="tension",
+        shot_mode="epic_arena_showdown",
+        editorial_profile="charged",
+    )
+    assert r.jobs, "expected at least one generated job"
+    blob = r.jobs[0].prompt_text
+    assert "☾" in blob
+    assert "♄" in blob
+    assert "—" in blob
+    assert "â˜¾" not in blob
+    assert "â™„" not in blob
+    assert "â€”" not in blob
+
+
+def test_utf8_writer_roundtrip_preserves_glyphs_and_em_dash(tmp_path: Path) -> None:
+    p = tmp_path / "roundtrip_prompt.txt"
+    body = "Moon ☾ attacks Saturn ♄ — diagonal swing."
+    _write_utf8_text(p, body)
+    got = p.read_text(encoding="utf-8")
+    assert "☾" in got
+    assert "♄" in got
+    assert "—" in got
+    assert "â˜¾" not in got
+    assert "â™„" not in got
+    assert "â€”" not in got

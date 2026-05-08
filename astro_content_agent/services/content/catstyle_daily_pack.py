@@ -44,7 +44,7 @@ def generate_catstyle_daily_pack(
     Optional ``skin_a`` / ``skin_b`` are passed through to ``CatstylePromptRequest`` (character_skins v0).
     Optional ``world_template_key`` / ``scene_template_key`` map to world/scene templates v1 when set.
     Optional ``render_style_profile_key`` selects render finish v1 (omit for model default premium poster).
-    Optional ``shot_mode`` overrides ``CatstylePromptRequest.shot_mode`` (``hero_pair`` or ``standard``).
+    Optional ``shot_mode`` overrides ``CatstylePromptRequest.shot_mode`` (``hero_pair`` | ``epic_arena_showdown`` | ``standard``).
     """
     skin_a_c = str(skin_a).strip() if skin_a else None
     skin_b_c = str(skin_b).strip() if skin_b else None
@@ -63,8 +63,8 @@ def generate_catstyle_daily_pack(
     shot_m = str(shot_mode).strip().lower() if shot_mode else None
     if shot_m == "":
         shot_m = None
-    if shot_m is not None and shot_m not in ("hero_pair", "standard"):
-        raise ValueError("shot_mode must be 'hero_pair' or 'standard'.")
+    if shot_m is not None and shot_m not in ("hero_pair", "epic_arena_showdown", "standard"):
+        raise ValueError("shot_mode must be 'hero_pair', 'epic_arena_showdown', or 'standard'.")
 
     render_k = str(render_style_profile_key).strip() if render_style_profile_key else None
     if render_k == "":

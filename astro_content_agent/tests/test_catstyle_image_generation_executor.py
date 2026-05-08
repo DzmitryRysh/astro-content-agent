@@ -216,6 +216,39 @@ def test_execute_openai_image_behaves_like_stub_executor_shape(
     payload = json.loads(exec_path.read_text(encoding="utf-8"))
     assert payload["provider"] == "openai_image"
     assert payload["status"] == "completed_openai"
+    assert isinstance(payload["outputs"][0].get("final_prompt_length"), int)
+    assert payload["outputs"][0]["final_prompt_length"] < 32000
+    assert payload["outputs"][0].get("reference_used") is False
+    assert payload["outputs"][0].get("generation_mode") == "text_generate"
+
+
+def test_execute_openai_manifest_records_reference_usage_and_mode(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    mock_client = MagicMock()
+    mock_client.images.edit.return_value = SimpleNamespace(
+        data=[SimpleNamespace(b64_json=_MINI_PNG_B64, url=None)]
+    )
+    _fake_openai_provider_registry(monkeypatch, mock_client)
+
+    ref = tmp_path / "style_ref.png"
+    ref.write_bytes(b"fake")
+    job = _sample_job(1)
+    job["style_reference_image_path"] = str(ref)
+    mpath = tmp_path / "image_generation_jobs.json"
+    _write_manifest(mpath, [job])
+    out = tmp_path / "gen_img_ref"
+    r = execute_catstyle_image_jobs(
+        mpath, provider_name="openai_image", output_dir=out, overwrite=False
+    )
+    assert r.outputs[0].status == "generated"
+    exec_path = out / "image_generation_execution_stub.json"
+    payload = json.loads(exec_path.read_text(encoding="utf-8"))
+    row = payload["outputs"][0]
+    assert row.get("reference_used") is True
+    assert row.get("generation_mode") == "image_edit"
+    assert row.get("reference_skip_reason") is None
+    assert isinstance(row.get("reference_path"), str) and row["reference_path"].endswith("style_ref.png")
 
 
 def test_default_output_dir_openai_is_generated_images(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

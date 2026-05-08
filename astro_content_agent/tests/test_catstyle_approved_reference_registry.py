@@ -22,7 +22,7 @@ def test_resolve_moon_saturn_square_tension() -> None:
     r = resolve_approved_reference("Moon", "Saturn", "square", "tension")
     assert r is not None
     assert r.registry_key == "moon_saturn_square_tension_v1"
-    assert "catstyle_moon_saturn_approved" in r.image_path.replace("\\", "/").lower()
+    assert "catstyle_moon_saturn_square_tension_approved" in r.image_path.replace("\\", "/").lower()
 
 
 def test_resolve_reversed_planets_same() -> None:

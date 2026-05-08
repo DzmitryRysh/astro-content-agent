@@ -7,9 +7,21 @@
       "planet_b": "Mars",
       "aspect_type": "square",
       "mode": "tension",
-      "image_path": "references/catstyle_jupiter_mars_approved.png",
-      "label": "Jupiter square Mars (tension)",
-      "notes": "Approved expansion vs kinetic reference.",
+      "image_path": "references/catstyle_jupiter_mars_square_tension_approved.png",
+      "label": "Jupiter Mars epic arena showdown approved reference",
+      "notes": "Strong epic arena scale, visible side banner, celestial background, readable duel.",
+      "priority": 100,
+      "active": true
+    },
+    {
+      "registry_key": "moon_saturn_square_tension_v1",
+      "planet_a": "Moon",
+      "planet_b": "Saturn",
+      "aspect_type": "square",
+      "mode": "tension",
+      "image_path": "references/catstyle_moon_saturn_square_tension_approved.png",
+      "label": "Best Moon Saturn arena reference",
+      "notes": "Approved final reference: brighter arena, better Earth cue, better scale, best current Moon/Saturn tension frame.",
       "priority": 100,
       "active": true
     },
@@ -22,18 +34,6 @@
       "image_path": "references/catstyle_pluto_mars_approved.png",
       "label": "Pluto square Mars (tension)",
       "notes": "Approved pressure/control vs strike reference.",
-      "priority": 100,
-      "active": true
-    },
-    {
-      "registry_key": "moon_saturn_square_tension_v1",
-      "planet_a": "Moon",
-      "planet_b": "Saturn",
-      "aspect_type": "square",
-      "mode": "tension",
-      "image_path": "references/catstyle_moon_saturn_approved.png",
-      "label": "Moon square Saturn (tension)",
-      "notes": "Approved softness-vs-structure reference.",
       "priority": 100,
       "active": true
     }

@@ -134,10 +134,14 @@ def main() -> int:
     )
     ap.add_argument(
         "--shot-mode",
-        choices=("hero_pair", "standard"),
+        choices=("hero_pair", "epic_arena_showdown", "standard"),
         default=None,
         dest="shot_mode",
-        help="hero_pair (default): paired hero_poster + alternate_action_angle framing; standard: legacy variant prompts.",
+        help=(
+            "hero_pair (default): paired hero_poster + alternate_action_angle framing; "
+            "epic_arena_showdown: wide arena spectacle framing with readable central characters; "
+            "standard: legacy variant prompts."
+        ),
     )
     ap.add_argument("--output", type=Path, default=None, help="Write JSON artifact to this path")
     args = ap.parse_args()

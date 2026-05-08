@@ -37,7 +37,7 @@ def test_list_cli_human_output(ref_cli, capsys: pytest.CaptureFixture[str]) -> N
     out = capsys.readouterr().out
     assert "Catstyle approved reference registry" in out
     assert "moon_saturn_square_tension_v1" in out
-    assert "references/catstyle_moon_saturn_approved.png" in out
+    assert "references/catstyle_moon_saturn_square_tension_approved.png" in out
 
 
 def test_list_cli_json(ref_cli, capsys: pytest.CaptureFixture[str]) -> None:

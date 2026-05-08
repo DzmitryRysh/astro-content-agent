@@ -7,6 +7,9 @@ from astro_content_agent.content.catstyle.hero_shots_v1 import (
     format_hero_shot_prompt_block,
     shot_roles_for_variant_indices,
 )
+from astro_content_agent.content.catstyle.approved_reference_registry import (
+    resolve_approved_reference,
+)
 from astro_content_agent.content.catstyle.models import (
     CatstylePromptPack,
     CatstylePromptRequest,
@@ -158,6 +161,155 @@ def _mars_heavy_scene_style_decouple_block(req: CatstylePromptRequest, pa: str, 
         "ONLY—do NOT import Mars choreography, sparks/flames, brawling, explosive kicks, savage duel posing, or combat staging onto "
         "these characters."
     )
+
+
+def _arena_composition_boost_block(req: CatstylePromptRequest) -> str:
+    """Composition boost for readable grand arena scale without shrinking subject readability."""
+    asp = (req.aspect_type or "").strip().lower()
+    world_k = (req.world_template_key or "").strip().lower()
+    is_hard = asp in {"square", "opposition"}
+    is_hero = req.shot_mode == "hero_pair"
+    is_arena_world = world_k == "cosmic_zodiac_arena"
+    if not (is_hard or is_hero or is_arena_world):
+        return (
+            "[ARENA COMPOSITION BOOST v1] Use medium-wide dramatic framing with environmental breathing room: keep both planet-cats "
+            "prominent with readable faces, gestures, and clean silhouette separation while preserving visible arena geography around them."
+        )
+    return (
+        "[ARENA COMPOSITION BOOST v1] Target medium-wide dramatic arena framing (not tight close-up, not tiny distant characters): "
+        "both planet-cats remain prominent with strong facial readability, gesture readability, and clean silhouette separation. "
+        "Keep visible cosmic zodiac coliseum structure: readable arena floor plane, curved coliseum wall, zodiac symbols around the ring, "
+        "arches/stadium tiers/layered architecture depth, and grand scale cues. "
+        "Give environmental breathing room around subjects so architecture reads as epic context. "
+        "Framing negatives: avoid overly tight crop on the two characters, avoid background collapsing into vague darkness, "
+        "avoid zodiac arena disappearing, avoid unreadable environment, avoid cropping away coliseum architecture."
+    )
+
+
+def _epic_arena_showdown_block(req: CatstylePromptRequest, pa: str, pb: str) -> str:
+    """Optional deterministic composition profile for epic arena spectacle with readable hero action."""
+    if (req.shot_mode or "").strip().lower() != "epic_arena_showdown":
+        return ""
+    pair = {pa.strip().lower(), pb.strip().lower()}
+    asp_l = (req.aspect_type or "").strip().lower()
+    mode_l = (req.mode or "").strip().lower()
+    glyph_lock = ""
+    moon_saturn_approved_anchor = ""
+    moon_saturn_hard_epic_action = ""
+    if pair == {"moon", "saturn"}:
+        glyph_lock = (
+            " Exact glyph + emblem recognizability lock for Moon/Saturn: prefer Moon banner exact glyph '☾' and Saturn banner exact glyph '♄' "
+            "(true Saturn symbol) on large opposite-side faction banners and/or large arena emblems as primary readable marks. "
+            "If Saturn glyph rendering becomes unstable or unreadable, fall back to a clean Saturn identity emblem (ringed-planet silhouette / ringed sphere icon) "
+            "rather than a wrong glyph variant, fake letters, or substitute symbols; recognizability takes priority over fragile glyph purity. "
+            "Moon banner may use exact '☾' or a clean crescent emblem when needed for immediate lunar readability. "
+            "Saturn's hat badge or crown emblem may repeat exact '♄' or a clean ringed-planet Saturn emblem as a readable secondary identity anchor. "
+            "Do not use abstract invented marks, faux-alphabet glyphs, or letter-shaped stand-ins for either planet marker. "
+            "Smaller accessory glyphs/emblems are secondary only. "
+            " Moon/Saturn epic arena scale HARD LOCK (mandatory—monumental recession, not tight hero crop): pull the camera back further than baseline epic mode; "
+            "characters must occupy slightly less of the overall frame while faces and silhouettes remain clearly readable—reduce character dominance versus architecture slightly; "
+            "show substantially more readable arena floor plane plus more upper coliseum tiers, arches, and sky-opening; "
+            "coliseum walls must recede clearly into the distance with stadium perspective—the arena must read monumental, elevated, expansive; "
+            "avoid compositions where arena walls feel pasted or attached flat immediately behind the characters like shallow backdrop wallpaper. "
+            "Benchmark alignment note (approved Jupiter/Mars epic arena scale as distant composition reference target): preserve heroic readability without tightening into portrait dominance. "
+        )
+        if asp_l == "square" and mode_l == "tension":
+            resolved_ms = resolve_approved_reference(
+                req.planet_a, req.planet_b, req.aspect_type, req.mode
+            )
+            if resolved_ms is not None:
+                moon_saturn_approved_anchor = (
+                    "[CATSTYLE APPROVED REFERENCE ANCHOR v1 - Moon/Saturn square+tension] Preferred visual anchor for this generation context: "
+                    "bias composition, lighting mood, and identity readability toward the project's approved Moon/Saturn square+tension reference image "
+                    f"(registry_key={resolved_ms.registry_key})—preserve its successful visual language: Moon identity, Saturn identity, taut chain restraint, "
+                    "stone pillar/barrier pressure, dark epic restrained clash mood; treat as compositional guidance rather than rigid pixel-copy. "
+                )
+        if asp_l in ("square", "opposition"):
+            moon_saturn_hard_epic_action = (
+                "[MOON-SATURN EPIC ARENA ACTION STAGING v5 - balanced lock] Anti-static action blocking: avoid static face-to-face standing poses and flat symmetrical standoffs. "
+                "Keep premium comic-poster force: premium cinematic comic-poster illustration, poster-grade heroic battle splash, polished 2D/2.5D comic rendering, collectible-cover polish, "
+                "dramatic rim-impact lighting, crisp line clarity, rich cel-shaded modeling, and layered foreground/midground/background depth. "
+                "Visual drift negatives: no nursery art, no storybook look, no soft watercolor wash, no washed-out painterly blur, no flat mascot read. "
+                "Color/readability: keep dark-but-vivid contrast with clean edge separation; forbid muddy darkness and unreadable murk. "
+                "Arena scale continuity: preserve monumental cosmic zodiac coliseum read with receding walls, visible upper arches, readable floor ring perspective, and two readable Moon/Saturn side banners. "
+                "Active clash continuity: keep readable mid-action confrontation with visible tension between restraint and resistance, preserving diagonal confrontation energy without forcing body-on-body brawling. "
+                "Benchmark bias (approved Jupiter/Mars epic arena energy): stronger motion and stronger diagonal confrontation, less passive symmetry, higher heroic readability at poster distance. "
+                "Chain tension clarity (Saturnian restraint): Saturn may use chain/control as Saturnian restraint with clear taut read; chain should read functional and load-bearing, not decorative slack, not jewelry drape, "
+                "not weaponized nunchuck behavior, and never Mars-like aggression transfer. "
+                "Moon action clarity (soft-force counter): Moon may hold, brace, swing, or strike with pillow energy in readable defensive/offensive motion; avoid forcing one rigid hit frame, "
+                "but keep intention clear enough that Moon is not passive prop-holding. "
+                "Moon motion style: Moon may pull against chain tension while giving a soft-force counter-response, preserving emotional urgency, silver-blue motion cues, and brave-but-vulnerable readability. "
+                "Composition depth continuity: avoid flat side-by-side staging; maintain overlapping depth cues, slightly offset character depth planes, and readable arena floor perspective for cinematic space. "
+                "Saturn control clarity: Saturn remains cold, heavy, restrictive, and controlling through barrier, gravity, and time-pressure symbolism; never passive Saturn, never flame/fighter/ninja styling, never reckless Mars energy. "
+                "Saturn emblem fallback continuity: prefer exact Saturn glyph '♄' where stable, and allow clean ringed-planet Saturn emblem fallback for recognizability. "
+                "Moon emblem continuity: prefer exact Moon glyph '☾' with clean crescent fallback where readability is stronger. "
+                "Earth cue stability: exactly one Earth-like sphere above and behind arena; avoid duplicate Earth-like globes. "
+                "Poster continuity reinforcement: preserve movie-one-sheet readability with decisive focal hierarchy, clear silhouette breakup, and controlled detail density (characters highest, architecture medium, sky lowest). "
+                "Lighting/readability reinforcement: preserve dramatic key-to-rim sculpting on faces, paws, pillow, chain, and Saturn hat/shoulders; keep contrast punch without muddy low-mid compression. "
+                "Premium finish reinforcement: maintain collectible-cover polish with confident contour authority, deliberate silhouette carve-outs, readable overlap, and clean depth progression from foreground duel bodies to midground architecture to far cosmic void. "
+                "Hero-poster print discipline: preserve clear face readability and pose intent at thumbnail scale while retaining premium battle-poster gravitas; avoid flattened sticker-tableau staging and avoid soft illustrative vignette drift. "
+                "Environment-as-co-star reinforcement: keep zodiac floor ring perspective readable, coliseum wall recession legible, and upper-arch crown forms visible so arena scale feels monumental, elevated, and mythic instead of shallow wallpaper. "
+                "Color separation reinforcement: preserve disciplined dark-but-vivid palette with readable silver-blue Moon energy and readable graphite/stone Saturn mass; keep controlled warm accents for contrast readability, never fire-bloom mimicry. "
+                "Action readability reinforcement: prioritize first-glance cause/effect readability where Moon's soft-force motion and Saturn's structural restraint are both readable in one frame, with chain tension and pillow intent legible without over-forcing exact impact choreography. "
+                "Cinematic depth reinforcement: maintain overlapping depth planes, clear foreground/midground/background spacing, and spatial offset between subjects so the scene reads as poster-cinematic rather than flat side profile. "
+                "Monumental arena reinforcement: include clear arena floor sweep, receding stadium tiers, and side architecture supports that frame conflict with ceremonial gravity; avoid clipping architecture into shoulder-level backdrop fragments. "
+                "Faction readability reinforcement: Moon/Saturn side emblems should remain large and legible enough to support narrative opposition while staying symbolic (no rendered words), and must not be reduced to tiny unreadable accents. "
+                "Detail density discipline: keep character focal regions (faces, paws, pillow edge, chain grip points, Saturn hat silhouette) as highest-detail anchors; keep architecture medium detail; keep sky and far-space accents restrained to avoid muddy clutter. "
+                "Contrast hygiene: protect edge separation between characters and arena walls; avoid overcompressed low mids, avoid murky blacks swallowing forms, avoid gray-brown wash that erodes comic-poster identity. "
+                "Premium Catstyle identity lock: preserve poster-grade heroic comic splash language, polished 2D/2.5D rendering cues, crisp line clarity, rich cel-shaded modeling, dramatic rim-impact lighting, and high-contrast readability as non-negotiable style anchors. "
+                "Anti-storybook drift reinforcement: reject nursery bedtime softness, reject fairytale watercolor haze, reject soft pastel storybook treatment, reject flat mascot simplification, reject toy-like cute flattening that weakens conflict readability. "
+                "Negatives: weak action, loose decorative chain, unclear restraint, passive Saturn, duplicated Earth-like sky spheres, shallow pasted backdrop arena, tight portrait crop creep, "
+                "environment reduced to backdrop afterthought, washed-out painterly blur, flat mascot simplification."
+            )
+    return (
+        "[SHOT/COMPOSITION PROFILE v4 - epic_arena_showdown] Mythic showdown poster framing in a ceremonial cosmic arena: "
+        "heroic medium-wide to wide cinematic composition where the environment is a co-star and not background afterthought. "
+        "Camera/framing correction: pull the camera back slightly into wider poster framing; characters occupy slightly less of the frame while "
+        "faces/poses remain readable; preserve negative space and breathing room around central action. "
+        "Keep both planet-cats central and readable (clear faces, readable poses, clean silhouette separation, strong aspect interaction), "
+        "while expanding environmental breathing room and monumental ceremonial scale. "
+        "Arena scale correction: coliseum recedes into the distance, arena walls rise behind the characters, upper arches feel towering and monumental, "
+        "with more visible arena floor and more upper architecture so environment feels elevated rather than attached directly behind characters. "
+        "Environment targets: clearly readable zodiac floor ring, layered coliseum walls, more visible upper arches, deep stadium tiers/perspective, "
+        "additional side architectural structures, visible zodiac symbols, stronger monumental arena feeling, "
+        f"and two large readable faction banners on opposite arena sides tied to {pa} and {pb} planetary identities "
+        "(one side marker per planet; symbolic motifs only, no readable text). "
+        "Background scale cue: include a clearly readable distant Earth or Earth-like blue-green planet with visible cloud and/or continent pattern "
+        "as the human-world impact cue (audience world affected by this aspect), smaller than characters but visually legible, clearly above and behind the arena. "
+        "Anti-confusion rule: do not replace the Earth impact cue with Moon/Jupiter/Mars/Saturn/or either character planet; "
+        "planet identity belongs on characters, banners, props, glyphs, and arena symbols unless explicitly overridden. "
+        "For Moon aspects specifically, keep Moon identity on the Moon character (crescent glyph, pillow/blanket language, silver aura, moonlight wave) "
+        "and avoid ambiguous moon-like background orb or large Moon sky-body as the main celestial cue when Earth impact cue is requested. "
+        f"{glyph_lock}"
+        f"{moon_saturn_approved_anchor}"
+        f"{moon_saturn_hard_epic_action}"
+        "Framing negatives: avoid tight crop and character-dominant framing, vague background darkness, disappearing coliseum, unreadable arena walls, tiny/barely readable Earth cue, "
+        "only one visible side banner, over-cropped arena architecture, or environment reduced to a backdrop afterthought."
+    )
+
+
+_IMAGE_PROMPT_SAFE_MAX_CHARS = 31_600
+
+
+def _compact_prompt_to_budget(prompt: str, safe_max: int = _IMAGE_PROMPT_SAFE_MAX_CHARS) -> str:
+    """
+    Deterministic prompt budget guard.
+
+    Strategy: normalize whitespace, then if still over budget, drop duplicate sentences/clauses
+    (case/space normalized) from left-to-right while preserving order of first occurrence.
+    """
+    raw = (prompt or "").strip()
+    if not raw:
+        return raw
+    # Whitespace compaction first (cheap, deterministic) but preserve the full rich stack.
+    s = " ".join(raw.split())
+    if len(s) <= safe_max:
+        return s
+    # Surgical trim: keep the strongest front-loaded style/identity/action stack and trim tail only.
+    cutoff = s.rfind(". ", 0, safe_max)
+    if cutoff > int(safe_max * 0.98):
+        return s[:cutoff].strip() + "."
+    return s[:safe_max].rstrip()
 
 
 def _animation_prompt_body(
@@ -367,6 +519,8 @@ def _prompt_choreography_middleware(
     blocks = [
         _aspect_choreography_block(req.aspect_type),
         _planet_pair_action_language(pa, pb),
+        _arena_composition_boost_block(req),
+        _epic_arena_showdown_block(req, pa, pb),
         _mars_heavy_scene_style_decouple_block(req, pa, pb),
         pair_guard,
     ]
@@ -708,13 +862,24 @@ def generate_catstyle_prompt_pack(req: CatstylePromptRequest) -> CatstylePromptP
                 render_negative_additions=render_neg,
             )
 
+    # Prompt budget guard: compact any over-budget image prompts deterministically before returning.
+    data = pack.model_dump(mode="json")
+    prompts = [str(p) for p in (data.get("image_prompts") or [])]
+    data["image_prompts"] = [_compact_prompt_to_budget(p) for p in prompts]
+    pack = CatstylePromptPack.model_validate(data)
+
     pack = _attach_template_profiles(
         pack,
         world_template_profile=world_prof,
         scene_template_profile=scene_prof,
         render_style_profile=render_prof_dict,
     )
-    return _finalize_pack_with_art_direction(pack, req, pa, pb, skin_a, skin_b)
+    pack = _finalize_pack_with_art_direction(pack, req, pa, pb, skin_a, skin_b)
+    # Re-apply budget guard after premium art-direction append (can increase prompt length).
+    data2 = pack.model_dump(mode="json")
+    prompts2 = [str(p) for p in (data2.get("image_prompts") or [])]
+    data2["image_prompts"] = [_compact_prompt_to_budget(p) for p in prompts2]
+    return CatstylePromptPack.model_validate(data2)
 
 
 def _finalize_pack_with_art_direction(

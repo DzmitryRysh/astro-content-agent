@@ -73,7 +73,7 @@ def main() -> int:
     )
     ap.add_argument(
         "--shot-mode",
-        choices=("hero_pair", "standard"),
+        choices=("hero_pair", "epic_arena_showdown", "standard"),
         default=None,
         dest="shot_mode",
         help="Optional shot framing mode for daily pack (default request uses hero_pair).",

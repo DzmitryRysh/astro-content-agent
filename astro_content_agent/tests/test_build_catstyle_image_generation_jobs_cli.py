@@ -180,3 +180,23 @@ def test_cli_passes_disable_approved_reference_auto(jobs_cli, tmp_path: Path) ->
     finally:
         sys.argv = old
     assert m.call_args.kwargs.get("disable_approved_reference_auto") is True
+
+
+def test_cli_passes_epic_arena_showdown_shot_mode(jobs_cli, tmp_path: Path) -> None:
+    out = tmp_path / "cli_epic"
+    old = sys.argv[:]
+    try:
+        sys.argv = [
+            "build_catstyle_image_generation_jobs.py",
+            "--date",
+            "2026-05-02",
+            "--output-dir",
+            str(out),
+            "--shot-mode",
+            "epic_arena_showdown",
+        ]
+        with patch.object(jobs_cli, "build_catstyle_image_generation_jobs", return_value=_minimal_result()) as m:
+            assert jobs_cli.main() == 0
+    finally:
+        sys.argv = old
+    assert m.call_args.kwargs.get("shot_mode") == "epic_arena_showdown"

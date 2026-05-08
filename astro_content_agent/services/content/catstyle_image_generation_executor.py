@@ -21,6 +21,11 @@ class StubJobOutputRecord(BaseModel):
     status: Literal["generated_stub", "skipped_existing", "generated", "failed"]
     prompt_preview: str | None = None
     note: str | None = None
+    final_prompt_length: int | None = None
+    reference_used: bool | None = None
+    reference_path: str | None = None
+    reference_skip_reason: str | None = None
+    generation_mode: str | None = None
 
 
 class CatstyleImageExecutorStubResult(BaseModel):
@@ -93,6 +98,21 @@ def _provider_result_to_stub_record(
         status=res.status,
         prompt_preview=res.metadata.get("prompt_preview"),
         note=note if isinstance(note, str) else None,
+        final_prompt_length=int(res.metadata["final_prompt_length"])
+        if isinstance(res.metadata.get("final_prompt_length"), int)
+        else None,
+        reference_used=bool(res.metadata["reference_used"])
+        if isinstance(res.metadata.get("reference_used"), bool)
+        else None,
+        reference_path=str(res.metadata["reference_path"])
+        if isinstance(res.metadata.get("reference_path"), str)
+        else None,
+        reference_skip_reason=str(res.metadata["reference_skip_reason"])
+        if isinstance(res.metadata.get("reference_skip_reason"), str)
+        else None,
+        generation_mode=str(res.metadata["generation_mode"])
+        if isinstance(res.metadata.get("generation_mode"), str)
+        else None,
     )
 
 

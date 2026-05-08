@@ -139,6 +139,8 @@ def test_openai_writes_png_from_mocked_b64(tmp_path: Path, monkeypatch: pytest.M
     assert "image" not in call_kw
     assert "response_format" not in call_kw
     assert call_kw.get("output_format") == "png"
+    assert isinstance(r.metadata.get("final_prompt_length"), int)
+    assert r.metadata["final_prompt_length"] < 32000
 
 
 def test_openai_uses_style_reference_when_provided(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -146,6 +148,9 @@ def test_openai_uses_style_reference_when_provided(tmp_path: Path, monkeypatch: 
     get_settings.cache_clear()
     mock_client = MagicMock()
     mock_client.images.edit.return_value = SimpleNamespace(
+        data=[SimpleNamespace(b64_json=_MINI_PNG_B64, url=None)]
+    )
+    mock_client.images.generate.return_value = SimpleNamespace(
         data=[SimpleNamespace(b64_json=_MINI_PNG_B64, url=None)]
     )
     ref = tmp_path / "style_ref.png"
@@ -157,18 +162,85 @@ def test_openai_uses_style_reference_when_provided(tmp_path: Path, monkeypatch: 
     r = p.generate(job, out, overwrite=False)
     assert r.status == "generated"
     assert r.metadata.get("style_reference_image_path") == str(ref.resolve())
+    assert r.metadata.get("reference_used") is True
+    assert r.metadata.get("generation_mode") == "image_edit"
+    assert r.metadata.get("reference_skip_reason") is None
     mock_client.images.generate.assert_not_called()
     mock_client.images.edit.assert_called_once()
     call_kw = mock_client.images.edit.call_args.kwargs
     assert call_kw["model"]
     assert "Avoid / negative guidance:" in call_kw["prompt"]
-    assert call_kw.get("output_format") == "png"
+    assert "output_format" not in call_kw
+    img_arg = call_kw.get("image")
+    assert img_arg is not None and hasattr(img_arg, "read")
+    dest = out / "out1.png"
+    assert dest.is_file()
+    assert dest.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
+
+
+def test_openai_dalle2_uses_edit_when_style_reference_provided(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-fake-key-for-unit-test")
+    get_settings.cache_clear()
+    mock_client = MagicMock()
+    mock_client.images.edit.return_value = SimpleNamespace(
+        data=[SimpleNamespace(b64_json=_MINI_PNG_B64, url=None)]
+    )
+    ref = tmp_path / "style_ref.png"
+    ref.write_bytes(b"not-a-real-png-but-path-exists")
+    p = OpenAICatstyleImageProvider(client=mock_client, model="dall-e-2")
+    out = tmp_path / "g"
+    out.mkdir()
+    job = {**_openai_job(1), "style_reference_image_path": str(ref)}
+    r = p.generate(job, out, overwrite=False)
+    assert r.status == "generated"
+    assert not r.metadata.get("note")
+    mock_client.images.generate.assert_not_called()
+    mock_client.images.edit.assert_called_once()
+    call_kw = mock_client.images.edit.call_args.kwargs
+    assert call_kw["model"] == "dall-e-2"
+    assert "Avoid / negative guidance:" in call_kw["prompt"]
+    assert "output_format" not in call_kw
     assert call_kw.get("n") == 1
     img_arg = call_kw.get("image")
     assert img_arg is not None and hasattr(img_arg, "read")
     dest = out / "out1.png"
     assert dest.is_file()
     assert dest.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
+    assert isinstance(r.metadata.get("final_prompt_length"), int)
+    assert r.metadata["final_prompt_length"] < 32000
+    assert r.metadata.get("reference_used") is True
+    assert r.metadata.get("generation_mode") == "image_edit"
+
+
+def test_openai_provider_boundary_trim_keeps_prompt_under_limit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-fake-key-for-unit-test")
+    get_settings.cache_clear()
+    mock_client = MagicMock()
+    mock_client.images.generate.return_value = SimpleNamespace(
+        data=[SimpleNamespace(b64_json=_MINI_PNG_B64, url=None)]
+    )
+    p = OpenAICatstyleImageProvider(client=mock_client)
+    out = tmp_path / "g"
+    out.mkdir()
+    long_main = ("premium cinematic comic-poster illustration. " * 650).strip()
+    long_neg = ("no muddy darkness, no flat mascot, no nursery storybook blur. " * 80).strip()
+    job = {
+        **_openai_job(1),
+        "prompt_text": long_main,
+        "negative_prompt": long_neg,
+    }
+    r = p.generate(job, out, overwrite=False)
+    assert r.status == "generated"
+    sent = mock_client.images.generate.call_args.kwargs["prompt"]
+    assert len(sent) < 32000
+    assert len(sent) >= 30500
+    assert "premium cinematic comic-poster illustration" in sent
+    assert "no muddy darkness" in sent
+    assert r.metadata.get("final_prompt_length") == len(sent)
 
 
 def test_openai_style_reference_missing_file_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -180,6 +252,8 @@ def test_openai_style_reference_missing_file_fails(tmp_path: Path, monkeypatch: 
     r = p.generate(job, tmp_path, overwrite=False)
     assert r.status == "failed"
     assert r.message and "style_reference_image_path not found" in r.message
+    assert r.metadata.get("reference_used") is False
+    assert r.metadata.get("reference_skip_reason") == "reference_file_missing"
     mock_client.images.generate.assert_not_called()
     mock_client.images.edit.assert_not_called()
 
@@ -194,7 +268,7 @@ def test_openai_style_reference_unsupported_client_returns_clear_error(
     mock_client.images.edit.side_effect = TypeError(f"unexpected kwarg {secret_token}")
     ref = tmp_path / "style_ref.png"
     ref.write_bytes(b"x")
-    p = OpenAICatstyleImageProvider(client=mock_client)
+    p = OpenAICatstyleImageProvider(client=mock_client, model="dall-e-2")
     job = {**_openai_job(1), "style_reference_image_path": str(ref)}
     r = p.generate(job, tmp_path, overwrite=False)
     assert r.status == "failed"
@@ -216,11 +290,13 @@ def test_openai_style_reference_missing_edit_method_fails_clearly(
     )
     ref = tmp_path / "style_ref.png"
     ref.write_bytes(b"x")
-    p = OpenAICatstyleImageProvider(client=mock_client)
+    p = OpenAICatstyleImageProvider(client=mock_client, model="dall-e-2")
     job = {**_openai_job(1), "style_reference_image_path": str(ref)}
     r = p.generate(job, tmp_path, overwrite=False)
     assert r.status == "failed"
     assert r.message and "client.images.edit is not available" in r.message
+    assert r.metadata.get("reference_used") is False
+    assert r.metadata.get("reference_skip_reason") == "images_edit_not_available"
     mock_client.images.generate.assert_not_called()
 
 

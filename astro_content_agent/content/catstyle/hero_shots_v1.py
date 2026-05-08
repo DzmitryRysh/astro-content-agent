@@ -6,7 +6,7 @@ from typing import Literal
 SHOT_ROLE_HERO_POSTER = "hero_poster"
 SHOT_ROLE_ALTERNATE_ACTION_ANGLE = "alternate_action_angle"
 
-HeroShotMode = Literal["hero_pair", "standard"]
+HeroShotMode = Literal["hero_pair", "standard", "epic_arena_showdown"]
 
 
 def shot_roles_for_variant_indices(count: int, shot_mode: str) -> list[str | None]:
@@ -14,8 +14,10 @@ def shot_roles_for_variant_indices(count: int, shot_mode: str) -> list[str | Non
     mode = (shot_mode or "hero_pair").strip().lower()
     if mode == "standard":
         return [None] * max(0, int(count))
-    if mode != "hero_pair":
-        raise ValueError(f"Unknown shot_mode {shot_mode!r}. Use 'hero_pair' or 'standard'.")
+    if mode not in {"hero_pair", "epic_arena_showdown"}:
+        raise ValueError(
+            f"Unknown shot_mode {shot_mode!r}. Use 'hero_pair', 'epic_arena_showdown', or 'standard'."
+        )
     n = max(0, int(count))
     roles: list[str | None] = []
     for i in range(n):
