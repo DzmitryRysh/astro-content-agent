@@ -1,6 +1,7 @@
 """Deterministic approved style-reference registry for Catstyle image jobs (local only, v1)."""
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +13,11 @@ from astro_content_agent.content.catstyle.planet_canon_v1 import normalize_plane
 def catstyle_repo_root() -> Path:
     """Repository root (parent of the ``astro_content_agent`` package)."""
     return Path(__file__).resolve().parents[3]
+
+
+def approved_references_json_path() -> Path:
+    """Canonical local registry data source."""
+    return catstyle_repo_root() / "astro_content_agent" / "content" / "catstyle" / "approved_references.json"
 
 
 class ApprovedReferenceEntry(BaseModel):
@@ -42,50 +48,34 @@ class ResolvedApprovedReference(BaseModel):
     priority: int
 
 
-# v1 seed data — extend by appending rows (deterministic order for equal priority: registry_key).
-APPROVED_REFERENCE_REGISTRY_V1: tuple[ApprovedReferenceEntry, ...] = (
-    ApprovedReferenceEntry(
-        registry_key="moon_saturn_square_tension_v1",
-        planet_a="Moon",
-        planet_b="Saturn",
-        aspect_type="square",
-        mode="tension",
-        image_path="references/catstyle_moon_saturn_approved.png",
-        label="Moon square Saturn (tension)",
-        notes="Approved softness-vs-structure reference.",
-        priority=100,
-        active=True,
-    ),
-    ApprovedReferenceEntry(
-        registry_key="pluto_mars_square_tension_v1",
-        planet_a="Pluto",
-        planet_b="Mars",
-        aspect_type="square",
-        mode="tension",
-        image_path="references/catstyle_pluto_mars_approved.png",
-        label="Pluto square Mars (tension)",
-        notes="Approved pressure/control vs strike reference.",
-        priority=100,
-        active=True,
-    ),
-    ApprovedReferenceEntry(
-        registry_key="jupiter_mars_square_tension_v1",
-        planet_a="Jupiter",
-        planet_b="Mars",
-        aspect_type="square",
-        mode="tension",
-        image_path="references/catstyle_jupiter_mars_approved.png",
-        label="Jupiter square Mars (tension)",
-        notes="Approved expansion vs kinetic reference.",
-        priority=100,
-        active=True,
-    ),
-)
+def read_registry_entries(path: Path | None = None) -> list[ApprovedReferenceEntry]:
+    """Load entries from JSON data source; empty list if file missing."""
+    p = (path or approved_references_json_path()).expanduser().resolve()
+    if not p.is_file():
+        return []
+    payload = json.loads(p.read_text(encoding="utf-8"))
+    raw = payload.get("entries")
+    if not isinstance(raw, list):
+        raise ValueError(f"Invalid approved references JSON at {p}: missing list 'entries'.")
+    return [ApprovedReferenceEntry.model_validate(x) for x in raw]
+
+
+def write_registry_entries(path: Path | None, entries: list[ApprovedReferenceEntry]) -> Path:
+    """Write registry entries to JSON (stable order by priority desc + registry_key)."""
+    p = (path or approved_references_json_path()).expanduser().resolve()
+    p.parent.mkdir(parents=True, exist_ok=True)
+    ordered = sorted(entries, key=lambda e: (-e.priority, e.registry_key))
+    payload = {
+        "version": "catstyle-approved-references-v1",
+        "entries": [e.model_dump(mode="json") for e in ordered],
+    }
+    p.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return p
 
 
 def load_approved_reference_registry() -> list[ApprovedReferenceEntry]:
-    """Return a copy of the built-in registry (deterministic, immutable source)."""
-    return list(APPROVED_REFERENCE_REGISTRY_V1)
+    """Load local JSON-backed registry."""
+    return read_registry_entries()
 
 
 def normalize_pair_key(planet_a: str, planet_b: str, aspect_type: str, mode: str) -> str:
@@ -160,13 +150,15 @@ def registry_entries_as_jsonable() -> list[dict[str, Any]]:
 
 
 __all__ = [
-    "APPROVED_REFERENCE_REGISTRY_V1",
     "ApprovedReferenceEntry",
     "ResolvedApprovedReference",
+    "approved_references_json_path",
     "catstyle_repo_root",
     "load_approved_reference_registry",
     "list_active_references",
     "normalize_pair_key",
+    "read_registry_entries",
     "registry_entries_as_jsonable",
     "resolve_approved_reference",
+    "write_registry_entries",
 ]
