@@ -17,6 +17,10 @@ from astro_content_agent.content.catstyle.planet_canon_v1 import (
     get_planet_canon,
     normalize_planet_name as canon_normalize_planet_name,
 )
+from astro_content_agent.content.catstyle.planet_canon import (
+    build_planet_canon_prompt_fragment,
+    get_planet_canon as get_planet_canon_v2,
+)
 from astro_content_agent.content.catstyle.planet_identity_markers_v1 import (
     format_identity_markers_prompt_block,
     get_planet_identity_marker_profile,
@@ -78,6 +82,84 @@ def _image_prompt_opening_prefix(render_prof: CatstyleRenderStyleProfile) -> str
     return base
 
 
+def _aspect_choreography_block(aspect_type: str) -> str:
+    """Deterministic aspect choreography: hard aspects clash; soft aspects cooperate (Catstyle v1)."""
+    k = (aspect_type or "").strip().lower()
+    mapping: dict[str, str] = {
+        "square": (
+            "[ASPECT CHOREOGRAPHY v1 - square] Active angular conflict on the zodiac arena: friction, strike/counterstrike, "
+            "tense collision beats; keep conflict readable at poster scale but each planet expresses force through its own "
+            "planetary physics—never generic MMA."
+        ),
+        "opposition": (
+            "[ASPECT CHOREOGRAPHY v1 - opposition] Face-off polarity on the arena rim: mirrored duel tension, push-pull, "
+            "two poles leaning into each other with reversible momentum."
+        ),
+        "trine": (
+            "[ASPECT CHOREOGRAPHY v1 - trine] Smooth cooperative flow: dance-like harmony, synchronized movement, "
+            "shared rhythm choreography."
+        ),
+        "sextile": (
+            "[ASPECT CHOREOGRAPHY v1 - sextile] Playful cooperation: light coordinated exchange, quick friendly assists, "
+            "sparkling back-and-forth without harsh clash."
+        ),
+        "conjunction": (
+            "[ASPECT CHOREOGRAPHY v1 - conjunction] Merged fused force: combined amplification, stacked silhouettes, "
+            "single-forward surge choreography."
+        ),
+    }
+    return mapping.get(k, "")
+
+
+def _aspect_choreography_animation_clause(aspect_type: str) -> str:
+    """Short animation bias aligned with major-aspect choreography."""
+    k = (aspect_type or "").strip().lower()
+    mapping: dict[str, str] = {
+        "square": "Choreography bias: angular friction, strike/counterstrike readability (planet-specific). ",
+        "opposition": "Choreography bias: mirrored face-off, push-pull polarity. ",
+        "trine": "Choreography bias: smooth synchronized flow and cooperative rhythm. ",
+        "sextile": "Choreography bias: playful coordinated assists and light exchange. ",
+        "conjunction": "Choreography bias: fused amplification and merged-forward motion. ",
+    }
+    return mapping.get(k, "")
+
+
+def _planet_pair_action_language(pa: str, pb: str) -> str:
+    """Planet-specific allowed action lexicon (Moon/Saturn explicit for choreography v1)."""
+    pair = {pa.strip().lower(), pb.strip().lower()}
+    chunks: list[str] = []
+    if "moon" in pair:
+        chunks.append(
+            "[PLANETARY ACTION LEXICON v1 - Moon] Prefer: pillow strike, moonlight wave, protective defensive motion, "
+            "tidal push, emotional flinch/retreat/burst—soft but active movement."
+        )
+    if "saturn" in pair:
+        chunks.append(
+            "[PLANETARY ACTION LEXICON v1 - Saturn] Prefer: stone block, freeze/frost field, gravity press, chain bind, "
+            "gate slam, ruler strike as measuring/architect line (not a blade swing), wall summon, stop gesture, time lock, "
+            "heavy downward force. Saturn may fight hard through barriers/time/weight—never as fiery reckless Mars: "
+            "no flames, no fire aura, no ninja/fighter styling, no martial-arts choreography, no reckless attack pose, "
+            "no Mars-like aggression, no nunchucks/martial weapons."
+        )
+    return " ".join(chunks).strip()
+
+
+def _mars_heavy_scene_style_decouple_block(req: CatstylePromptRequest, pa: str, pb: str) -> str:
+    """Mars-named scene or Mars-heavy reference finisher on a non-Mars pair: anchor finish only—not Mars combat behavior."""
+    if "mars" in {pa.strip().lower(), pb.strip().lower()}:
+        return ""
+    raw = (req.scene_template_key or "").strip().lower()
+    mars_named_scene = bool(raw.startswith("mars_"))
+    if not mars_named_scene and not req.mars_heavy_style_reference_finisher:
+        return ""
+    return (
+        "[MARS-HEAVY STYLE REFERENCE DECOUPLING v1] This Mars-forward scene template or Mars-heavy reference may anchor "
+        "finish quality only for these non-Mars planet-cats: inherit polish, line weight, lighting rhythm, and poster composition "
+        "ONLY—do NOT import Mars choreography, sparks/flames, brawling, explosive kicks, savage duel posing, or combat staging onto "
+        "these characters."
+    )
+
+
 def _animation_prompt_body(
     pa: str,
     pb: str,
@@ -87,9 +169,11 @@ def _animation_prompt_body(
 ) -> str:
     """Loop prompt aligned with the same render finish as still frames (no legacy flat-cartoon lead-in)."""
     prefix = _image_prompt_opening_prefix(render_prof)
+    choreo_anim = _aspect_choreography_animation_clause(aspect_type)
     return (
         f"{prefix} "
-        f"Loopable 3–5s animation: {pa} and {pb} planet-cats, aspect {aspect_type}; minimal squash-and-stretch "
+        f"Loopable 3–5s animation: {pa} and {pb} planet-cats, aspect {aspect_type}; {choreo_anim}"
+        f"minimal squash-and-stretch "
         f"preserving silhouette reads; outlines stay crisp at loop resolution; environment honors locked world/scene "
         f"when applicable (otherwise restrained cosmic void is acceptable); readable comic timing.{anim_skin}"
     ).strip()
@@ -207,6 +291,10 @@ def _planet_cat_line(planet: str, canon: PlanetCatCanon, skin_key: str | None) -
     sk_raw = _strip_optional_skin(skin_key)
     marker = get_planet_identity_marker_profile(planet)
     marker_block = format_identity_markers_prompt_block(planet, marker, has_skin=bool(sk_raw))
+    canon_v2 = get_planet_canon_v2(planet)
+    canon_v2_block = build_planet_canon_prompt_fragment(planet)
+    must_have = " | ".join(canon_v2.must_have)
+    must_not = " | ".join(canon_v2.must_not_have)
     base = (
         f"{planet} planet-cat [CANON v1 base]: {canon.short_prompt_line} "
         f"This block is the immutable planet identity — keep recognizable across every scene and skin. "
@@ -222,7 +310,10 @@ def _planet_cat_line(planet: str, canon: PlanetCatCanon, skin_key: str | None) -
         f"Motion style: {canon.motion_style} "
         f"Visual priorities: {canon.visual_do} "
         f"Visual avoid: {canon.visual_avoid} "
-        f"Recognizability rule: {canon.recognizability_rule}"
+        f"Recognizability rule: {canon.recognizability_rule} "
+        f"{canon_v2_block} "
+        f"{planet} must-have traits lock: {must_have} "
+        f"{planet} must-not traits lock: {must_not}"
     )
     base_with_markers = f"{base} {marker_block}"
     if not sk_raw:
@@ -238,6 +329,48 @@ def _planet_cat_line(planet: str, canon: PlanetCatCanon, skin_key: str | None) -
         f"Avoid for this skin: {sk.avoid_elements}."
     )
     return base_with_markers + overlay
+
+
+def _moon_saturn_visual_correction_block(pa: str, pb: str, aspect_type: str, mode: str) -> str:
+    """Moon square Saturn: arena-readable clash where Moon stays soft-force and Saturn stays structural—not Mars combat."""
+    pair = {pa.lower(), pb.lower()}
+    if pair != {"moon", "saturn"}:
+        return ""
+    if (aspect_type or "").strip().lower() != "square":
+        return ""
+    if (mode or "").strip().lower() != "tension":
+        return ""
+    return (
+        "[MOON-SATURN VISUAL CORRECTION PATCH v1 - mandatory identity guard] "
+        "Dynamic zodiac-arena conflict is OK here: this is softness versus structure, not a generic action-hero brawl or soft cat versus fire ninja. "
+        "Moon attacks/defends with pillow strikes, moonlight waves, tidal pushes, protective defensive motion, emotional "
+        "flinch/retreat/burst—soft but active force; Moon stays rounded, vulnerable, comfort-seeking, silver-lit, clutching pillow/blanket/soft cloth; "
+        "may glance toward a small glowing cozy doorway/window as memory of past comfort. "
+        "Saturn counters with stone blocks, freeze/frost fields, gravity presses, chain binds, gate slams, wall summons, stop gesture, "
+        "time-lock, ruler-as-measure strike, heavy downward structural force—cold stone-and-iron judge/architect/guardian energy; upright, severe, emotionally reserved. "
+        "Scene metaphor: a heavy stone gate of time and responsibility blocks the way back to comfort while Moon presses with soft waves. "
+        "Checkpoint imagery: stone gate/wall/tower, chain, clock boundary line; Saturn props like ruler, key, hourglass, blank watch, architectural plan. "
+        "Composition target: premium cinematic comic poster, strong silhouettes, dramatic arena-readable pressure via symbolism (not MMA). "
+        "Palette target: cold stone-and-silver dominant palette with controlled warm memory glow only in background comfort cue. "
+        "Saturn critical negatives: do NOT depict Saturn with flames, fire aura, martial weapons, ninja/fighter styling, "
+        "reckless attack pose, reckless speed, or Mars-like aggression; do NOT let Saturn inherit Mars visual traits. "
+        "Whole-scene hard negatives: no martial-arts duel choreography, no body-on-body brawl, no nunchucks; "
+        "not cute nursery, not flat mascot, not 3D CGI figurine, not game render look. "
+        "Read: Moon softer/more emotionally defensive, Saturn still/imposing/limiting through mass and time; vulnerability vs discipline."
+    )
+
+
+def _prompt_choreography_middleware(
+    req: CatstylePromptRequest, pa: str, pb: str, pair_guard: str
+) -> str:
+    """Aspect choreography + optional planet lexicon + Mars scene decouple; Moon/Saturn square adds dedicated guard."""
+    blocks = [
+        _aspect_choreography_block(req.aspect_type),
+        _planet_pair_action_language(pa, pb),
+        _mars_heavy_scene_style_decouple_block(req, pa, pb),
+        pair_guard,
+    ]
+    return " ".join(b for b in blocks if b).strip()
 
 
 def _skin_animation_suffix(pa: str, pb: str, skin_a: str | None, skin_b: str | None) -> str:
@@ -285,6 +418,8 @@ def _pack_from_deep(
     shot_roles = shot_roles_for_variant_indices(n, req.shot_mode)
     line_a = _planet_cat_line(pa, canon_a, skin_a)
     line_b = _planet_cat_line(pb, canon_b, skin_b)
+    pair_guard = _moon_saturn_visual_correction_block(pa, pb, req.aspect_type, req.mode)
+    choreo_block = _prompt_choreography_middleware(req, pa, pb, pair_guard)
     anim_skin = _skin_animation_suffix(pa, pb, skin_a, skin_b)
 
     image_prompts: list[str] = []
@@ -307,6 +442,7 @@ def _pack_from_deep(
             f"Aspect type: {req.aspect_type}. "
             f"{line_a} "
             f"{line_b} "
+            f"{choreo_block} "
             f"{template_middle}"
             f"{render_middle}"
             f"{shot_middle}"
@@ -358,6 +494,8 @@ def _pack_from_seed(
     shot_roles = shot_roles_for_variant_indices(n, req.shot_mode)
     line_a = _planet_cat_line(pa, canon_a, skin_a)
     line_b = _planet_cat_line(pb, canon_b, skin_b)
+    pair_guard = _moon_saturn_visual_correction_block(pa, pb, req.aspect_type, req.mode)
+    choreo_block = _prompt_choreography_middleware(req, pa, pb, pair_guard)
     anim_skin = _skin_animation_suffix(pa, pb, skin_a, skin_b)
 
     image_prompts: list[str] = []
@@ -380,6 +518,7 @@ def _pack_from_seed(
             f"Aspect type: {req.aspect_type}. "
             f"{line_a} "
             f"{line_b} "
+            f"{choreo_block} "
             f"{template_middle}"
             f"{render_middle}"
             f"{shot_middle}"
@@ -442,6 +581,8 @@ def _pack_from_fallback(
     shot_roles = shot_roles_for_variant_indices(n, req.shot_mode)
     line_a = _planet_cat_line(pa, canon_a, skin_a)
     line_b = _planet_cat_line(pb, canon_b, skin_b)
+    pair_guard = _moon_saturn_visual_correction_block(pa, pb, req.aspect_type, req.mode)
+    choreo_block = _prompt_choreography_middleware(req, pa, pb, pair_guard)
     anim_skin = _skin_animation_suffix(pa, pb, skin_a, skin_b)
 
     image_prompts: list[str] = []
@@ -464,6 +605,7 @@ def _pack_from_fallback(
             f"Aspect type: {req.aspect_type}. "
             f"{line_a} "
             f"{line_b} "
+            f"{choreo_block} "
             f"{template_middle}"
             f"{render_middle}"
             f"{shot_middle}"

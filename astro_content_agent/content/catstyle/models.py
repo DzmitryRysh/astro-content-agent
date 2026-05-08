@@ -195,6 +195,13 @@ class CatstylePromptRequest(BaseModel):
         default="hero_pair",
         description="hero_pair: deterministic hero_poster / alternate_action_angle framing when variants_count>=1.",
     )
+    mars_heavy_style_reference_finisher: bool = Field(
+        default=False,
+        description=(
+            "When True with a non-Mars pair, inject prompt guard: Mars-heavy reference anchors illustration finish only—"
+            "do not copy Mars combat choreography onto these planet-cats (Catstyle v1)."
+        ),
+    )
 
 
 class CatstylePromptPack(BaseModel):

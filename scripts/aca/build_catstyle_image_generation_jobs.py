@@ -85,6 +85,12 @@ def main() -> int:
         help="Optional local reference image path for style anchoring (providers may or may not support image conditioning).",
     )
     ap.add_argument(
+        "--disable-approved-reference-auto",
+        action="store_true",
+        dest="disable_approved_reference_auto",
+        help="Do not auto-pick an approved reference from the Catstyle registry when --style-reference-image is omitted.",
+    )
+    ap.add_argument(
         "--planet-a",
         default=None,
         dest="planet_a_override",
@@ -134,6 +140,7 @@ def main() -> int:
             render_style_profile_key=args.render_style_profile,
             shot_mode=args.shot_mode,
             style_reference_image_path=args.style_reference_image,
+            disable_approved_reference_auto=args.disable_approved_reference_auto,
             planet_a_override=args.planet_a_override,
             planet_b_override=args.planet_b_override,
             aspect_type_override=args.aspect_type_override,
@@ -150,6 +157,14 @@ def main() -> int:
     print("Catstyle image generation jobs")
     print(f"  date:              {result.date}")
     print(f"  editorial_profile: {result.editorial_profile}")
+    meta = result.style_reference_meta or {}
+    src = meta.get("source")
+    if src == "approved_registry" and meta.get("path"):
+        print(f"  style reference:   approved reference auto-resolved: {meta.get('path')}")
+    elif src == "explicit" and meta.get("path"):
+        print(f"  style reference:   explicit style reference: {meta.get('path')}")
+    else:
+        print("  style reference:   no reference selected")
     if result.manual_aspect_override:
         mo = result.manual_aspect_override
         print(
