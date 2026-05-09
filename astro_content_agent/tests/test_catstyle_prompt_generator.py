@@ -826,6 +826,10 @@ def test_epic_arena_showdown_profile_includes_environment_scale_and_readable_sub
     assert "characters must occupy slightly less of the overall frame" in blob
     assert "coliseum walls must recede clearly into the distance" in blob
     assert "avoid compositions where arena walls feel pasted or attached flat immediately behind the characters" in blob
+    assert "bias extra recession versus default epic framing" in blob
+    assert "banner identity clarity (moon/saturn)" in blob
+    assert "night-atmosphere brightness lift" in blob
+    assert "arena-floor glow" in blob and "lunar rim" in blob
     assert "[catstyle approved reference anchor v1 - moon/saturn square+tension]" in blob
     assert "registry_key=moon_saturn_square_tension_v1" in blob
     assert "[moon-saturn epic arena action staging v5 - balanced lock]" in blob

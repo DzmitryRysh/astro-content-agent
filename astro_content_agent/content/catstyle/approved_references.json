@@ -20,8 +20,8 @@
       "aspect_type": "square",
       "mode": "tension",
       "image_path": "references/catstyle_moon_saturn_square_tension_approved.png",
-      "label": "Best Moon Saturn arena reference",
-      "notes": "Approved final reference: brighter arena, better Earth cue, better scale, best current Moon/Saturn tension frame.",
+      "label": "Final Moon Saturn cosmic arena reference",
+      "notes": "Final approved Moon/Saturn reference: bright premium cosmic arena, strong Earth cue, clean blue aura instead of smoke trail, monumental coliseum scale, readable Saturn ringed-planet identity.",
       "priority": 100,
       "active": true
     },
