@@ -36,6 +36,18 @@
       "notes": "Approved pressure/control vs strike reference.",
       "priority": 100,
       "active": true
+    },
+    {
+      "registry_key": "saturn_venus_square_tension_v1",
+      "planet_a": "Venus",
+      "planet_b": "Saturn",
+      "aspect_type": "square",
+      "mode": "tension",
+      "image_path": "references/catstyle_saturn_venus_square_tension_approved.png",
+      "label": "Venus Saturn epic arena reference",
+      "notes": "Approved Venus/Saturn tension reference: Venus as beauty/desire with rose, mirror and golden aura; Saturn as cold authority with chain, restriction and ringed-planet identity; epic cosmic arena scale with Earth cue.",
+      "priority": 100,
+      "active": true
     }
   ]
 }
