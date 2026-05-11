@@ -16,6 +16,16 @@ def test_normalize_pair_key_order_insensitive() -> None:
     assert normalize_pair_key("mars", "pluto", "square", "tension") == normalize_pair_key(
         "Pluto", "Mars", "SQUARE", "TENSION"
     )
+    assert normalize_pair_key("Jupiter", "Mercury", "sextile", "flow") == normalize_pair_key(
+        "Mercury", "Jupiter", "Sextile", "FLOW"
+    )
+
+
+def test_resolve_mercury_jupiter_sextile_flow() -> None:
+    r = resolve_approved_reference("Mercury", "Jupiter", "sextile", "flow")
+    assert r is not None
+    assert r.registry_key == "mercury_jupiter_sextile_flow_v1"
+    assert "catstyle_mercury_jupiter_sextile_flow_approved" in r.image_path.replace("\\", "/").lower()
 
 
 def test_resolve_moon_saturn_square_tension() -> None:

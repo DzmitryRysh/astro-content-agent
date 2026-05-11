@@ -111,6 +111,31 @@ def test_cli_variants_count_respected(catstyle_cli, tmp_path: Path) -> None:
     assert len(data["image_prompts"]) == 2
 
 
+def test_cli_accepts_flow_mode(catstyle_cli, tmp_path: Path) -> None:
+    out_file = tmp_path / "flow.json"
+    old = sys.argv[:]
+    try:
+        sys.argv = [
+            "generate_catstyle_pack.py",
+            "--planet-a",
+            "Mercury",
+            "--planet-b",
+            "Jupiter",
+            "--aspect-type",
+            "sextile",
+            "--mode",
+            "flow",
+            "--output",
+            str(out_file),
+        ]
+        assert catstyle_cli.main() == 0
+    finally:
+        sys.argv = old
+    data = json.loads(out_file.read_text(encoding="utf-8"))
+    assert data["mode"] == "flow"
+    assert data["aspect_type"] == "sextile"
+
+
 def test_cli_unsupported_pair_exits_nonzero(catstyle_cli, capsys: pytest.CaptureFixture[str]) -> None:
     old = sys.argv[:]
     try:

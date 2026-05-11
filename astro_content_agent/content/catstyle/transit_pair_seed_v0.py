@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Final, Literal
 
-Mode = Literal["tension", "compensation", "mixed"]
+Mode = Literal["tension", "compensation", "mixed", "flow"]
 
 OUTER_PLANETS: Final[frozenset[str]] = frozenset({"Jupiter", "Saturn", "Uranus", "Neptune", "Pluto"})
 PERSONAL_PLANETS: Final[frozenset[str]] = frozenset({"Sun", "Moon", "Mercury", "Venus", "Mars"})

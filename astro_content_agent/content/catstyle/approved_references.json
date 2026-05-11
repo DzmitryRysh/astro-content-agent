@@ -14,6 +14,18 @@
       "active": true
     },
     {
+      "registry_key": "mercury_jupiter_sextile_flow_v1",
+      "planet_a": "Mercury",
+      "planet_b": "Jupiter",
+      "aspect_type": "sextile",
+      "mode": "flow",
+      "image_path": "references/catstyle_mercury_jupiter_sextile_flow_approved.png",
+      "label": "Mercury Jupiter sextile flow approved reference",
+      "notes": "Final approved Mercury/Jupiter flow reference: premium planetary-cat arena scene, readable Mercury scholar identity, readable Jupiter wise expansive identity, clean cosmic scale, strong Earth cue, balanced detail, strong polished Catstyle finish.",
+      "priority": 100,
+      "active": true
+    },
+    {
       "registry_key": "moon_saturn_square_tension_v1",
       "planet_a": "Moon",
       "planet_b": "Saturn",

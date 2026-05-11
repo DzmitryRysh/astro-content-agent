@@ -158,9 +158,9 @@ def parse_manual_aspect_override_fields(
             f"Missing or empty: {', '.join(missing)}."
         )
     mode_l = mo.lower()
-    if mode_l not in ("tension", "compensation", "mixed"):
+    if mode_l not in ("tension", "compensation", "mixed", "flow"):
         raise ValueError(
-            "manual aspect override --mode must be one of: tension, compensation, mixed "
+            "manual aspect override --mode must be one of: tension, compensation, mixed, flow "
             f"(got {mo!r})."
         )
     assert pa is not None and pb is not None and asp is not None
@@ -315,6 +315,7 @@ def build_catstyle_image_generation_jobs(
     aspect_type_override: str | None = None,
     mode_override: str | None = None,
     disable_approved_reference_auto: bool = False,
+    jobs_count: int | None = None,
     *,
     compute_positions_fn: Callable[..., dict[str, PlanetPosition]] | None = None,
     orb_config: dict[str, tuple[float, float]] | None = None,
@@ -325,8 +326,13 @@ def build_catstyle_image_generation_jobs(
     When ``planet_a_override``, ``planet_b_override``, ``aspect_type_override``, and ``mode_override``
     are all set, skips sky-scan aspect selection and builds prompts directly for that aspect (v1).
 
+    ``jobs_count`` (1 or 2): emit exactly this many jobs from the primary prompt pack. ``None`` keeps
+    legacy behavior (one job per prompt line returned by the pack, typically two).
+
     Does not call OpenAI, Cloudinary, or Instagram.
     """
+    if jobs_count is not None and jobs_count not in (1, 2):
+        raise ValueError("jobs_count must be 1, 2, or omitted (None); got " + repr(jobs_count))
     skin_a_c = str(skin_a).strip() if skin_a else None
     skin_b_c = str(skin_b).strip() if skin_b else None
     if skin_a_c == "":
@@ -382,12 +388,13 @@ def build_catstyle_image_generation_jobs(
             aspect_type=o_asp,
             mode=o_mode,
         )
+        vc_manual = 2 if jobs_count is None else jobs_count
         req_kw: dict[str, Any] = dict(
             planet_a=pa_n,
             planet_b=pb_n,
             aspect_type=o_asp,
             mode=o_mode,
-            variants_count=2,
+            variants_count=vc_manual,
             skin_a=skin_a_c,
             skin_b=skin_b_c,
             editorial_profile=profile,
@@ -463,12 +470,13 @@ def build_catstyle_image_generation_jobs(
             pb_chk = pb_sel.lower()
             if "mars" not in {pa_chk, pb_chk}:
                 n_img = len(pp.get("image_prompts") or [])
+                refresh_vc = jobs_count if jobs_count is not None else max(1, n_img)
                 req_kw_refresh: dict[str, Any] = dict(
                     planet_a=pa_sel,
                     planet_b=pb_sel,
                     aspect_type=asp_sel,
                     mode=mode_sel,
-                    variants_count=max(1, n_img),
+                    variants_count=refresh_vc,
                     skin_a=skin_a_c,
                     skin_b=skin_b_c,
                     editorial_profile=profile,
@@ -513,6 +521,16 @@ def build_catstyle_image_generation_jobs(
     shot_roles_list: list[str | None] = (
         list(shot_roles_list_raw) if isinstance(shot_roles_list_raw, list) else []
     )
+
+    if jobs_count is not None:
+        if len(image_prompts) < jobs_count:
+            raise ValueError(
+                f"jobs_count={jobs_count} requires at least {jobs_count} image prompt(s); "
+                f"pack has {len(image_prompts)}."
+            )
+        image_prompts = image_prompts[:jobs_count]
+        if shot_roles_list:
+            shot_roles_list = shot_roles_list[:jobs_count]
 
     vpp = max(1, int(variants_per_prompt))
     pa = str(primary["planet_a"])

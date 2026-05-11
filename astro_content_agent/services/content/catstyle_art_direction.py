@@ -16,7 +16,7 @@ def resolve_art_energy(editorial_profile: str | None, mode: str) -> CatstyleArtE
     """
     Map editorial + mode to art-direction energy.
 
-    Editorial wins when set to charged/supportive; otherwise mode biases tension/compensation.
+    Editorial wins when set to charged/supportive; otherwise mode biases tension/compensation/flow.
     """
     ep = (editorial_profile or "").strip().lower()
     if ep == "charged":
@@ -27,6 +27,8 @@ def resolve_art_energy(editorial_profile: str | None, mode: str) -> CatstyleArtE
     if m == "tension":
         return "charged"
     if m == "compensation":
+        return "supportive"
+    if m == "flow":
         return "supportive"
     return "balanced"
 

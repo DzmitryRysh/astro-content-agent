@@ -43,9 +43,9 @@ def _slug(s: str) -> str:
 
 def _validate_mode(mode: str) -> str:
     m = (mode or "").strip().lower()
-    if m not in ("tension", "compensation", "mixed"):
+    if m not in ("tension", "compensation", "mixed", "flow"):
         raise CatstyleReferenceApprovalError(
-            "mode must be one of: tension, compensation, mixed " f"(got {mode!r})."
+            "mode must be one of: tension, compensation, mixed, flow " f"(got {mode!r})."
         )
     return m
 

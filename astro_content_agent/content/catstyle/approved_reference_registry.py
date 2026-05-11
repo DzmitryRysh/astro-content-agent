@@ -27,7 +27,7 @@ class ApprovedReferenceEntry(BaseModel):
     planet_a: str = Field(..., description="Planet A (English title case after normalize).")
     planet_b: str = Field(..., description="Planet B (English title case after normalize).")
     aspect_type: str = Field(..., description="Major aspect, e.g. square (matched case-insensitive).")
-    mode: str = Field(..., description="tension | compensation | mixed (matched case-insensitive).")
+    mode: str = Field(..., description="tension | compensation | mixed | flow (matched case-insensitive).")
     image_path: str = Field(
         ...,
         description="Path relative to repo root, POSIX slashes (e.g. references/catstyle_moon_saturn_approved.png).",

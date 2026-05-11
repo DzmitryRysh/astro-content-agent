@@ -158,7 +158,7 @@ class CatstylePromptRequest(BaseModel):
     planet_a: str
     planet_b: str
     aspect_type: str
-    mode: Literal["tension", "compensation", "mixed"]
+    mode: Literal["tension", "compensation", "mixed", "flow"]
     variants_count: int = Field(default=2, ge=1, le=8)
     skin_a: str | None = Field(
         default=None,
@@ -246,7 +246,7 @@ class CatstyleCandidate(BaseModel):
     planet_a: str
     planet_b: str
     aspect_type: str
-    mode_recommendation: Literal["tension", "compensation", "mixed"]
+    mode_recommendation: Literal["tension", "compensation", "mixed", "flow"]
     visual_score: int = Field(ge=1, le=10)
     emotional_score: int = Field(ge=1, le=10)
     comedy_score: int = Field(ge=1, le=10)

@@ -37,6 +37,7 @@ def test_list_cli_human_output(ref_cli, capsys: pytest.CaptureFixture[str]) -> N
     out = capsys.readouterr().out
     assert "Catstyle approved reference registry" in out
     assert "moon_saturn_square_tension_v1" in out
+    assert "mercury_jupiter_sextile_flow_v1" in out
     assert "references/catstyle_moon_saturn_square_tension_approved.png" in out
 
 
@@ -52,4 +53,5 @@ def test_list_cli_json(ref_cli, capsys: pytest.CaptureFixture[str]) -> None:
     assert isinstance(data, list)
     keys = {row["registry_key"] for row in data}
     assert "jupiter_mars_square_tension_v1" in keys
+    assert "mercury_jupiter_sextile_flow_v1" in keys
     assert all("image_path_absolute" in row for row in data)

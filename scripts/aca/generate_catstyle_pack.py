@@ -100,7 +100,7 @@ def main() -> int:
     ap.add_argument("--planet-a", required=True, dest="planet_a")
     ap.add_argument("--planet-b", required=True, dest="planet_b")
     ap.add_argument("--aspect-type", required=True, dest="aspect_type")
-    ap.add_argument("--mode", required=True, choices=["tension", "compensation", "mixed"])
+    ap.add_argument("--mode", required=True, choices=["tension", "compensation", "mixed", "flow"])
     ap.add_argument("--variants-count", type=int, default=2, dest="variants_count")
     ap.add_argument(
         "--skin-a",

@@ -143,6 +143,56 @@ def test_cli_passes_manual_override_kwargs(jobs_cli, tmp_path: Path) -> None:
     assert kw.get("mode_override") == "tension"
 
 
+def test_cli_passes_manual_override_flow_kwargs(jobs_cli, tmp_path: Path) -> None:
+    out = tmp_path / "cli_flow"
+    old = sys.argv[:]
+    try:
+        sys.argv = [
+            "build_catstyle_image_generation_jobs.py",
+            "--date",
+            "2026-06-01",
+            "--output-dir",
+            str(out),
+            "--planet-a",
+            "Mercury",
+            "--planet-b",
+            "Jupiter",
+            "--aspect-type",
+            "sextile",
+            "--mode",
+            "flow",
+        ]
+        with patch.object(jobs_cli, "build_catstyle_image_generation_jobs", return_value=_minimal_result()) as m:
+            assert jobs_cli.main() == 0
+    finally:
+        sys.argv = old
+    kw = m.call_args.kwargs
+    assert kw.get("planet_a_override") == "Mercury"
+    assert kw.get("planet_b_override") == "Jupiter"
+    assert kw.get("aspect_type_override") == "sextile"
+    assert kw.get("mode_override") == "flow"
+
+
+def test_cli_passes_jobs_count_one(jobs_cli, tmp_path: Path) -> None:
+    out = tmp_path / "cli_jc"
+    old = sys.argv[:]
+    try:
+        sys.argv = [
+            "build_catstyle_image_generation_jobs.py",
+            "--date",
+            "2026-05-02",
+            "--output-dir",
+            str(out),
+            "--jobs-count",
+            "1",
+        ]
+        with patch.object(jobs_cli, "build_catstyle_image_generation_jobs", return_value=_minimal_result()) as m:
+            assert jobs_cli.main() == 0
+    finally:
+        sys.argv = old
+    assert m.call_args.kwargs.get("jobs_count") == 1
+
+
 def test_cli_passes_style_reference_image_arg(jobs_cli, tmp_path: Path) -> None:
     out = tmp_path / "cli_out"
     old = sys.argv[:]

@@ -46,6 +46,14 @@ def main() -> int:
     ap.add_argument("--step-hours", type=int, default=2)
     ap.add_argument("--variants-per-prompt", type=int, default=1, dest="variants_per_prompt")
     ap.add_argument(
+        "--jobs-count",
+        type=int,
+        choices=(1, 2),
+        default=None,
+        dest="jobs_count",
+        help="Emit exactly this many image jobs from the primary pack (1 or 2). Omit for legacy: one job per pack prompt line.",
+    )
+    ap.add_argument(
         "--output-dir",
         type=Path,
         default=None,
@@ -112,7 +120,7 @@ def main() -> int:
         "--mode",
         default=None,
         dest="mode_override",
-        help="Manual aspect override v1: tension | compensation | mixed.",
+        help="Manual aspect override v1: tension | compensation | mixed | flow.",
     )
     args = ap.parse_args()
 
@@ -145,6 +153,7 @@ def main() -> int:
             planet_b_override=args.planet_b_override,
             aspect_type_override=args.aspect_type_override,
             mode_override=args.mode_override,
+            jobs_count=args.jobs_count,
         )
     except ValueError as e:
         print(str(e), file=sys.stderr)

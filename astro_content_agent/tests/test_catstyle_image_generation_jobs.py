@@ -169,6 +169,44 @@ def test_build_jobs_two_prompts_all_pending(tmp_path: Path) -> None:
     assert "jupiter_mars_square" in r.jobs[0].suggested_output_name
 
 
+def test_build_jobs_jobs_count_one_daily_pack(tmp_path: Path) -> None:
+    with patch(
+        "astro_content_agent.services.content.catstyle_image_generation_jobs.generate_catstyle_daily_pack",
+        return_value=_fake_pack_one_primary(),
+    ):
+        r = build_catstyle_image_generation_jobs(
+            date(2026, 5, 2),
+            editorial_profile="charged",
+            output_dir=tmp_path / "jobs1",
+            jobs_count=1,
+        )
+    assert len(r.jobs) == 1
+    assert r.jobs[0].prompt_index == 1
+    assert r.jobs[0].prompt_text == "prompt line one"
+    assert r.jobs[0].shot_role == "hero_poster"
+    assert r.jobs[0].job_id == "catstyle-2026-05-02-001"
+
+
+def test_jobs_count_two_requires_two_prompts(tmp_path: Path) -> None:
+    """Without registry refresh, a single-line pack cannot satisfy jobs_count=2."""
+    with patch(
+        "astro_content_agent.services.content.catstyle_image_generation_jobs.generate_catstyle_daily_pack",
+        return_value=_fake_pack_moon_saturn_square_tension(),
+    ):
+        with pytest.raises(ValueError, match="requires at least 2"):
+            build_catstyle_image_generation_jobs(
+                date(2026, 5, 3),
+                output_dir=tmp_path / "x",
+                jobs_count=2,
+                disable_approved_reference_auto=True,
+            )
+
+
+def test_jobs_count_invalid_raises() -> None:
+    with pytest.raises(ValueError, match="jobs_count must be"):
+        build_catstyle_image_generation_jobs(date(2026, 5, 2), jobs_count=5)
+
+
 def test_variants_per_prompt_duplicates_jobs(tmp_path: Path) -> None:
     with patch(
         "astro_content_agent.services.content.catstyle_image_generation_jobs.generate_catstyle_daily_pack",
@@ -212,6 +250,26 @@ def test_output_writes_manifest_and_prompt_files(tmp_path: Path) -> None:
     assert "manifest_summary.txt" in r.files_written
 
 
+def test_output_jobs_count_one_writes_single_prompt_file(tmp_path: Path) -> None:
+    out = tmp_path / "out_one"
+    with patch(
+        "astro_content_agent.services.content.catstyle_image_generation_jobs.generate_catstyle_daily_pack",
+        return_value=_fake_pack_one_primary(),
+    ):
+        r = build_catstyle_image_generation_jobs(date(2026, 5, 2), output_dir=out, jobs_count=1)
+    assert len(r.jobs) == 1
+    manifest = json.loads((out / "image_generation_jobs.json").read_text(encoding="utf-8"))
+    assert len(manifest["jobs"]) == 1
+    assert (out / "job_01_prompt.txt").is_file()
+    assert not (out / "job_02_prompt.txt").exists()
+    assert "job_02_prompt.txt" not in r.files_written
+    assert manifest["style_reference"]["source"] == "approved_registry"
+    assert manifest["jobs"][0]["shot_role"] == "hero_poster"
+    assert "neg body" in (out / "negative_prompt.txt").read_text(encoding="utf-8")
+    assert "anim body" in (out / "animation_prompt.txt").read_text(encoding="utf-8")
+    assert "image_generation_jobs.json" in r.files_written
+
+
 def test_no_selected_returns_empty_jobs_no_files(tmp_path: Path) -> None:
     with patch(
         "astro_content_agent.services.content.catstyle_image_generation_jobs.generate_catstyle_daily_pack",
@@ -250,6 +308,21 @@ def test_parse_manual_aspect_override_partial_raises() -> None:
 def test_parse_manual_aspect_override_invalid_mode() -> None:
     with pytest.raises(ValueError, match="--mode must be one of"):
         parse_manual_aspect_override_fields("Pluto", "Mars", "square", "bananas")
+
+
+def test_parse_manual_aspect_override_accepts_flow() -> None:
+    assert parse_manual_aspect_override_fields("Mercury", "Jupiter", "sextile", "flow") == (
+        "Mercury",
+        "Jupiter",
+        "sextile",
+        "flow",
+    )
+    assert parse_manual_aspect_override_fields("Mercury", "Jupiter", "sextile", "FLOW") == (
+        "Mercury",
+        "Jupiter",
+        "sextile",
+        "flow",
+    )
 
 
 def test_manual_override_build_jobs_and_manifest(tmp_path: Path) -> None:
@@ -309,6 +382,62 @@ def test_manual_override_build_jobs_and_manifest(tmp_path: Path) -> None:
     assert "Manual aspect override" in summary
 
 
+def test_manual_override_jobs_count_one_prompt_variant(tmp_path: Path) -> None:
+    fake = CatstylePromptPack(
+        image_prompts=["only one"],
+        image_prompt_shot_roles=["hero_poster"],
+        animation_prompt="anim",
+        negative_prompt="neg",
+        carousel_idea="car",
+    )
+    with patch(
+        "astro_content_agent.services.content.catstyle_image_generation_jobs.generate_catstyle_prompt_pack",
+        return_value=fake,
+    ) as m_pack:
+        r = build_catstyle_image_generation_jobs(
+            date(2026, 5, 2),
+            editorial_profile="charged",
+            output_dir=tmp_path / "ov1",
+            planet_a_override="Pluto",
+            planet_b_override="Mars",
+            aspect_type_override="square",
+            mode_override="tension",
+            jobs_count=1,
+        )
+    req = m_pack.call_args[0][0]
+    assert req.variants_count == 1
+    assert len(r.jobs) == 1
+
+
+def test_manual_override_mercury_jupiter_flow_resolves_registry(tmp_path: Path) -> None:
+    fake = CatstylePromptPack(
+        image_prompts=["mj one", "mj two"],
+        image_prompt_shot_roles=["hero_poster", "alternate_action_angle"],
+        animation_prompt="anim",
+        negative_prompt="neg",
+        carousel_idea="car",
+    )
+    with patch(
+        "astro_content_agent.services.content.catstyle_image_generation_jobs.generate_catstyle_prompt_pack",
+        return_value=fake,
+    ):
+        r = build_catstyle_image_generation_jobs(
+            date(2026, 6, 1),
+            editorial_profile="charged",
+            output_dir=tmp_path / "mj_flow",
+            planet_a_override="Mercury",
+            planet_b_override="Jupiter",
+            aspect_type_override="sextile",
+            mode_override="flow",
+        )
+    assert r.style_reference_meta is not None
+    assert r.style_reference_meta.get("source") == "approved_registry"
+    assert r.style_reference_meta.get("registry_key") == "mercury_jupiter_sextile_flow_v1"
+    p = (r.jobs[0].style_reference_image_path or "").replace("\\", "/").lower()
+    assert "catstyle_mercury_jupiter_sextile_flow_approved" in p
+    assert r.jobs[0].mode == "flow"
+
+
 def test_manual_override_post_package_roundtrip(tmp_path: Path) -> None:
     fake = CatstylePromptPack(
         image_prompts=["only"],
@@ -359,6 +488,24 @@ def test_manual_override_real_prompt_pack_pluto_mars_square(tmp_path: Path) -> N
     assert len(r.jobs) >= 1
     assert r.jobs[0].prompt_text.strip()
     assert r.manual_aspect_override is not None
+
+
+def test_manual_override_real_prompt_pack_mercury_jupiter_sextile_flow(tmp_path: Path) -> None:
+    """Integration: flow mode + registry-backed Mercury/Jupiter sextile."""
+    r = build_catstyle_image_generation_jobs(
+        date(2026, 6, 1),
+        editorial_profile="charged",
+        output_dir=tmp_path / "mj_real",
+        planet_a_override="Mercury",
+        planet_b_override="Jupiter",
+        aspect_type_override="sextile",
+        mode_override="flow",
+    )
+    assert len(r.jobs) >= 1
+    assert r.jobs[0].prompt_text.strip()
+    assert r.jobs[0].mode == "flow"
+    assert r.style_reference_meta is not None
+    assert r.style_reference_meta.get("registry_key") == "mercury_jupiter_sextile_flow_v1"
 
 
 def test_manifest_includes_style_reference_image_path(tmp_path: Path) -> None:

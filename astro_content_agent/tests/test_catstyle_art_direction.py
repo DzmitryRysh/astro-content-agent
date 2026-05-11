@@ -28,6 +28,10 @@ def test_resolve_art_energy_balanced_uses_mode_compensation() -> None:
     assert resolve_art_energy("balanced", "compensation") == "supportive"
 
 
+def test_resolve_art_energy_balanced_uses_mode_flow() -> None:
+    assert resolve_art_energy("balanced", "flow") == "supportive"
+
+
 def test_resolve_art_energy_none_falls_through_mode() -> None:
     assert resolve_art_energy(None, "mixed") == "balanced"
 

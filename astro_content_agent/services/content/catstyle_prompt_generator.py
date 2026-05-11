@@ -592,7 +592,7 @@ def _pack_from_deep(
     for i in range(n):
         if req.mode == "tension":
             base_scene = tension_scenes[i % len(tension_scenes)]
-        elif req.mode == "compensation":
+        elif req.mode in ("compensation", "flow"):
             base_scene = comp_scenes[i % len(comp_scenes)]
             if i >= len(comp_scenes):
                 base_scene = f"{base_scene} Constructive channel: {aspect_ix.constructive_channel}"
@@ -668,7 +668,7 @@ def _pack_from_seed(
     for i in range(n):
         if req.mode == "tension":
             base_scene = tension_scenes[i % len(tension_scenes)]
-        elif req.mode == "compensation":
+        elif req.mode in ("compensation", "flow"):
             base_scene = comp_scenes[i % len(comp_scenes)]
             if i >= len(comp_scenes):
                 base_scene = f"{base_scene} Constructive channel: {seed.constructive_channel}"
@@ -755,7 +755,7 @@ def _pack_from_fallback(
     for i in range(n):
         if req.mode == "tension":
             base_scene = tension_scenes[i % len(tension_scenes)]
-        elif req.mode == "compensation":
+        elif req.mode in ("compensation", "flow"):
             base_scene = comp_scenes[i % len(comp_scenes)]
             if i >= len(comp_scenes):
                 base_scene = f"{base_scene} Constructive channel: {constructive}"
