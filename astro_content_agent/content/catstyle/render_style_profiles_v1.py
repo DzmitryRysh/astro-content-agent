@@ -357,10 +357,75 @@ def format_render_style_prompt_block(profile: CatstyleRenderStyleProfile) -> str
     )
 
 
+def format_render_style_prompt_block_for_flow(profile: CatstyleRenderStyleProfile) -> str:
+    """
+    Flow-mode render finish: same premium poster discipline as v2, without duel/battle vocabulary.
+
+    Non-v2 profiles keep the standard block (already lighter on explicit duel language).
+    """
+    if profile.key != "premium_comic_poster_v2":
+        return format_render_style_prompt_block(profile)
+    must_have = " | ".join(
+        [
+            "Collectible comic-cover / alliance discovery poster energy.",
+            "Cinematic staging with shared focal pull toward horizon, portal, atlas, or open chart beat.",
+            "Layered depth planes that sell monumental arena consequence without tournament clash read.",
+            "Bold silhouette authority on both planet-cats at thumbnail.",
+            "Polished painterly cel comic finish with disciplined richness.",
+            "Canon + identity markers remain unmistakable—never generic animals.",
+            "Bright readable heroic poster lighting with luminous midtones and Instagram-mobile legible faces.",
+            "Luminous golden opportunity portal treated as central key light with warm bounce on both subjects.",
+        ]
+    )
+    avoid = " | ".join(
+        list(profile.avoid_lines)
+        + [
+            "versus duel or showdown symmetry as primary read",
+            "squared-off combat tournament clash staging",
+            "MMA brawl collision framing as dominant read",
+            "underexposed overall scene",
+            "muddy crushed shadows",
+            "black-crushed unreadable background",
+            "characters disappearing into darkness",
+            "overly dark noir lighting",
+            "horror gloom darkness dominance",
+        ]
+    )
+    return (
+        f"[RENDER STYLE v1 - high-priority visual finish] {profile.label} (FLOW alliance read): "
+        "Ultra-premium cinematic comic POSTER illustration—movie-one-sheet and collectible cover clarity with "
+        "discovery-opportunity gravity (not combat contest); polished contours plus disciplined painterly cel modeling "
+        "(rich planes, no mush); explicitly NOT nursery softness, NOT kawaii cute flattening, NOT cheap chibi novelty, "
+        "NOT flat mobile-game icon gloss, NOT simplistic clip mascot staging. "
+        f"Composition: Poster-grade allied framing: monumental scale via FG/MG/BG layering—foreground duo shares a "
+        "co-directed gesture or joint motion toward a visible shared objective (star map, portal rim, horizon band, open atlas); "
+        "midground carries arena architecture weight; background opens into consequential cosmic depth; "
+        "reject centered sticker tableaus and empty minimalist staging. "
+        f"Linework: {profile.linework_line} "
+        f"Shading: {profile.shading_line} "
+        "Lighting (flow readability): bright readable heroic poster lighting—preserve deep cosmic arena mood but lift "
+        "overall exposure for faces, portal aperture, faction banners, and distant Earth impact cue to Instagram-thumb "
+        "clarity; treat a luminous golden opportunity portal as the central key light with warm reflected fill across "
+        "both muzzles and paws; add soft cool Mercury rim light and warm Jupiter generous fill so banded and rocky "
+        "sphere reads stay dimensional; keep dramatic contrast with clean luminous midtones—reject murky mud, clipped "
+        "black voids, horror/noir underexposure, or characters vanishing into shadow. "
+        f"Environment: {profile.environment_line} "
+        f"Detail control: {profile.detail_line} "
+        "Color: Vivid disciplined harmonic contrasts supporting co-discovery focal pull while honoring canon palettes. "
+        "Facial acting: Warm intelligent theatrical acting—curiosity, wonder, generous focus—readable eyes/jaws/paws selling "
+        "alliance stakes with comic gravitas (not infant cute mush). "
+        f"Must have: {must_have} "
+        f"Avoid: {avoid}. "
+        "Compact cue: V2 premium alliance-discovery poster—monumental cosmic opportunity staging, luminous golden portal "
+        "key light, dramatic clean rim/fill balance, anti-nursery discipline, Instagram-mobile readable polish."
+    )
+
+
 __all__ = [
     "DEFAULT_RENDER_STYLE_PROFILE_KEY",
     "RENDER_STYLE_PROFILES",
     "format_render_style_prompt_block",
+    "format_render_style_prompt_block_for_flow",
     "get_render_style_profile",
     "list_render_style_profiles",
     "normalize_render_style_profile_key",

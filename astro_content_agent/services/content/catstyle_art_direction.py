@@ -80,7 +80,29 @@ def build_catstyle_art_direction_profile(
     )
 
 
-def composition_line(*, render_style_profile_key: str | None = None) -> str:
+def composition_line(*, render_style_profile_key: str | None = None, mode: str | None = None) -> str:
+    m = (mode or "").strip().lower()
+    if m == "flow":
+        if render_style_profile_key == "premium_comic_poster_v2":
+            return (
+                "Cinematic comic-panel composition with premium poster clarity: allied silhouette dominance, "
+                "foreground-led co-discovery staging with shared focal pull toward horizon/portal/atlas/chart, "
+                "decisive FG/MG/BG separation and impactful depth—reject centered sticker mascots floating on empty flats. "
+                "Instagram-mobile readable composition: faces, portal rim, flags/banners, and distant Earth cue must stay "
+                "legible at small crop with polished comic-cover clarity—never murky darkness. "
+                "Keep backgrounds simplified relative to characters: arena + zodiac floor readable and epic, but lower "
+                "detail density than focal bodies."
+                " Keep each planet's [IDENTITY MARKERS v1] symbol/prop stamps readable at thumbnail scale beside faces/bodies."
+            )
+        return (
+            "Cinematic comic-panel composition with poster-like clarity: allied staging toward one shared objective, "
+            "strong silhouette readability, decisive foreground/background separation, one focal co-discovery beat "
+            "readable at thumbnail size. "
+            "Not a flat mascot pose, not a centered sticker-like character floating in empty space—"
+            "stage the beat like a premium comic panel or movie one-sheet while staying cartony flat-color Catstyle "
+            "(never photoreal, never glossy prestige portrait). "
+            "Keep each planet's [IDENTITY MARKERS v1] symbol/prop stamps readable at thumbnail scale beside faces/bodies."
+        )
     if render_style_profile_key == "premium_comic_poster_v2":
         return (
             "Cinematic comic-panel composition with premium battle-poster clarity: heroic silhouette dominance, "
@@ -99,7 +121,15 @@ def composition_line(*, render_style_profile_key: str | None = None) -> str:
     )
 
 
-def scene_intensity_line(energy: CatstyleArtEnergy) -> str:
+def scene_intensity_line(energy: CatstyleArtEnergy, *, mode: str | None = None) -> str:
+    if (mode or "").strip().lower() == "flow":
+        return (
+            "Scene energy (flow): alliance-forward momentum—co-lit discovery, opportunity threshold, portal-open or "
+            "map-activation beat; expressive motion reads as collaboration and guided expansion, not contest combat. "
+            "Brightness discipline: bright readable heroic poster lighting with clear midtone modeling—luminous golden "
+            "portal as key light, warm bounce on faces, cool Mercury rim and warm Jupiter fill—dramatic but never "
+            "horror-noir underexposure."
+        )
     if energy == "charged":
         return (
             "Scene energy (charged): dynamic action read, impact moment, conflict staging, expressive motion, "
@@ -116,7 +146,12 @@ def scene_intensity_line(energy: CatstyleArtEnergy) -> str:
     )
 
 
-def visual_gag_line(energy: CatstyleArtEnergy) -> str:
+def visual_gag_line(energy: CatstyleArtEnergy, *, mode: str | None = None) -> str:
+    if (mode or "").strip().lower() == "flow":
+        return (
+            "Visual timing: cooperative micro-reveal—props echo partnership (star map, keys, open book, laurel lens); "
+            "avoid antagonist framing, macho clash posturing, or mirrored combat-stance silhouettes."
+        )
     if energy == "charged":
         return (
             "Visual timing: push silhouette-first comedy and contrast (slow vs fast, big vs small); "
@@ -183,7 +218,8 @@ def compose_premium_catstyle_prompt(
             "do not substitute a generic tableau."
         )
     chunks: list[str] = [*locked]
-    if render_style_profile_key == "premium_comic_poster_v2":
+    mode_l = (profile.mode or "").strip().lower()
+    if render_style_profile_key == "premium_comic_poster_v2" and mode_l != "flow":
         chunks.append(
             "Heroic presentation pressure (preserve [CANON v1 base] + [IDENTITY MARKERS v1]): foreground-dominant bodies "
             "with pose authority and face intensity; stronger silhouette-first comic-cover energy—still unmistakable "
@@ -191,9 +227,9 @@ def compose_premium_catstyle_prompt(
         )
     chunks.extend(
         [
-            composition_line(render_style_profile_key=render_style_profile_key),
-            scene_intensity_line(profile.energy),
-            visual_gag_line(profile.energy),
+            composition_line(render_style_profile_key=render_style_profile_key, mode=profile.mode),
+            scene_intensity_line(profile.energy, mode=profile.mode),
+            visual_gag_line(profile.energy, mode=profile.mode),
         ]
     )
     skin = skin_emphasis_block(profile.planet_a, profile.planet_b, profile.skin_a, profile.skin_b)
@@ -208,6 +244,7 @@ def strengthen_negative_prompt(
     profile: CatstyleArtDirectionProfile,
     *,
     render_style_profile_key: str | None = None,
+    mode: str | None = None,
 ) -> str:
     def _split_chunks(text: str) -> list[str]:
         return [p.strip() for p in (text or "").split(",") if p.strip()]
@@ -261,6 +298,19 @@ def strengthen_negative_prompt(
         )
         carried_safety = [p for p in _split_chunks(base_negative) if any(t in p.lower() for t in safety_terms)]
         merged = _dedupe_keep_order(style_compact + carried_safety)
+        if (mode or "").strip().lower() == "flow":
+            flow_extra = [
+                "tournament duel framing",
+                "versus showdown poster symmetry",
+                "MMA brawl collision staging",
+                "squared-off combat stare-down as primary read",
+                "underexposed overall scene",
+                "muddy crushed shadows",
+                "black-crushed unreadable background",
+                "characters disappearing into darkness",
+                "overly dark noir lighting",
+            ]
+            merged = _dedupe_keep_order(merged + flow_extra)
         return ", ".join(merged)
     universal.extend(
             [
@@ -293,6 +343,20 @@ def strengthen_negative_prompt(
         extra.append("poster-like energy collapses into flat icon poses")
 
     chunks = [base_negative.strip().rstrip(",").strip(), *universal, *extra]
+    if (mode or "").strip().lower() == "flow":
+        chunks.extend(
+            [
+                "tournament duel framing",
+                "versus showdown poster symmetry",
+                "MMA brawl collision staging",
+                "squared-off combat stare-down as primary read",
+                "underexposed overall scene",
+                "muddy crushed shadows",
+                "black-crushed unreadable background",
+                "characters disappearing into darkness",
+                "overly dark noir lighting",
+            ]
+        )
     return ", ".join(_dedupe_keep_order([c for c in chunks if c]))
 
 
@@ -354,7 +418,9 @@ def apply_art_direction_to_prompt_pack(pack: CatstylePromptPack, profile: Catsty
             for p in pack.image_prompts
         ],
         animation_prompt=enrich_animation_prompt(pack.animation_prompt, profile),
-        negative_prompt=strengthen_negative_prompt(pack.negative_prompt, profile, render_style_profile_key=rk),
+        negative_prompt=strengthen_negative_prompt(
+            pack.negative_prompt, profile, render_style_profile_key=rk, mode=profile.mode
+        ),
         carousel_idea=enrich_carousel_idea(pack.carousel_idea, profile),
         art_direction_profile=meta,
         world_template_profile=pack.world_template_profile,

@@ -43,5 +43,13 @@ def test_format_blocks_distinct() -> None:
     assert "alternate_action_angle:" in b and ("diagonal" in b or "tilt" in b)
 
 
+def test_format_flow_mode_alternate_avoids_sidewinder_tension_phrase() -> None:
+    classic = format_hero_shot_prompt_block("alternate_action_angle", flow_mode=False).lower()
+    flow = format_hero_shot_prompt_block("alternate_action_angle", flow_mode=True).lower()
+    assert "sidewinder tension" in classic
+    assert "sidewinder tension" not in flow
+    assert "shared objective" in flow or "co-facing" in flow
+
+
 def test_format_none_empty() -> None:
     assert format_hero_shot_prompt_block(None) == ""

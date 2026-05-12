@@ -25,7 +25,7 @@ def shot_roles_for_variant_indices(count: int, shot_mode: str) -> list[str | Non
     return roles
 
 
-def format_hero_shot_prompt_block(shot_role: str | None) -> str:
+def format_hero_shot_prompt_block(shot_role: str | None, *, flow_mode: bool = False) -> str:
     """High-priority framing cue inserted before Scene beat (deterministic v1)."""
     if shot_role is None:
         return ""
@@ -37,6 +37,14 @@ def format_hero_shot_prompt_block(shot_role: str | None) -> str:
             "foreground emphasis (reject symmetric mascot-sticker dead centers)."
         )
     if shot_role == SHOT_ROLE_ALTERNATE_ACTION_ANGLE:
+        if flow_mode:
+            return (
+                "[SHOT ROLE v1 - premium hero framing] alternate_action_angle: "
+                "Alternate premium cinematic staging—diagonal discovery plane or gentle heroic tilt with overlapping "
+                "foreground bodies co-facing a shared objective (atlas/portal/horizon band) compared to the hero_poster frame; "
+                "same identities and locked scene/world beats, distinct camera grammar and depth layering—avoid "
+                "squared-off adversarial stance or confrontational combat symmetry."
+            )
         return (
             "[SHOT ROLE v1 - premium hero framing] alternate_action_angle: "
             "Alternate premium cinematic staging - diagonal kinetic plane or lower heroic tilt / sidewinder tension "

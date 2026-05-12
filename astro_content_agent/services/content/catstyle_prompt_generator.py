@@ -35,6 +35,7 @@ from astro_content_agent.content.catstyle.scene_templates_v1 import (
 from astro_content_agent.content.catstyle.render_style_profiles_v1 import (
     DEFAULT_RENDER_STYLE_PROFILE_KEY,
     format_render_style_prompt_block,
+    format_render_style_prompt_block_for_flow,
     get_render_style_profile,
 )
 from astro_content_agent.content.catstyle.world_templates_v1 import (
@@ -70,14 +71,40 @@ _NEGATIVE_BASE_CHUNKS = [
     "disconnected sticker posing, over-rendered fur strands, over-rendered material noise",
 ]
 
+_FLOW_IMAGE_OPENING_V2 = (
+    "Premium cinematic comic-poster illustration — poster-grade comic splash illustration — high-impact heroic "
+    "co-discovery alliance splash featuring anthropomorphic planet-cats; hand-painted stylized 2D/2.5D comic feel "
+    "(NOT photoreal, NOT 3D CGI, NOT game splash render), collectible-cover polish, monumental opportunity staging, "
+    "layered foreground/midground/background depth, bright readable heroic poster lighting with luminous midtones, "
+    "dramatic focal and rim-impact lighting, bold authoritative silhouettes, painterly cel-shaded polished comic "
+    "rendering—prioritize premium alliance-discovery poster reads over cute mascot simplicity."
+)
+
+_FLOW_STYLE_HARDLOCK_V2 = (
+    "Prioritize dramatic poster composition over cute simplicity—reject nursery-book softness, kawaii sticker "
+    "flattening, and bland mascot idle posing. Stage as premium comic cover / alliance discovery splash: decisive "
+    "focal hierarchy, meaningful environment depth behind the duo (never empty flats), dynamic joint motion or "
+    "co-revealing gesture with pose authority, cinematic rim lighting sculpting forms—never floating mascots on void "
+    "backdrops or emoji-flat icon staging. Texture rule: use only large and medium texture groups "
+    "(no dense microtexture layering). Background rule: arena and zodiac floor stay epic but simplified and "
+    "less detailed than characters. Lighting rule: dramatic but clean and Instagram-thumb readable—lift exposure for "
+    "faces, portal, flags, and Earth cue; luminous golden opportunity portal as central key light with warm bounce "
+    "across both muzzles; soft cool Mercury rim light and warm Jupiter generous fill; preserve deep cosmic void mood "
+    "without murky underexposure, muddy crushed shadows, or black-crushed silhouettes; never horror/noir darkness."
+)
+
 
 def _image_prompt_lead(render_prof: CatstyleRenderStyleProfile) -> str:
     """Opening sentences: render-profile priority before canon/world/scene (must not contradict premium finish)."""
     return f"{render_prof.image_prompt_opening_line.strip()} {_CATSTYLE_SUBJECT_GUARDS}".strip()
 
 
-def _image_prompt_opening_prefix(render_prof: CatstyleRenderStyleProfile) -> str:
+def _image_prompt_opening_prefix(render_prof: CatstyleRenderStyleProfile, *, mode: str | None = None) -> str:
     """Opening lead plus optional v2 style-hardlock mandate (deterministic, highest priority before Aspect line)."""
+    m = (mode or "").strip().lower()
+    if m == "flow" and render_prof.key == "premium_comic_poster_v2":
+        base = f"{_FLOW_IMAGE_OPENING_V2} {_CATSTYLE_SUBJECT_GUARDS}".strip()
+        return f"{base} [STYLE HARDLOCK v2 - premium poster mandate] {_FLOW_STYLE_HARDLOCK_V2}".strip()
     base = _image_prompt_lead(render_prof)
     hb = render_prof.style_hardlock_block
     if hb and str(hb).strip():
@@ -85,7 +112,7 @@ def _image_prompt_opening_prefix(render_prof: CatstyleRenderStyleProfile) -> str
     return base
 
 
-def _aspect_choreography_block(aspect_type: str) -> str:
+def _aspect_choreography_block(aspect_type: str, mode: str | None = None) -> str:
     """Deterministic aspect choreography: hard aspects clash; soft aspects cooperate (Catstyle v1)."""
     k = (aspect_type or "").strip().lower()
     mapping: dict[str, str] = {
@@ -111,7 +138,15 @@ def _aspect_choreography_block(aspect_type: str) -> str:
             "single-forward surge choreography."
         ),
     }
-    return mapping.get(k, "")
+    base = mapping.get(k, "")
+    if not base:
+        return ""
+    if (mode or "").strip().lower() == "flow" and k in ("square", "opposition"):
+        return (
+            f"{base} [FLOW geometry cue v1] Staging must resolve toward alliance—co-build, shoulder-aligned discovery, "
+            "shared lift—never prizefight collision as dominant read."
+        )
+    return base
 
 
 def _aspect_choreography_animation_clause(aspect_type: str) -> str:
@@ -145,6 +180,45 @@ def _planet_pair_action_language(pa: str, pb: str) -> str:
             "no Mars-like aggression, no nunchucks/martial weapons."
         )
     return " ".join(chunks).strip()
+
+
+def _catstyle_flow_mode_visual_lock(req: CatstylePromptRequest) -> str:
+    if (req.mode or "").strip().lower() != "flow":
+        return ""
+    return (
+        "[CATSTYLE FLOW MODE v1 — alliance epic, not combat poster] Preserve premium cinematic comic-poster illustration "
+        "quality, rich cel-shaded modeling, dramatic clean light, and layered depth—never flatten. Narrative read: "
+        "discovery, opportunity, guided expansion, portal-opening, co-created momentum—both planet-cats share a visible "
+        "objective (star chart, horizon band, open atlas, map key activation, threshold doorway) and face or advance "
+        "that objective together more than a confrontational stare-down. Prefer joined motion, coordinated reach, "
+        "shoulder-aligned co-reading, tandem gesture toward one shared lure. Hard ban on heroic duel/tournament clash/"
+        "MMA collision framing, savage brawl staging, squared-off warrior symmetry, shoved-together combat collision, "
+        "or spectacle that reads as prizefight. Symbol discipline: at most one clear glyph or icon on a large banner "
+        "or flag; at most one compact symbol on a medallion, badge, or crown; books and maps use spare celestial diagram "
+        "lines and constellation geometry—do not spam repeated planet-glyph texture as filler. "
+        "Flow readability (mobile / Instagram): bright readable heroic poster lighting with polished comic-cover clarity—"
+        "keep dark cosmic arena atmosphere but favor luminous midtones so faces, portal aperture, faction flags, and "
+        "distant Earth cue stay legible on small screens; center a luminous golden opportunity portal as primary key "
+        "light with warm reflected fill washing both characters' faces; add soft cool Mercury rim light and warm Jupiter "
+        "generous fill so both read as dimensional planetary bodies; silhouettes and expressions stay crisp—avoid "
+        "underexposed murk, muddy shadow blobs, characters disappearing into black crush, or noir horror gloom."
+    )
+
+
+def _mercury_jupiter_flow_planetary_being_lock(req: CatstylePromptRequest, pa: str, pb: str) -> str:
+    if (req.mode or "").strip().lower() != "flow":
+        return ""
+    pair = {pa.strip().lower(), pb.strip().lower()}
+    if pair != {"mercury", "jupiter"}:
+        return ""
+    return (
+        "[MERCURY–JUPITER FLOW CAST v1 — planetary bodies first] Mercury reads as the smaller rocky gray-blue scholarly "
+        "planet-cat: tight rocky inner-planet silhouette, clever bright eyes, nimble proportions—recognizable as Mercury "
+        "before costume trims. Jupiter reads as the large banded wise expansive gas-giant planet-cat: volumetric sphere "
+        "body, calm generous stance, flowing bands and soft auroral tone—recognizable as Jupiter before costume "
+        "accessories. Costuming only amplifies planet identity; never replace sphere-body read with generic domestic-cat "
+        "anatomy."
+    )
 
 
 def _mars_heavy_scene_style_decouple_block(req: CatstylePromptRequest, pa: str, pb: str) -> str:
@@ -330,9 +404,11 @@ def _animation_prompt_body(
     aspect_type: str,
     anim_skin: str,
     render_prof: CatstyleRenderStyleProfile,
+    *,
+    mode: str | None = None,
 ) -> str:
     """Loop prompt aligned with the same render finish as still frames (no legacy flat-cartoon lead-in)."""
-    prefix = _image_prompt_opening_prefix(render_prof)
+    prefix = _image_prompt_opening_prefix(render_prof, mode=mode)
     choreo_anim = _aspect_choreography_animation_clause(aspect_type)
     return (
         f"{prefix} "
@@ -440,7 +516,10 @@ def _resolve_render_style(req: CatstylePromptRequest):
     raw = (req.render_style_profile_key or "").strip()
     key = raw or DEFAULT_RENDER_STYLE_PROFILE_KEY
     profile = get_render_style_profile(key)
-    render_middle = format_render_style_prompt_block(profile).strip() + " "
+    if (req.mode or "").strip().lower() == "flow":
+        render_middle = format_render_style_prompt_block_for_flow(profile).strip() + " "
+    else:
+        render_middle = format_render_style_prompt_block(profile).strip() + " "
     return profile, profile.model_dump(mode="json"), render_middle
 
 
@@ -528,14 +607,20 @@ def _prompt_choreography_middleware(
     req: CatstylePromptRequest, pa: str, pb: str, pair_guard: str
 ) -> str:
     """Aspect choreography + optional planet lexicon + Mars scene decouple; Moon/Saturn square adds dedicated guard."""
-    blocks = [
-        _aspect_choreography_block(req.aspect_type),
-        _planet_pair_action_language(pa, pb),
-        _arena_composition_boost_block(req),
-        _epic_arena_showdown_block(req, pa, pb),
-        _mars_heavy_scene_style_decouple_block(req, pa, pb),
-        pair_guard,
-    ]
+    blocks: list[str] = []
+    if (req.mode or "").strip().lower() == "flow":
+        blocks.append(_catstyle_flow_mode_visual_lock(req))
+        blocks.append(_mercury_jupiter_flow_planetary_being_lock(req, pa, pb))
+    blocks.extend(
+        [
+            _aspect_choreography_block(req.aspect_type, req.mode),
+            _planet_pair_action_language(pa, pb),
+            _arena_composition_boost_block(req),
+            _epic_arena_showdown_block(req, pa, pb),
+            _mars_heavy_scene_style_decouple_block(req, pa, pb),
+            pair_guard,
+        ]
+    )
     return " ".join(b for b in blocks if b).strip()
 
 
@@ -600,11 +685,13 @@ def _pack_from_deep(
             pool = tension_scenes + comp_scenes
             base_scene = pool[i % len(pool)]
 
-        shot_blk = format_hero_shot_prompt_block(shot_roles[i])
+        shot_blk = format_hero_shot_prompt_block(
+            shot_roles[i], flow_mode=(req.mode or "").strip().lower() == "flow"
+        )
         shot_middle = (shot_blk + " ") if shot_blk else ""
 
         prompt = (
-            f"{_image_prompt_opening_prefix(render_prof)} "
+            f"{_image_prompt_opening_prefix(render_prof, mode=req.mode)} "
             f"Aspect type: {req.aspect_type}. "
             f"{line_a} "
             f"{line_b} "
@@ -618,7 +705,7 @@ def _pack_from_deep(
         ).strip()
         image_prompts.append(prompt)
 
-    animation_prompt = _animation_prompt_body(pa, pb, req.aspect_type, anim_skin, render_prof)
+    animation_prompt = _animation_prompt_body(pa, pb, req.aspect_type, anim_skin, render_prof, mode=req.mode)
 
     rn = list(render_negative_additions or [])
     negative_prompt = _merge_negative_prompt(_NEGATIVE_BASE_CHUNKS, list(aspect_ix.avoid_list) + rn)
@@ -676,11 +763,13 @@ def _pack_from_seed(
             pool = tension_scenes + comp_scenes
             base_scene = pool[i % len(pool)]
 
-        shot_blk = format_hero_shot_prompt_block(shot_roles[i])
+        shot_blk = format_hero_shot_prompt_block(
+            shot_roles[i], flow_mode=(req.mode or "").strip().lower() == "flow"
+        )
         shot_middle = (shot_blk + " ") if shot_blk else ""
 
         prompt = (
-            f"{_image_prompt_opening_prefix(render_prof)} "
+            f"{_image_prompt_opening_prefix(render_prof, mode=req.mode)} "
             f"Aspect type: {req.aspect_type}. "
             f"{line_a} "
             f"{line_b} "
@@ -695,7 +784,7 @@ def _pack_from_seed(
         ).strip()
         image_prompts.append(prompt)
 
-    animation_prompt = _animation_prompt_body(pa, pb, req.aspect_type, anim_skin, render_prof)
+    animation_prompt = _animation_prompt_body(pa, pb, req.aspect_type, anim_skin, render_prof, mode=req.mode)
 
     rn = list(render_negative_additions or [])
     negative_prompt = _merge_negative_prompt(_NEGATIVE_BASE_CHUNKS, list(seed.avoid) + rn)
@@ -763,11 +852,13 @@ def _pack_from_fallback(
             pool = tension_scenes + comp_scenes
             base_scene = pool[i % len(pool)]
 
-        shot_blk = format_hero_shot_prompt_block(shot_roles[i])
+        shot_blk = format_hero_shot_prompt_block(
+            shot_roles[i], flow_mode=(req.mode or "").strip().lower() == "flow"
+        )
         shot_middle = (shot_blk + " ") if shot_blk else ""
 
         prompt = (
-            f"{_image_prompt_opening_prefix(render_prof)} "
+            f"{_image_prompt_opening_prefix(render_prof, mode=req.mode)} "
             f"Aspect type: {req.aspect_type}. "
             f"{line_a} "
             f"{line_b} "
@@ -781,7 +872,7 @@ def _pack_from_fallback(
         ).strip()
         image_prompts.append(prompt)
 
-    animation_prompt = _animation_prompt_body(pa, pb, req.aspect_type, anim_skin, render_prof)
+    animation_prompt = _animation_prompt_body(pa, pb, req.aspect_type, anim_skin, render_prof, mode=req.mode)
 
     rn = list(render_negative_additions or [])
     negative_prompt = _merge_negative_prompt(_NEGATIVE_BASE_CHUNKS, avoid + rn)

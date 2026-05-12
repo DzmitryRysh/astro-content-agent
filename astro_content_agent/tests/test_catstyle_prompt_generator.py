@@ -1080,7 +1080,39 @@ def test_aspect_choreography_square_vs_trine_tone() -> None:
     assert "playful cooperation" in sex_blob or "coordinated exchange" in sex_blob
 
 
-def test_opposition_prompt_includes_conflict_choreography_not_trine_flow() -> None:
+def test_mercury_jupiter_sextile_flow_avoids_battle_language_keeps_premium_poster() -> None:
+    """Flow mode must not inherit v2 battle-poster vocabulary; still reads as premium comic poster."""
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Mercury",
+            planet_b="Jupiter",
+            aspect_type="sextile",
+            mode="flow",
+            premium_art_direction=True,
+            variants_count=1,
+        )
+    )
+    blob = " ".join(pack.image_prompts).lower()
+    assert "comic-cover battle splash" not in blob
+    assert "heroic comic-cover battle" not in blob
+    assert "monumental duel staging" not in blob
+    assert "body-on-body" not in blob
+    assert "heroic battle splash" not in blob
+    assert "collectible comic-cover / battle splash poster energy" not in blob
+    assert "catstyle flow mode v1" in blob
+    assert "planetary bodies first" in blob
+    assert "alliance" in blob or "co-discovery" in blob or "discovery" in blob
+    assert "premium cinematic comic-poster" in blob or "co-discovery alliance splash" in blob
+    assert "instagram-mobile readable" in blob or "instagram-thumb" in blob
+    assert "luminous golden" in blob and "portal" in blob
+    assert "midtone" in blob or "luminous midtones" in blob
+    assert "mercury rim" in blob or "mercury rim light" in blob
+    assert "jupiter" in blob and "fill" in blob
+    neg = pack.negative_prompt.lower()
+    assert "underexposed overall scene" in neg or "underexposed" in neg
+    assert "muddy crushed shadows" in neg or "muddy" in neg
     from astro_content_agent.content.catstyle.models import CatstylePromptRequest
 
     pack = generate_catstyle_prompt_pack(
