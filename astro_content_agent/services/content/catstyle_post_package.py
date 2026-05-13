@@ -2,10 +2,19 @@
 from __future__ import annotations
 
 import json
+from datetime import date
 from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, Field
+
+from astro_content_agent.content.catstyle.models import CatstyleAspectTimingMetadata
+from astro_content_agent.content.catstyle.transit_pair_seed_v0 import orient_outer_personal
+from astro_content_agent.services.content.catstyle_aspect_timing import (
+    append_ru_timing_to_caption,
+    build_aspect_timing_from_manifest,
+    render_aspect_timing_markdown_section,
+)
 
 
 POST_PACKAGE_VERSION = "catstyle-post-package-v1"
@@ -114,6 +123,9 @@ def _classify_aspect_copy_profile(
         if aspect_l in ("square", "opposition") or mode_l == "tension":
             return "jupiter_mars_tension"
 
+    if pair == frozenset({"jupiter", "mercury"}) and aspect_l == "sextile" and mode_l == "flow":
+        return "mercury_jupiter_sextile_flow"
+
     if pair == frozenset({"pluto", "mars"}) and aspect_l == "square" and mode_l == "tension":
         return "pluto_mars_square_tension"
 
@@ -136,6 +148,42 @@ def _classify_aspect_copy_profile(
         return "jupiter_saturn_square_tension"
 
     return "generic"
+
+
+def _ru_mercury_jupiter_sextile_flow() -> tuple[str, str, str, str, str]:
+    hook = (
+        "Меркурий и Юпитер в секстиле: мелкий текст встречает большой смысл — "
+        "и оба готовы спорить, кто тут «главный по идее»."
+    )
+    caption = (
+        "Секстиль — это не «всё само сложится», а аккуратный шанс: Юпитер раздувает смысл и горизонт, "
+        "Меркурий предлагает факты, формулировки и маршрут на сегодня. "
+        "По-взрослому и с острым языком: лови момент, когда «крутая идея» ещё не превратилась в вечный скетч без релиза. "
+        "Один конкретный шаг сегодня: **запиши одну гипотезу в три строки и назначь ей 20 минут проверки** — "
+        "без меню из десяти задач и без «я подумаю неделю»."
+    )
+    carousel = (
+        "Слайд 1 — Обложка: два кота-архетипа, читабельные силуэты, без текста на арте.\n"
+        "Слайд 2 — Меркурий: список, карточка, быстрый ритм «собери факты».\n"
+        "Слайд 3 — Юпитер: шире кадр, «зачем это вообще» — масштаб без пустой мишуры.\n"
+        "Слайд 4 — Вывод: шанс любит короткую дистанцию — один шаг, одна проверка."
+    )
+    compensation = (
+        "Компенсация (если разгоняет «идеями»):\n"
+        "• одна гипотеза — один критерий проверки;\n"
+        "• один таймер 20 минут — потом решение «да/нет/переформулировать»;\n"
+        "• не покупай себе неделю «исследований» вместо одного пинка в реальность;\n"
+        "• если лезет «я гений, просто мир не готов» — переведи энергию в текст/схему/звонок."
+    )
+    checklist = (
+        "Чеклист:\n"
+        "☐ В подписи есть один живой шаг на сегодня (не абстракция).\n"
+        "☐ Тон острый, но без снобизма и без оскорбления аудитории.\n"
+        "☐ Карусель читается без микро-текста на арте.\n"
+        "☐ Планетные знаки на **флагах**: **нарисованы в ткани**, канонические, крупные, читаемые на телефоне.\n"
+        "☐ Дисклеймер/юмор на месте по правилам канала?"
+    )
+    return hook, caption, carousel, compensation, checklist
 
 
 def _ru_jupiter_mars_square() -> tuple[str, str, str, str, str]:
@@ -421,9 +469,8 @@ def _ru_generic(pa: str | None, pb: str | None, asp: str | None) -> tuple[str, s
         f"а Земля всё равно просит конкретику."
     )
     caption = (
-        f"Пакет Catstyle для ручной сборки поста. Смотри на пару и тип аспекта как на метафору ритма: "
-        f"где хочется действовать, где — расширять, где — тормозить. "
-        f"Без морализаторства: просто якорь для подписи и карусели."
+        f"Лови пару и тип аспекта как метафору ритма: где хочется разогнаться, где — собрать факты, где — поставить рамку. "
+        f"Без морализаторства: одна ясная мысль, один шаг, который можно сделать сегодня без театра."
     )
     carousel = (
         "Слайд 1 — Обложка: ключевой кадр без текста на арте.\n"
@@ -443,6 +490,9 @@ def _ru_generic(pa: str | None, pb: str | None, asp: str | None) -> tuple[str, s
         "☐ Совпадает ли картинка с аспектом и тоном профиля?\n"
         "☐ Есть ли один явный посыл, без перегруза?\n"
         "☐ Карусель читается без текста на слайдах?\n"
+        "☐ Планетные знаки на **флагах**: **нарисованы в ткани** (геральдика, перспектива полотна), канонические, крупные, читаемые на телефоне; "
+        "отклонить, если любой глиф неверен, похож на руну/букву или выглядит как плавающий стикер поверх персонажей.\n"
+        "☐ (Опционально, вручную) Экспериментальный пост-оверлей `scripts/aca/apply_catstyle_symbol_overlay.py` — **не** стандартный путь публикации Catstyle.\n"
         "☐ Дисклеймер/юмор на месте по правилам канала?"
     )
     return hook, caption, carousel, compensation, checklist
@@ -501,6 +551,10 @@ class CatstylePostPackage(BaseModel):
     compensation: str
     checklist: str
     source_manifest_path: str
+    aspect_timing: CatstyleAspectTimingMetadata | None = Field(
+        default=None,
+        description="UTC timing derived from manifest scan fields (no fabricated ephemeris).",
+    )
 
 
 def build_catstyle_post_package(
@@ -511,8 +565,8 @@ def build_catstyle_post_package(
     mp = Path(manifest_path).expanduser().resolve()
     raw = load_catstyle_image_generation_manifest(mp)
 
-    date = str(raw.get("date") or "").strip()
-    if not date:
+    date_iso = str(raw.get("date") or "").strip()
+    if not date_iso:
         raise ValueError("Manifest missing required field: date")
 
     editorial_profile = str(raw.get("editorial_profile") or "balanced").strip() or "balanced"
@@ -579,6 +633,8 @@ def build_catstyle_post_package(
     profile_key = _classify_aspect_copy_profile(selected, jobs)
     if profile_key == "jupiter_mars_tension":
         hook, caption, carousel, compensation, checklist = _ru_jupiter_mars_square()
+    elif profile_key == "mercury_jupiter_sextile_flow":
+        hook, caption, carousel, compensation, checklist = _ru_mercury_jupiter_sextile_flow()
     elif profile_key == "pluto_mars_square_tension":
         hook, caption, carousel, compensation, checklist = _ru_pluto_mars_square_tension()
     elif profile_key == "venus_pluto_opposition_tension":
@@ -596,11 +652,17 @@ def build_catstyle_post_package(
     else:
         hook, caption, carousel, compensation, checklist = _ru_generic(pa_e, pb_e, asp_e)
 
-    # Prefer first job carousel_idea as EN snippet hint only when generic? User asked deterministic Russian — keep Russian carousel.
-    # Optionally append job carousel as metadata line in markdown only.
+    aspect_timing = build_aspect_timing_from_manifest(raw)
+    try:
+        post_d = date.fromisoformat(date_iso)
+    except ValueError:
+        post_d = date.today()
+    oriented = orient_outer_personal(pa_e or "", pb_e or "") if pa_e and pb_e else None
+    personal_for_timing = oriented[1] if oriented else pb_e
+    caption = append_ru_timing_to_caption(caption, aspect_timing, post_d, personal_for_timing)
 
     return CatstylePostPackage(
-        date=date,
+        date=date_iso,
         aspect_summary=aspect_summary,
         planet_a=pa_e,
         planet_b=pb_e,
@@ -622,6 +684,7 @@ def build_catstyle_post_package(
         compensation=compensation,
         checklist=checklist,
         source_manifest_path=str(mp),
+        aspect_timing=aspect_timing,
     )
 
 
@@ -669,6 +732,12 @@ def render_catstyle_post_package_markdown(pkg: CatstylePostPackage) -> str:
             json.dumps(pkg.image_jobs_summary, indent=2, ensure_ascii=False),
             "```",
             "",
+        ]
+    )
+    if pkg.aspect_timing is not None:
+        lines.extend(render_aspect_timing_markdown_section(pkg.aspect_timing).rstrip("\n").split("\n"))
+    lines.extend(
+        [
             "## Hook",
             "",
             pkg.hook,

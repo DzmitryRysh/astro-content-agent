@@ -24,6 +24,10 @@ from astro_content_agent.content.catstyle.planet_canon import (
     build_planet_canon_prompt_fragment,
     get_planet_canon as get_planet_canon_v2,
 )
+from astro_content_agent.content.catstyle.planet_glyph_registry_v1 import (
+    canonical_glyph_char,
+    format_pair_flag_glyph_system_block,
+)
 from astro_content_agent.content.catstyle.planet_identity_markers_v1 import (
     format_identity_markers_prompt_block,
     get_planet_identity_marker_profile,
@@ -69,6 +73,8 @@ _NEGATIVE_BASE_CHUNKS = [
     "flat vector icon, mobile-game icon look, simplistic educational cartoon",
     "cluttered architecture detail spam, busy background clutter, weak bland composition",
     "disconnected sticker posing, over-rendered fur strands, over-rendered material noise",
+    "malformed planetary glyphs, pseudo-symbols, fake astrological letters, distorted zodiac marks, invented sigils",
+    "floating white sticker symbols, detached glow glyphs not locked to cloth, symbols pasted over faces or torsos",
 ]
 
 _FLOW_IMAGE_OPENING_V2 = (
@@ -193,14 +199,14 @@ def _catstyle_flow_mode_visual_lock(req: CatstylePromptRequest) -> str:
         "that objective together more than a confrontational stare-down. Prefer joined motion, coordinated reach, "
         "shoulder-aligned co-reading, tandem gesture toward one shared lure. Hard ban on heroic duel/tournament clash/"
         "MMA collision framing, savage brawl staging, squared-off warrior symmetry, shoved-together combat collision, "
-        "or spectacle that reads as prizefight. Symbol discipline: at most one clear glyph or icon on a large banner "
-        "or flag; at most one compact symbol on a medallion, badge, or crown; books and maps use spare celestial diagram "
-        "lines and constellation geometry—do not spam repeated planet-glyph texture as filler. "
+        "or spectacle that reads as prizefight. **Flag glyphs:** honor **[CATSTYLE PAIR FLAG GLYPH SYSTEM v1]** from the pair block—"
+        "each planet's canonical mark is **painted into its own banner cloth** (heraldic gold / embroidery, cloth-locked, not floating stickers). "
+        "Books and maps use spare constellation geometry only—no spammed faux-glyph texture. "
         "Flow readability (mobile / Instagram): bright readable heroic poster lighting with polished comic-cover clarity—"
         "keep dark cosmic arena atmosphere but favor luminous midtones so faces, portal aperture, faction flags, and "
         "distant Earth cue stay legible on small screens; center a luminous golden opportunity portal as primary key "
-        "light with warm reflected fill washing both characters' faces; add soft cool Mercury rim light and warm Jupiter "
-        "generous fill so both read as dimensional planetary bodies; silhouettes and expressions stay crisp—avoid "
+        "light with warm reflected fill washing both characters' faces; add complementary rim and fill keyed to each "
+        "planet-cat's palette so both read as dimensional hero bodies beside their banners; silhouettes and expressions stay crisp—avoid "
         "underexposed murk, muddy shadow blobs, characters disappearing into black crush, or noir horror gloom."
     )
 
@@ -217,7 +223,8 @@ def _mercury_jupiter_flow_planetary_being_lock(req: CatstylePromptRequest, pa: s
         "before costume trims. Jupiter reads as the large banded wise expansive gas-giant planet-cat: volumetric sphere "
         "body, calm generous stance, flowing bands and soft auroral tone—recognizable as Jupiter before costume "
         "accessories. Costuming only amplifies planet identity; never replace sphere-body read with generic domestic-cat "
-        "anatomy."
+        "anatomy. "
+        "Pair-flag heraldic detail is governed globally by **[CATSTYLE PAIR FLAG GLYPH SYSTEM v1]** (see choreography block)."
     )
 
 
@@ -272,19 +279,10 @@ def _epic_arena_showdown_block(req: CatstylePromptRequest, pa: str, pb: str) -> 
     moon_saturn_hard_epic_action = ""
     if pair == {"moon", "saturn"}:
         glyph_lock = (
-            " Exact glyph + emblem recognizability lock for Moon/Saturn: prefer Moon banner exact glyph '☾' and Saturn banner exact glyph '♄' "
-            "(true Saturn symbol) on large opposite-side faction banners and/or large arena emblems as primary readable marks. "
-            "Banner identity clarity (Moon/Saturn): each primary large faction banner must immediately read Moon versus Saturn at poster distance—Moon side stays clearly lunar; "
-            "Saturn side must present unmistakable Saturn planet-cat faction identity (not a decorative generic planet marble)—pair a clean Saturn identity emblem with Saturn costume cues at readable banner scale when helpful "
-            "(wide-brim hat silhouette, pinstripe/time-structure Boss stamp, watch plaque)—so the mark lands as Saturn authority, not random sci-fi iconography. "
-            "If Saturn glyph rendering becomes unstable or unreadable, fall back to a clean Saturn identity emblem (ringed-planet silhouette / ringed sphere icon) "
-            "or another simple canonical Saturn-symbol treatment that still reads as structured restraint—not invented glyphs, random spheres, unrelated icons, "
-            "wrong glyph variants, fake letters, or substitute symbols; "
-            "prefer recognizable correctness over fragile purity; recognizability takes priority over fragile glyph purity. "
-            "Moon banner may use exact '☾' or a clean crescent emblem when needed for immediate lunar readability. "
-            "Saturn's hat badge or crown emblem may repeat exact '♄' or a clean ringed-planet Saturn emblem as a readable secondary identity anchor. "
-            "Do not use abstract invented marks, faux-alphabet glyphs, or letter-shaped stand-ins for either planet marker. "
-            "Smaller accessory glyphs/emblems are secondary only. "
+            "[MOON–SATURN EMBLEM DISCIPLINE v1 — painted banner heraldry] Opposite-side faction banners each carry **one large canonical Moon (\u263d / ☽) or Saturn (\u2644 / ♄) glyph painted into the cloth** as integrated **flat heraldic gold / embroidery**—centered, perspective-correct, following folds and light—**not** floating stickers, **not** pasted over faces. "
+            "Moon side reads lunar via pillow/silver/cool pearlescent palette and crescent **ear** staging; Saturn side reads via pinstripe/time-structure Boss cues, hat/watch plaques, stone/chain restraint—"
+            "optional simple **ringed-sphere silhouette** as abstract graphic only (not a distorted substitute for the ♄ mark). "
+            "Smaller accessory stamps stay secondary to the **banner cloth** identity. "
             " Moon/Saturn epic arena scale HARD LOCK (mandatory—monumental recession, not tight hero crop): pull the camera back further than baseline epic mode; "
             "characters must occupy slightly less of the overall frame while faces and silhouettes remain clearly readable—reduce character dominance versus architecture slightly; "
             "show substantially more readable arena floor plane plus more upper coliseum tiers, arches, and sky-opening; "
@@ -327,8 +325,8 @@ def _epic_arena_showdown_block(req: CatstylePromptRequest, pa: str, pb: str) -> 
                 "Moon motion style: Moon may pull against chain tension while giving a soft-force counter-response, preserving emotional urgency, silver-blue motion cues, and brave-but-vulnerable readability. "
                 "Composition depth continuity: avoid flat side-by-side staging; maintain overlapping depth cues, slightly offset character depth planes, and readable arena floor perspective for cinematic space. "
                 "Saturn control clarity: Saturn remains cold, heavy, restrictive, and controlling through barrier, gravity, and time-pressure symbolism; never passive Saturn, never flame/fighter/ninja styling, never reckless Mars energy. "
-                "Saturn emblem fallback continuity: prefer exact Saturn glyph '♄' where stable, and allow clean ringed-planet Saturn emblem fallback for recognizability. "
-                "Moon emblem continuity: prefer exact Moon glyph '☾' with clean crescent fallback where readability is stronger. "
+                "Saturn banner continuity: **♄ painted into Saturn's faction banner cloth** as integrated heraldic emblem—centered, cloth-locked, large enough to read at thumbnail scale. "
+                "Moon banner continuity: **☽ painted into Moon's faction banner cloth** the same way—lunar read also reinforced by pillow/silver costume cues, not by floating detached symbols. "
                 "Earth cue stability: exactly one Earth-like sphere above and behind arena; avoid duplicate Earth-like globes. "
                 "Poster continuity reinforcement: preserve movie-one-sheet readability with decisive focal hierarchy, clear silhouette breakup, and controlled detail density (characters highest, architecture medium, sky lowest). "
                 "Lighting/readability reinforcement: preserve dramatic key-to-rim sculpting on faces, paws, pillow, chain, and Saturn hat/shoulders; keep contrast punch without muddy low-mid compression. "
@@ -347,6 +345,10 @@ def _epic_arena_showdown_block(req: CatstylePromptRequest, pa: str, pb: str) -> 
                 "Negatives: weak action, loose decorative chain, unclear restraint, passive Saturn, duplicated Earth-like sky spheres, shallow pasted backdrop arena, tight portrait crop creep, "
                 "environment reduced to backdrop afterthought, washed-out painterly blur, flat mascot simplification."
             )
+    ga = canonical_glyph_char(pa)
+    gb = canonical_glyph_char(pb)
+    sa = f"{pa} ({ga})" if ga else pa
+    sb = f"{pb} ({gb})" if gb else pb
     return (
         "[SHOT/COMPOSITION PROFILE v4 - epic_arena_showdown] Mythic showdown poster framing in a ceremonial cosmic arena: "
         "heroic medium-wide to wide cinematic composition where the environment is a co-star and not background afterthought. "
@@ -358,13 +360,13 @@ def _epic_arena_showdown_block(req: CatstylePromptRequest, pa: str, pb: str) -> 
         "with more visible arena floor and more upper architecture so environment feels elevated rather than attached directly behind characters. "
         "Environment targets: clearly readable zodiac floor ring, layered coliseum walls, more visible upper arches, deep stadium tiers/perspective, "
         "additional side architectural structures, visible zodiac symbols, stronger monumental arena feeling, "
-        f"and two large readable faction banners on opposite arena sides tied to {pa} and {pb} planetary identities "
-        "(one side marker per planet; symbolic motifs only, no readable text). "
+        f"and two large readable faction banners on opposite arena sides tied to {sa} and {sb} planetary identities "
+        "(each banner shows **one large canonical planetary glyph painted into the flag cloth** as integrated heraldic gold—no readable words, no floating sticker symbols over characters). "
         "Background scale cue: include a clearly readable distant Earth or Earth-like blue-green planet with visible cloud and/or continent pattern "
         "as the human-world impact cue (audience world affected by this aspect), smaller than characters but visually legible, clearly above and behind the arena. "
         "Anti-confusion rule: do not replace the Earth impact cue with Moon/Jupiter/Mars/Saturn/or either character planet; "
-        "planet identity belongs on characters, banners, props, glyphs, and arena symbols unless explicitly overridden. "
-        "For Moon aspects specifically, keep Moon identity on the Moon character (crescent glyph, pillow/blanket language, silver aura, moonlight wave) "
+        "planet identity belongs on characters, banners, props, reserved emblem zones, and arena symbols unless explicitly overridden. "
+        "For Moon aspects specifically, keep Moon identity on the Moon character (crescent ear staging, pillow/blanket language, silver aura, moonlight wave) "
         "and avoid ambiguous moon-like background orb or large Moon sky-body as the main celestial cue when Earth impact cue is requested. "
         f"{glyph_lock}"
         f"{moon_saturn_approved_anchor}"
@@ -564,7 +566,7 @@ def _planet_cat_line(planet: str, canon: PlanetCatCanon, skin_key: str | None) -
     sk = get_character_skin(planet, sk_raw)
     overlay = (
         f" Archetype skin **{sk.display_name}** (OPTIONAL COSTUME OVERLAY ONLY — preserve the full [CANON v1 base] "
-        f"and [IDENTITY MARKERS v1] sections above: same planet, base silhouette, glyphs/placement cues, "
+        f"and [IDENTITY MARKERS v1] sections above: same planet, base silhouette, emblem-zone placement cues, "
         f"signature props/details, and recognizability rule must remain readable; "
         f"skin enhances costume/scene hooks, never replaces the planet-cat core): "
         f"costume: {sk.costume_elements}. Props: {sk.prop_elements}. Body language: {sk.body_language}. "
@@ -603,6 +605,11 @@ def _moon_saturn_visual_correction_block(pa: str, pb: str, aspect_type: str, mod
     )
 
 
+def _pair_flag_glyph_system_block(pa: str, pb: str) -> str:
+    """System-wide cloth-integrated banner glyphs for the active planet pair (all modes)."""
+    return format_pair_flag_glyph_system_block(pa, pb).strip()
+
+
 def _prompt_choreography_middleware(
     req: CatstylePromptRequest, pa: str, pb: str, pair_guard: str
 ) -> str:
@@ -611,6 +618,7 @@ def _prompt_choreography_middleware(
     if (req.mode or "").strip().lower() == "flow":
         blocks.append(_catstyle_flow_mode_visual_lock(req))
         blocks.append(_mercury_jupiter_flow_planetary_being_lock(req, pa, pb))
+    blocks.append(_pair_flag_glyph_system_block(pa, pb))
     blocks.extend(
         [
             _aspect_choreography_block(req.aspect_type, req.mode),

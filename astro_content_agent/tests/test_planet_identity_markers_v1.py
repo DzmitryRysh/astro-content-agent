@@ -69,7 +69,7 @@ def test_format_block_includes_symbol_and_must_show() -> None:
     txt = format_identity_markers_prompt_block("Mars", m, has_skin=False)
     assert "[IDENTITY MARKERS v1]" in txt
     assert "Mars glyph" in txt or "male sign" in txt.lower()
-    assert "Must remain visible:" in txt
+    assert "Staging objectives" in txt
 
 
 def test_format_block_skin_clause_when_overlay() -> None:

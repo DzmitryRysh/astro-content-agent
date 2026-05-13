@@ -8,6 +8,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from astro_content_agent.content.catstyle.models import CatstyleAspectTimingMetadata
+from astro_content_agent.services.content.catstyle_aspect_timing import render_aspect_timing_markdown_section
 from astro_content_agent.services.content.catstyle_manual_review import load_catstyle_manual_review
 from astro_content_agent.services.content.catstyle_post_package import CatstylePostPackage
 
@@ -40,6 +42,10 @@ class CatstylePublishHandoff(BaseModel):
     created_at: str = Field(
         ...,
         description="UTC ISO-8601 when the handoff artifact was created.",
+    )
+    aspect_timing: CatstyleAspectTimingMetadata | None = Field(
+        default=None,
+        description="Echo of post_package aspect_timing for producers (UTC scan-derived).",
     )
 
 
@@ -111,6 +117,7 @@ def build_catstyle_publish_handoff(package_dir: Path | str) -> CatstylePublishHa
         compensation=str(pkg.compensation or ""),
         publish_checklist=str(pkg.checklist or ""),
         created_at=created_iso,
+        aspect_timing=pkg.aspect_timing,
     )
 
 
@@ -141,25 +148,31 @@ def render_catstyle_publish_handoff_markdown(h: CatstylePublishHandoff) -> str:
         "",
         h.caption_final,
         "",
-        "## Hook",
-        "",
-        h.hook,
-        "",
-        "## Carousel text",
-        "",
-        h.carousel_text or "_(empty)_",
-        "",
-        "## Compensation",
-        "",
-        h.compensation or "_(empty)_",
-        "",
-        "## Manual publish checklist",
-        "",
-        h.publish_checklist or "_(empty)_",
-        "",
-        "## Generated images",
-        "",
     ]
+    if h.aspect_timing is not None:
+        lines.extend(render_aspect_timing_markdown_section(h.aspect_timing).rstrip("\n").split("\n"))
+    lines.extend(
+        [
+            "## Hook",
+            "",
+            h.hook,
+            "",
+            "## Carousel text",
+            "",
+            h.carousel_text or "_(empty)_",
+            "",
+            "## Compensation",
+            "",
+            h.compensation or "_(empty)_",
+            "",
+            "## Manual publish checklist",
+            "",
+            h.publish_checklist or "_(empty)_",
+            "",
+            "## Generated images",
+            "",
+        ]
+    )
     if h.generated_image_paths:
         for p in h.generated_image_paths:
             lines.append(f"- `{p}`")

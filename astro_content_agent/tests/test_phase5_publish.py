@@ -16,6 +16,7 @@ from astro_content_agent.main import create_app
 from astro_content_agent.repositories.assets import AssetRepository
 from astro_content_agent.repositories.drafts import DraftRepository
 from astro_content_agent.repositories.publish_jobs import PublishJobRepository
+from astro_content_agent.services.instagram.client import MetaAPIError
 from astro_content_agent.services.instagram.publisher import PublisherService
 from astro_content_agent.services.media.storage import LocalFileStorage
 from astro_content_agent.tests.fakes.fake_instagram import FakeInstagramClient
@@ -232,6 +233,87 @@ def test_container_creation_failure_marks_job_retryable(db_session: Session, bra
 
     assert result.succeeded is False
     assert result.publish_job.status == "queued"
+
+
+def test_execute_job_retries_meta_media_not_ready_then_succeeds(
+    db_session: Session, brand_profile, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "astro_content_agent.services.instagram.publisher.time.sleep",
+        lambda _s: None,
+    )
+    client = FakeInstagramClient(publish_not_ready_failures=2)
+    draft = _make_approved_draft(db_session, brand_profile.id)
+    account = _make_account(db_session)
+    _make_asset(db_session, draft)
+
+    svc = PublisherService(ig_client=client)
+    job = svc.create_job(db_session, draft_id=draft.id, instagram_account_id=account.id)
+    result = svc.execute_job(db_session, job_id=job.id)
+
+    assert result.succeeded is True
+    assert len(client.publish_calls) == 3
+    assert result.media_publish_attempts == 3
+
+
+def test_execute_job_exhausts_meta_media_not_ready_retries(
+    db_session: Session, brand_profile, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "astro_content_agent.services.instagram.publisher.time.sleep",
+        lambda _s: None,
+    )
+    client = FakeInstagramClient(publish_not_ready_failures=10)
+    draft = _make_approved_draft(db_session, brand_profile.id)
+    account = _make_account(db_session)
+    _make_asset(db_session, draft)
+
+    svc = PublisherService(ig_client=client)
+    job = svc.create_job(db_session, draft_id=draft.id, instagram_account_id=account.id)
+    result = svc.execute_job(db_session, job_id=job.id)
+
+    assert result.succeeded is False
+    assert len(client.publish_calls) == 5
+    assert result.publish_job.external_container_id is not None
+    assert result.meta_error is not None
+    assert result.meta_error.get("meta_error_code") == 9007
+    assert result.meta_error.get("meta_error_subcode") == 2207027
+    assert result.media_publish_attempts == 5
+
+
+def test_execute_job_non_retryable_meta_error_fails_without_publish_retries(
+    db_session: Session, brand_profile, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "astro_content_agent.services.instagram.publisher.time.sleep",
+        lambda _s: None,
+    )
+
+    class _Meta190Client:
+        def create_image_container(self, *, ig_user_id: str, image_url: str, caption: str) -> str:
+            return "cont-190"
+
+        def publish_container(self, *, ig_user_id: str, container_id: str) -> str:
+            raise MetaAPIError(
+                status_code=400,
+                url="https://graph.instagram.com/x?access_token=<REDACTED>",
+                response_text="{}",
+                meta_error_code=190,
+                meta_error_subcode=None,
+                meta_error_message="Invalid OAuth",
+            )
+
+    draft = _make_approved_draft(db_session, brand_profile.id)
+    account = _make_account(db_session)
+    _make_asset(db_session, draft)
+
+    svc = PublisherService(ig_client=_Meta190Client())
+    job = svc.create_job(db_session, draft_id=draft.id, instagram_account_id=account.id)
+    result = svc.execute_job(db_session, job_id=job.id)
+
+    assert result.succeeded is False
+    assert result.meta_error is not None
+    assert result.meta_error.get("meta_error_code") == 190
 
 
 def test_retry_skips_container_creation_when_container_id_stored(db_session: Session, brand_profile) -> None:

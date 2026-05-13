@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
@@ -19,6 +20,25 @@ logger = logging.getLogger(__name__)
 
 MAX_ATTEMPTS = 3
 
+# Instagram returns 400 / code=9007 / subcode=2207027 when media_publish runs before the
+# container is ready ("Media ID is not available"). Retry media_publish with bounded backoff.
+META_MEDIA_NOT_READY_CODE = 9007
+META_MEDIA_NOT_READY_SUBCODE = 2207027
+MEDIA_PUBLISH_MAX_ATTEMPTS = 5
+MEDIA_PUBLISH_NOT_READY_BACKOFF_SEC = 5.0
+
+
+def _is_meta_media_not_ready_error(exc: BaseException) -> bool:
+    if not isinstance(exc, MetaAPIError):
+        return False
+    if exc.meta_error_code != META_MEDIA_NOT_READY_CODE:
+        return False
+    try:
+        sub = int(exc.meta_error_subcode) if exc.meta_error_subcode is not None else None
+    except (TypeError, ValueError):
+        return False
+    return sub == META_MEDIA_NOT_READY_SUBCODE
+
 
 @dataclass(frozen=True)
 class PublishResult:
@@ -27,6 +47,8 @@ class PublishResult:
     succeeded: bool
     error: str | None = None
     meta_error: dict | None = None
+    # How many ``publish_container`` calls were made in this ``execute_job`` (includes retries).
+    media_publish_attempts: int | None = None
 
 
 @dataclass(frozen=True)
@@ -80,6 +102,37 @@ class PublisherService:
             post_repo=PublishedPostRepository(),
             container_builder=ContainerBuilder(url_resolver=url_resolver),
         )
+
+    def _publish_container_with_not_ready_retries(
+        self,
+        *,
+        ig_user_id: str,
+        container_id: str,
+    ) -> tuple[str, int]:
+        """Call ``publish_container``; retry on Meta *container not ready* (9007 / 2207027)."""
+        last_exc: MetaAPIError | None = None
+        for attempt in range(1, MEDIA_PUBLISH_MAX_ATTEMPTS + 1):
+            try:
+                ig_media_id = self._client.publish_container(
+                    ig_user_id=ig_user_id,
+                    container_id=container_id,
+                )
+                return ig_media_id, attempt
+            except MetaAPIError as e:
+                last_exc = e
+                if _is_meta_media_not_ready_error(e) and attempt < MEDIA_PUBLISH_MAX_ATTEMPTS:
+                    logger.warning(
+                        "IG media_publish not ready (code=%s subcode=%s); sleeping %.1fs before retry %s/%s",
+                        e.meta_error_code,
+                        e.meta_error_subcode,
+                        MEDIA_PUBLISH_NOT_READY_BACKOFF_SEC,
+                        attempt + 1,
+                        MEDIA_PUBLISH_MAX_ATTEMPTS,
+                    )
+                    time.sleep(MEDIA_PUBLISH_NOT_READY_BACKOFF_SEC)
+                    continue
+                raise
+        raise AssertionError("unreachable") from last_exc
 
     def create_job(
         self,
@@ -153,8 +206,8 @@ class PublisherService:
                 self._deps.job_repo.store_container_id(db, job, container_id=container_id)
                 db.commit()
 
-            # Step 2: publish the container
-            ig_media_id = self._client.publish_container(
+            # Step 2: publish the container (retry if Meta reports container not ready yet)
+            ig_media_id, media_publish_attempts = self._publish_container_with_not_ready_retries(
                 ig_user_id=account.ig_user_id,
                 container_id=container_id,
             )
@@ -173,7 +226,12 @@ class PublisherService:
             db.refresh(job)
             db.refresh(published_post)
             logger.info("Published draft=%s ig_media_id=%s", job.draft_id, ig_media_id)
-            return PublishResult(publish_job=job, published_post=published_post, succeeded=True)
+            return PublishResult(
+                publish_job=job,
+                published_post=published_post,
+                succeeded=True,
+                media_publish_attempts=media_publish_attempts,
+            )
 
         except Exception as exc:
             error_msg = str(exc)
@@ -182,6 +240,7 @@ class PublisherService:
             db.commit()
             db.refresh(job)
             meta_payload = None
+            media_publish_attempts: int | None = None
             if isinstance(exc, MetaAPIError):
                 meta_payload = {
                     "meta_status_code": exc.status_code,
@@ -193,10 +252,13 @@ class PublisherService:
                     "meta_error_message": exc.meta_error_message,
                     "meta_url": exc.url,
                 }
+                if _is_meta_media_not_ready_error(exc):
+                    media_publish_attempts = MEDIA_PUBLISH_MAX_ATTEMPTS
             return PublishResult(
                 publish_job=job,
                 published_post=None,
                 succeeded=False,
                 error=error_msg,
                 meta_error=meta_payload,
+                media_publish_attempts=media_publish_attempts,
             )

@@ -82,6 +82,10 @@ def build_catstyle_art_direction_profile(
 
 def composition_line(*, render_style_profile_key: str | None = None, mode: str | None = None) -> str:
     m = (mode or "").strip().lower()
+    _flag_emblem = (
+        " Pair-poster flags: each planet's **canonical glyph is painted into its own banner cloth** as large heraldic gold—"
+        "woven with folds, perspective, and lighting—never floating sticker symbols over characters."
+    )
     if m == "flow":
         if render_style_profile_key == "premium_comic_poster_v2":
             return (
@@ -92,7 +96,8 @@ def composition_line(*, render_style_profile_key: str | None = None, mode: str |
                 "legible at small crop with polished comic-cover clarity—never murky darkness. "
                 "Keep backgrounds simplified relative to characters: arena + zodiac floor readable and epic, but lower "
                 "detail density than focal bodies."
-                " Keep each planet's [IDENTITY MARKERS v1] symbol/prop stamps readable at thumbnail scale beside faces/bodies."
+                " Keep each planet's [IDENTITY MARKERS v1] prop stamps and reserved emblem zones readable at thumbnail scale beside faces/bodies."
+                + _flag_emblem
             )
         return (
             "Cinematic comic-panel composition with poster-like clarity: allied staging toward one shared objective, "
@@ -101,7 +106,8 @@ def composition_line(*, render_style_profile_key: str | None = None, mode: str |
             "Not a flat mascot pose, not a centered sticker-like character floating in empty space—"
             "stage the beat like a premium comic panel or movie one-sheet while staying cartony flat-color Catstyle "
             "(never photoreal, never glossy prestige portrait). "
-            "Keep each planet's [IDENTITY MARKERS v1] symbol/prop stamps readable at thumbnail scale beside faces/bodies."
+            "Keep each planet's [IDENTITY MARKERS v1] prop stamps and reserved emblem zones readable at thumbnail scale beside faces/bodies."
+            + _flag_emblem
         )
     if render_style_profile_key == "premium_comic_poster_v2":
         return (
@@ -109,7 +115,7 @@ def composition_line(*, render_style_profile_key: str | None = None, mode: str |
             "foreground-heavy duel staging with authoritative poses, decisive FG/MG/BG separation and impactful depth—"
             "reject centered sticker mascots floating on empty flats. Keep backgrounds simplified relative to characters: "
             "arena + zodiac floor readable and epic, but lower detail density than focal bodies."
-            " Keep each planet's [IDENTITY MARKERS v1] symbol/prop stamps readable at thumbnail scale beside faces/bodies."
+            " Keep each planet's [IDENTITY MARKERS v1] prop stamps and reserved emblem zones readable at thumbnail scale beside faces/bodies."
         )
     return (
         "Cinematic comic-panel composition with poster-like clarity: strong silhouette readability, "
@@ -117,7 +123,7 @@ def composition_line(*, render_style_profile_key: str | None = None, mode: str |
         "Not a flat mascot pose, not a centered sticker-like character floating in empty space—"
         "stage the beat like a premium comic panel or movie one-sheet while staying cartony flat-color Catstyle "
         "(never photoreal, never glossy prestige portrait). "
-        "Keep each planet's [IDENTITY MARKERS v1] symbol/prop stamps readable at thumbnail scale beside faces/bodies."
+        "Keep each planet's [IDENTITY MARKERS v1] prop stamps and reserved emblem zones readable at thumbnail scale beside faces/bodies."
     )
 
 
@@ -309,6 +315,9 @@ def strengthen_negative_prompt(
                 "black-crushed unreadable background",
                 "characters disappearing into darkness",
                 "overly dark noir lighting",
+                "malformed astrological glyphs painted in-image",
+                "pseudo-runes or fake zodiac letters on flags",
+                "floating planetary glyph stickers pasted over faces or bodies instead of woven into flag cloth",
             ]
             merged = _dedupe_keep_order(merged + flow_extra)
         return ", ".join(merged)
@@ -355,6 +364,9 @@ def strengthen_negative_prompt(
                 "black-crushed unreadable background",
                 "characters disappearing into darkness",
                 "overly dark noir lighting",
+                "malformed astrological glyphs painted in-image",
+                "pseudo-runes or fake zodiac letters on flags",
+                "floating planetary glyph stickers pasted over faces or bodies instead of woven into flag cloth",
             ]
         )
     return ", ".join(_dedupe_keep_order([c for c in chunks if c]))

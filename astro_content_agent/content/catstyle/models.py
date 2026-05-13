@@ -296,3 +296,38 @@ class CatstyleDailyPackResult(BaseModel):
     prompt_packs: list[dict]
     primary_candidate: dict | None = None
     secondary_supportive_candidate: dict | None = None
+
+
+CatstyleAspectTimingPhase = Literal["applying", "exact", "separating", "unknown"]
+
+CatstyleAspectTimingStatus = Literal[
+    "sky_window_utc",
+    "orb_only_estimate",
+    "missing_exact_window",
+    "estimated",
+]
+
+
+class CatstyleAspectTimingMetadata(BaseModel):
+    """UTC timing slice for Catstyle posts, derived from manifest scan fields only."""
+
+    timing_status: CatstyleAspectTimingStatus
+    window_start_utc: str | None = None
+    peak_at_utc: str | None = None
+    exact_at_utc: str | None = Field(
+        default=None,
+        description="Same instant as peak_at_utc when peak comes from closest_hour_utc in scan data.",
+    )
+    window_end_utc: str | None = None
+    orb_at_post_date: float | None = None
+    phase: CatstyleAspectTimingPhase = "unknown"
+    timezone_note: str = Field(default="UTC", description="All instants are UTC unless a downstream channel localizes.")
+    sky_scan_mode: str | None = None
+    sky_scan_step_hours_utc: int | None = None
+    data_source: str = Field(
+        default="manifest_selected_candidate_v1",
+        description=(
+            "Provenance: manifest_selected_candidate_v1 | manual_override_with_timing_v1 | "
+            "manual_override_no_sky_match_v1 | manifest_manual_override_v1."
+        ),
+    )

@@ -22,20 +22,20 @@ PLANET_IDENTITY_MARKER_PROFILES: dict[str, PlanetIdentityMarkerProfile] = {
         planet_name="Sun",
         planet_symbol="\u2609",
         symbol_name="Sun glyph",
-        primary_marker="Warm solar medallion or chest emblem (flat icon)",
+        primary_marker="Warm solar chest emblem zone or crown medallion plate (blank flat emblem-ready panel)",
         secondary_marker="Tiny corona rim line echo on silhouette",
         signature_prop="Director chair fold-line or stage medallion collar",
         placement_rules=[
-            "Place sun glyph on chest emblem, crown band, or collar medallion - never tiny illegible speck.",
-            "Keep emblem large enough to read at thumbnail scale beside the face.",
+            "Reserve a large flat emblem-ready panel on chest emblem, crown band, or collar medallion—never a tiny speck.",
+            "Keep emblem zone large enough for large integrated banner glyph at thumbnail scale beside the face.",
         ],
         must_show_markers=[
-            "Visible Sun glyph OR unmistakable corona+crown staging tied to Sun identity.",
+            "Warm regal staging with blank solar medallion/crown stamp zone OR unmistakable corona+crown read without painted Sun glyph pixels.",
             "Warm gold palette cue from canon remains visible.",
         ],
         optional_label_ideas=["crown stud chip", "spotlight oval rim behind head"],
         visual_read_rule=(
-            "Keep Sun identity readable in every scene: visible Sun glyph on emblem/crown/medallion plus regal warm staging."
+            "Keep Sun identity readable: blank emblem-ready solar medallion/crown zone plus regal warm staging—when a solar banner appears, paint ☉ into the cloth as integrated heraldry."
         ),
         avoid_marker_mistakes=[
             "Replacing Sun read with generic lion only",
@@ -43,235 +43,241 @@ PLANET_IDENTITY_MARKER_PROFILES: dict[str, PlanetIdentityMarkerProfile] = {
             "Cool monochrome hero with no warm solar cue",
         ],
         short_prompt_line=(
-            "Sun read: chest/crown Sun glyph + warm corona cue - leader medallion, not vague sparkle."
+            "Sun read: blank chest/crown emblem panel + warm corona cue—leader medallion zone, not vague sparkle."
         ),
     ),
     "Moon": PlanetIdentityMarkerProfile(
         planet_name="Moon",
-        planet_symbol="\u263e",
-        symbol_name="Moon crescent glyph",
-        primary_marker="Crescent mark on pillow corner, blanket fold, or sleepwear pin",
+        planet_symbol="\u263d",
+        symbol_name="Moon crescent glyph (☽)",
+        primary_marker="Crescent-shaped blank stamp zone on pillow corner, blanket fold, or sleepwear pin (emblem-ready)",
         secondary_marker="Tide-line belly stripe from canon",
         signature_prop="Soft pillow + pled blanket fold with optional crescent chip",
         placement_rules=[
-            "Moon glyph sits on pillow embroidery patch, blanket corner, or hairpin - flat graphic.",
+            "Reserve one flat embroidery patch, blanket corner stamp disk, or hairpin medallion—keep the stamp area clear for cloth-integrated emblem art.",
             "One placement only - do not scatter many moons.",
         ],
         must_show_markers=[
-            "Visible crescent glyph OR clear pillow+pled nest with crescent ear tufts from canon.",
+            "Cozy pillow+pled nest with blank lunar stamp zone OR crescent ear tufts from canon—no painted crescent glyph pixels in-image.",
             "Cool pearlescent palette cue remains.",
         ],
         optional_label_ideas=["felt star lure chip", "sleep mask band"],
         visual_read_rule=(
-            "Keep Moon identity readable: crescent glyph on soft goods OR unmistakable cozy nest + crescent ears."
+            "Keep Moon identity readable: blank lunar stamp zone on soft goods OR unmistakable cozy nest + crescent ears—integrated canon glyph on that planet's banner when flags appear."
         ),
         avoid_marker_mistakes=[
             "Night sky filled with dozens of moon shapes",
             "Horror hollow eyes tied only to moon shape",
         ],
-        short_prompt_line="Moon read: crescent on pillow/pled/pin - cozy nest staging, one clear glyph.",
+        short_prompt_line="Moon read: blank pillow/pled stamp patch + nest staging—☽ integrated on Moon banner cloth when shown—not floating sticker glyphs.",
     ),
     "Mercury": PlanetIdentityMarkerProfile(
         planet_name="Mercury",
         planet_symbol="\u263f",
-        symbol_name="Mercury glyph",
-        primary_marker="Tiny Mercury mark on glasses temple, pen cap, or messenger flap",
-        secondary_marker="Notepad corner seal (blank)",
+        symbol_name="Mercury glyph (☿)",
+        primary_marker="Mercury faction banner: large centered **\u263f (☿)** painted **into the flag cloth** as flat heraldic gold / embroidery—follows folds and light (not a floating sticker)",
+        secondary_marker="Glasses + satchel + note-card student cluster from canon",
         signature_prop="Messenger bag flap pin + pencil from canon",
         placement_rules=[
-            "Glyph on glasses case edge, pen ferrule disk, or bag clasp plate - flat stamp.",
-            "Keep student/analyst props clustered - avoid prop haystack.",
+            "Banner glyph must read as **canonical ☿**: circle with small crescent/horns above and cross below—centered on Mercury's left/port banner field in pair shots.",
+            "Keep student props clustered; do not shrink the banner emblem to an unreadable speck.",
         ],
         must_show_markers=[
-            "Visible Mercury glyph OR glasses+satchel+note card trio clearly Mercury-coded.",
+            "Glasses+satchel+note-card trio clearly Mercury-coded **and** Mercury's faction flag shows **one large integrated ☿** in the cloth (heraldic treatment, perspective-correct).",
         ],
         optional_label_ideas=["stamp on star-map card corner"],
         visual_read_rule=(
-            "Keep Mercury identity readable: Mercury glyph on stationery/bag/glasses plus nimble student props."
+            "Keep Mercury identity readable: **☿ on Mercury's own banner** as in-scene heraldry plus nimble student props—never a pasted white sticker hovering over the muzzle."
         ),
         avoid_marker_mistakes=[
             "Readable checklist text",
             "Too many competing stamps",
+            "Distorted pseudo-Mercury marks, random runes, or letters pretending to be ☿",
         ],
-        short_prompt_line="Mercury read: glyph on glasses/pen/bag - messenger-student stamp cluster.",
+        short_prompt_line=(
+            "Mercury read: **☿** integrated on Mercury's banner cloth—student props cluster; no floating sticker glyphs."
+        ),
     ),
     "Venus": PlanetIdentityMarkerProfile(
         planet_name="Venus",
         planet_symbol="\u2640",
         symbol_name="Venus glyph",
-        primary_marker="Venus mark on clasp, handbag plate, mirror back, or single jewelry accent",
+        primary_marker="Blank fashion clasp plate, handbag medallion, mirror back disk, or single jewelry accent (emblem-ready)",
         secondary_marker="Rose stem + pearl strand from canon (keep minimal)",
-        signature_prop="Exactly one refined accessory focal carrying the glyph",
+        signature_prop="Exactly one refined accessory focal with reserved flat stamp zone (no painted Venus glyph pixels)",
         placement_rules=[
-            "Choose ONE primary placement for the Venus glyph - clasp, mirror back, or gem pin face.",
-            "Fashion silhouette stays elegant - glyph reads at thumbnail without extra bling.",
+            "Choose ONE primary blank medallion/clasp zone for cloth-integrated emblem—clasp, mirror back, or gem pin face kept clean.",
+            "Fashion silhouette stays elegant—stamp zone large enough for a clear cloth emblem without micro-filigree clutter.",
         ],
         must_show_markers=[
-            "Visible Venus glyph on accessory OR rose+pearl pairing with one glyph stamp.",
-            "Never overload: respect canon one-accent rule alongside glyph.",
+            "Rose+pearl pairing with one blank emblem-ready accessory stamp zone (no readable Venus glyph pixels in-image).",
+            "Never overload: respect canon one-accent rule alongside reserved stamp zone.",
         ],
         optional_label_ideas=["ribbon buckle chip", "compact clutch plate"],
         visual_read_rule=(
-            "Keep Venus identity readable: Venus glyph on fashion detail plus elegant silhouette - one refined focal."
+            "Keep Venus identity readable: blank fashion stamp zone plus elegant silhouette—integrated canon glyph on that planet's banner when flags appear."
         ),
         avoid_marker_mistakes=[
             "Stacking many luxury props",
             "Micro-filigree glyph lost at small size",
             "Readable brand marks",
         ],
-        short_prompt_line="Venus read: female-sign on clasp/mirror/pin - chic minimal, never glam clutter.",
+        short_prompt_line="Venus read: blank clasp/mirror/pin medallion—chic minimal; integrated heraldic glyph on faction banner when visible.",
     ),
     "Mars": PlanetIdentityMarkerProfile(
         planet_name="Mars",
         planet_symbol="\u2642",
         symbol_name="Mars male sign glyph",
-        primary_marker="Mars glyph as shoulder tattoo, shield emblem, or armor plaque",
+        primary_marker="Blank shoulder stamp patch, shield boss, or armor plaque (emblem-ready; no painted Mars glyph pixels)",
         secondary_marker="Foam weapon motif plane carrying matching emblem chip",
         signature_prop="Bandana + flame tuft + bitten ear nick from canon (always)",
         placement_rules=[
-            "Glyph on skin patch, shield face, belt plate, or pauldron - high contrast flat icon.",
-            "If shield exists, emblem occupies center mass - not edge sliver.",
+            "Reserve a centered flat emblem boss on skin patch, shield face, belt plate, or pauldron—keep boss clear for cloth-integrated emblem.",
+            "If shield exists, emblem boss occupies center mass - not edge sliver.",
         ],
         must_show_markers=[
-            "Visible Mars glyph (tattoo, shield, or armor mark)",
+            "Blank fight-ready emblem boss on tattoo/shield/armor (no readable Mars glyph pixels in-image)",
             "Bandana knot visible",
             "Tiny flame ear tuft visible",
             "Bitten ear nick visible",
         ],
         optional_label_ideas=["helm crest chip", "gauntlet buckle stamp"],
         visual_read_rule=(
-            "Keep Mars identity readable in every scene: visible Mars symbol plus bandana, flame tuft, and bitten ear nick."
+            "Keep Mars identity readable: blank emblem boss plus bandana, flame tuft, and bitten ear nick—integrated canon glyph on that planet's banner when flags appear."
         ),
         avoid_marker_mistakes=[
             "Hiding all Mars cues under helmet without emblem elsewhere",
             "Realistic gore tied to emblem",
         ],
         short_prompt_line=(
-            "Mars read: male-sign tattoo/shield/armor + bandana + flame tuft + ear nick - fight-ready stamp."
+            "Mars read: blank shield/armor stamp boss + bandana + flame tuft + ear nick; integrated heraldic glyph on faction banner when visible."
         ),
     ),
     "Jupiter": PlanetIdentityMarkerProfile(
         planet_name="Jupiter",
         planet_symbol="\u2643",
-        symbol_name="Jupiter glyph",
-        primary_marker="Jupiter mark on book cover seal, robe clasp, brooch, or ring face",
-        secondary_marker="Laurel outline chip pairing with glyph",
+        symbol_name="Jupiter glyph (♃)",
+        primary_marker="Jupiter faction banner: large centered **\u2643 (♃)** painted **into the flag cloth** as flat heraldic gold / embroidery—follows folds and rim light (not a floating sticker)",
+        secondary_marker="Laurel outline chip near banner hoist (abstract motif only)",
         signature_prop="Open wisdom book + pointer from canon",
         placement_rules=[
-            "Glyph on book seal, clasp, or brooch - centered readable silhouette.",
-            "Keep sage/teaching props adjacent so glyph reads as Jupiter authority.",
+            "Banner glyph must read as **canonical ♃**: stylized **number-4** structure with **curved upper stroke** and **cross-like lower stroke**—centered on Jupiter's right/starboard banner in pair shots.",
+            "Reject hook-shapes, Latin **J**, lambda **\u039b**, random runes, or lumpy pseudo-symbols masquerading as Jupiter.",
         ],
         must_show_markers=[
-            "Visible Jupiter glyph OR book+brooch pairing with clear glyph stamp.",
+            "Open wisdom book + pointer with sage silhouette **and** Jupiter's faction flag shows **one large integrated ♃** in the cloth (heraldic treatment, perspective-correct).",
             "Big-cheek sage silhouette from canon remains.",
         ],
         optional_label_ideas=["lecture baton end cap disk"],
         visual_read_rule=(
-            "Keep Jupiter identity readable: Jupiter glyph on teaching regalia plus sage book/pointer staging."
+            "Keep Jupiter identity readable: **♃ on Jupiter's own banner** as in-scene heraldry plus sage book/pointer—never a pasted sticker over the face."
         ),
         avoid_marker_mistakes=[
             "Readable textbook pages",
             "Tiny lost glyph on busy robe pattern",
+            "♃ distorted into hook, J, lambda, or invented sigil",
         ],
-        short_prompt_line="Jupiter read: glyph on book seal/clasp/brooch - sage teacher medallion.",
+        short_prompt_line=(
+            "Jupiter read: **♃** integrated on Jupiter's banner cloth—sage book/pointer; canonical 4-like cross structure."
+        ),
     ),
     "Saturn": PlanetIdentityMarkerProfile(
         planet_name="Saturn",
         planet_symbol="\u2644",
         symbol_name="Saturn glyph",
-        primary_marker="Saturn mark on wristwatch face center, cufflink, hat band plaque, or belt buckle",
-        secondary_marker="Ring-hoop belt echo beside glyph",
+        primary_marker="Blank watch dial center disk, cufflink face, hat band plaque, or belt buckle boss (emblem-ready)",
+        secondary_marker="Ring-hoop belt echo beside reserved stamp zone",
         signature_prop="Wide-brim hat + blank watch from canon",
         placement_rules=[
-            "Glyph replaces dial center icon OR sits on hat band plaque - crisp contrast.",
-            "Keep business-structure silhouette while placing glyph.",
+            "Keep watch dial center open for integrated cloth emblem OR clean hat band plaque disk—crisp contrast, no painted Saturn glyph pixels.",
+            "Keep business-structure silhouette while reserving stamp zone.",
         ],
         must_show_markers=[
-            "Visible Saturn glyph on watch/cuff/hat/belt OR structured hat+watch with glyph on accessory.",
+            "Structured hat+watch with blank time/structure accessory stamp zone (no readable Saturn glyph pixels in-image).",
         ],
         optional_label_ideas=["briefcase clasp medallion"],
         visual_read_rule=(
-            "Keep Saturn identity readable: Saturn glyph on time/structure accessory plus hat/pinstripe boss read."
+            "Keep Saturn identity readable: blank stamp zone on time/structure accessory plus hat/pinstripe boss read—integrated canon glyph on that planet's banner when flags appear."
         ),
         avoid_marker_mistakes=[
             "Readable clock numerals",
-            "Glyph shrunk inside watch bezel unreadably",
+            "Stamp zone shrunk inside watch bezel unreadably",
         ],
-        short_prompt_line="Saturn read: glyph on watch/hat plaque/belt - time-and-structure boss stamp.",
+        short_prompt_line="Saturn read: blank watch/hat/belt stamp boss—structure boss; integrated heraldic glyph on faction banner when visible.",
     ),
     "Uranus": PlanetIdentityMarkerProfile(
         planet_name="Uranus",
         planet_symbol="\u2645",
         symbol_name="Uranus glyph",
-        primary_marker="Uranus mark as neon patch, hoop earring disk, jacket back patch, or portal rim stamp",
-        secondary_marker="Lightning tail tip echo near glyph",
+        primary_marker="Blank neon patch disk, hoop earring face, jacket back patch, or portal rim medallion (emblem-ready)",
+        secondary_marker="Lightning tail tip echo near reserved stamp zone (abstract)",
         signature_prop="Electric portal hoop from canon",
         placement_rules=[
-            "Glyph sits on glowing patch, earring face, or portal ring stamp - high contrast.",
+            "Reserve clean glowing patch / earring / portal rim stamp disk—no painted Uranus glyph pixels.",
             "Pair with punk silhouette - avoid washing out under jacket folds.",
         ],
         must_show_markers=[
-            "Visible Uranus glyph OR portal hoop with Uranus stamp on rim/patch.",
+            "Portal hoop with blank rim/patch stamp zone OR punk electric palette with one emblem-ready disk.",
         ],
         optional_label_ideas=["sneaker strap buckle plate"],
         visual_read_rule=(
-            "Keep Uranus identity readable: Uranus glyph on neon/patch/earring/portal plus punk electric palette."
+            "Keep Uranus identity readable: blank stamp zone on neon/patch/earring/portal plus punk electric palette—integrated canon glyph on that planet's banner when flags appear."
         ),
         avoid_marker_mistakes=[
             "Readable graffiti words",
-            "Glyph lost in chaotic pattern spam",
+            "Stamp zone lost in chaotic pattern spam",
         ],
-        short_prompt_line="Uranus read: glyph on neon patch/earring/portal rim - punk electric badge.",
+        short_prompt_line="Uranus read: blank neon/portal stamp disk—punk electric badge; integrated heraldic glyph on faction banner when visible.",
     ),
     "Neptune": PlanetIdentityMarkerProfile(
         planet_name="Neptune",
         planet_symbol="\u2646",
         symbol_name="Neptune glyph",
-        primary_marker="Neptune glyph on trident head, staff disk, wave buckle, or fog medallion",
-        secondary_marker="Twin bubbles + single tiny fish shape supporting glyph placement",
+        primary_marker="Blank trident head disk, staff top medallion, wave buckle boss, or fog medallion (emblem-ready)",
+        secondary_marker="Twin bubbles + single tiny fish shape framing reserved stamp zone",
         signature_prop="Quiet trident/wave ornament + fog pocket from canon tone",
         placement_rules=[
-            "Glyph on trident plane, staff top disk, or belt wave plaque - flat graphic.",
+            "Reserve flat disk on trident plane, staff top, or belt wave plaque—no painted Neptune glyph pixels.",
             "Pair bubbles/fish as framing only - do not crowd schools.",
         ],
         must_show_markers=[
-            "Visible Neptune glyph OR trident/wave ornament with Neptune stamp plus bubble/fish motif.",
+            "Trident/wave ornament with blank stamp disk plus bubble/fish motif (no readable Neptune glyph pixels in-image).",
             "Misty outline read from canon preserved.",
         ],
         optional_label_ideas=["bottle cap seal disk", "surf sash buckle"],
         visual_read_rule=(
-            "Keep Neptune identity readable: Neptune glyph on trident/wave accessory plus bubbles/fish support cues."
+            "Keep Neptune identity readable: blank trident/wave stamp zone plus bubbles/fish support cues—integrated canon glyph on that planet's banner when flags appear."
         ),
         avoid_marker_mistakes=[
-            "Busy fish swarm hiding glyph",
-            "Hyperreal water simulation obscuring symbol",
+            "Busy fish swarm hiding stamp zone",
+            "Hyperreal water simulation obscuring emblem disk",
         ],
-        short_prompt_line="Neptune read: glyph on trident/wave disk - bubbles/fish frame, fog stays minimal.",
+        short_prompt_line="Neptune read: blank trident/wave disk—bubbles/fish frame; integrated heraldic glyph on faction banner when visible.",
     ),
     "Pluto": PlanetIdentityMarkerProfile(
         planet_name="Pluto",
         planet_symbol="\u2647",
         symbol_name="Pluto glyph",
-        primary_marker="Pluto glyph on cauldron face, amulet disk, glove plate, or shadow sigil plaque",
-        secondary_marker="Spiral pupil echo beside stamped glyph (readable cartoon)",
+        primary_marker="Blank cauldron face disk, amulet face, glove back plaque, or shadow sigil medallion (emblem-ready)",
+        secondary_marker="Spiral pupil echo beside reserved stamp zone (readable cartoon)",
         signature_prop="Mini cauldron + spike cuffs + shadow smoke wisps from canon",
         placement_rules=[
-            "Glyph on cauldron belly, pendant face, or glove back - high contrast flat stamp.",
-            "Shadow wisps frame glyph - never obscure it entirely.",
+            "Reserve high-contrast flat stamp on cauldron belly, pendant face, or glove back—no painted Pluto glyph pixels.",
+            "Shadow wisps frame stamp zone - never obscure it entirely.",
         ],
         must_show_markers=[
-            "Visible Pluto glyph OR cauldron/amulet with clear Pluto stamp.",
+            "Cauldron/amulet with blank underworld stamp disk OR glove plaque open for integrated cloth emblem if shown.",
             "Spiral eyes + shadow smoke intensity from canon preserved.",
         ],
         optional_label_ideas=["cloak clasp octagon", "ritual spoon handle disk"],
         visual_read_rule=(
-            "Keep Pluto identity readable: Pluto glyph on cauldron/amulet/glove/shadow plaque plus spiral-eye cue."
+            "Keep Pluto identity readable: blank cauldron/amulet/glove/shadow stamp zone plus spiral-eye cue—integrated canon glyph on that planet's banner when flags appear."
         ),
         avoid_marker_mistakes=[
             "Readable occult words",
-            "Gore tied to glyph area",
+            "Gore tied to stamp zone",
         ],
-        short_prompt_line="Pluto read: glyph on cauldron/amulet/glove - underworld stamp with spiral-eye cue.",
+        short_prompt_line="Pluto read: blank cauldron/amulet/glove stamp—underworld disk; integrated heraldic glyph on faction banner when visible.",
     ),
 }
 
@@ -291,20 +297,29 @@ def format_identity_markers_prompt_block(
     if has_skin:
         skin_clause = (
             " Skin/costume overlay is optional: preserve this entire marker block alongside [CANON v1 base] "
-            "- place glyph on armor, shield face, gear plaque, tattoo, fabric patch, or jewelry plane so symbol stays readable."
+            "- keep armor/shield/jewelry secondary to **large integrated banner glyphs**; avoid competing fake runes on small props."
         )
+    glyph_tail = (
+        " [PLANET GLYPH HERALDRY v1 — painted into the scene] When this planet carries a visible **faction flag or parade banner**, "
+        f"paint **one large canonical astrological glyph** ({marker.planet_symbol} — {marker.symbol_name}) **into the flag cloth** as part of the illustration: "
+        "centered on the cloth field, **flat heraldic gold paint or embroidered-thread emblem**, warped with **fabric folds, perspective, and key light** "
+        "(not a floating white sticker, not a detached glow hovering over characters, not pasted across faces/foreheads/muzzles or torsos unless the shot is explicitly medallion-focused). "
+        "Reject malformed planetary signs, pseudo-glyphs, fake letters, random occult runes, or sticker-like symbols that ignore cloth physics."
+    )
     return (
         f"[IDENTITY MARKERS v1] for {planet}:{skin_clause} "
-        f"- Planet symbol: {marker.planet_symbol} ({marker.symbol_name}). "
+        f"- Canonical glyph to render **on this planet's own banner cloth** when flags appear: "
+        f"{marker.planet_symbol} ({marker.symbol_name}). "
         f"- Primary marker: {marker.primary_marker}. "
         f"- Secondary marker: {marker.secondary_marker}. "
         f"- Signature prop: {marker.signature_prop}. "
         f"- Placement guidance: {placement}. "
-        f"- Must remain visible: {must_show}. "
+        f"- Staging objectives (achieve without painted glyph pixels—props + blank stamp zones): {must_show}. "
         f"- Optional accent ideas: {optional}. "
         f"- Visual read rule: {marker.visual_read_rule}. "
         f"- Avoid marker mistakes: {avoid_m}. "
         f"- Compact cue: {marker.short_prompt_line}"
+        f"{glyph_tail}"
     )
 
 

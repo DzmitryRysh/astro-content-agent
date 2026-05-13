@@ -802,24 +802,23 @@ def test_epic_arena_showdown_profile_includes_environment_scale_and_readable_sub
     assert "additional side architectural structures" in blob
     assert "stronger monumental arena feeling" in blob
     assert "two large readable faction banners on opposite arena sides" in blob
-    assert "one side marker per planet" in blob
+    assert "painted into the flag cloth" in blob
     assert "clearly readable distant earth or earth-like blue-green planet" in blob
     assert "visible cloud and/or continent pattern" in blob
     assert "human-world impact cue" in blob
     assert "smaller than characters but visually legible" in blob
     assert "clearly above and behind the arena" in blob
     assert "do not replace the earth impact cue with moon/jupiter/mars/saturn" in blob
-    assert "planet identity belongs on characters, banners, props, glyphs, and arena symbols" in blob
+    assert "planet identity belongs on characters, banners, props, reserved emblem zones, and arena symbols" in blob
     assert "for moon aspects specifically" in blob
     assert "avoid ambiguous moon-like background orb" in blob
     assert "large moon sky-body as the main celestial cue" in blob
-    assert "exact glyph + emblem recognizability lock for moon/saturn" in blob
-    assert "prefer moon banner exact glyph '☾'" in blob
-    assert "saturn banner exact glyph '♄'" in blob
-    assert "if saturn glyph rendering becomes unstable or unreadable" in blob
-    assert "ringed-planet silhouette / ringed sphere icon" in blob
-    assert "fake letters" in blob and "faux-alphabet glyphs" in blob
-    assert "smaller accessory glyphs/emblems are secondary only" in blob
+    assert "[moon–saturn emblem discipline v1 — painted banner heraldry]" in blob or (
+        "[moon-saturn emblem discipline v1 — painted banner heraldry]" in blob.replace("–", "-")
+    )
+    assert "canonical moon" in blob or "\u263d" in " ".join(pack.image_prompts).lower()
+    assert "ringed-sphere silhouette" in blob
+    assert "painted into the cloth" in blob
     assert "moon/saturn epic arena scale hard lock" in blob
     assert "benchmark alignment note (approved jupiter/mars epic arena scale as distant composition reference target)" in blob
     assert "pull the camera back further than baseline epic mode" in blob
@@ -827,7 +826,7 @@ def test_epic_arena_showdown_profile_includes_environment_scale_and_readable_sub
     assert "coliseum walls must recede clearly into the distance" in blob
     assert "avoid compositions where arena walls feel pasted or attached flat immediately behind the characters" in blob
     assert "bias extra recession versus default epic framing" in blob
-    assert "banner identity clarity (moon/saturn)" in blob
+    assert "moon side reads lunar" in blob
     assert "night-atmosphere brightness lift" in blob
     assert "arena-floor glow" in blob and "lunar rim" in blob
     assert "[catstyle approved reference anchor v1 - moon/saturn square+tension]" in blob
@@ -848,7 +847,7 @@ def test_epic_arena_showdown_profile_includes_environment_scale_and_readable_sub
     assert "moon may hold, brace, swing, or strike with pillow energy" in blob
     assert "exactly one earth-like sphere above and behind arena" in blob
     assert "avoid duplicate earth-like globes" in blob
-    assert "ringed-planet silhouette / ringed sphere icon" in blob or "saturn banner exact glyph '♄'" in blob
+    assert "saturn's faction banner cloth" in blob
     assert "coliseum recedes into the distance" in blob
     assert "more visible arena floor and more upper architecture" in blob
     assert "movie-one-sheet readability" in blob

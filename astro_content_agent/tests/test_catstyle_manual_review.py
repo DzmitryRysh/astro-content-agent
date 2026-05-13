@@ -15,6 +15,12 @@ from astro_content_agent.services.content.catstyle_manual_review import (
     render_catstyle_manual_review_markdown,
     write_catstyle_manual_review,
 )
+
+
+def test_build_review_questions_include_integrated_flag_glyph_review() -> None:
+    qs = build_review_questions("Mercury", "Jupiter")
+    assert any("флагах" in q and "ткани" in q for q in qs)
+    assert any("реестре catstyle" in q.lower() for q in qs)
 from astro_content_agent.services.content.catstyle_post_package_quality import (
     CatstylePostPackageQualityResult,
 )

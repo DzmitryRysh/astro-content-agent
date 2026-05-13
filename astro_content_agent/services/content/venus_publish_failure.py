@@ -1,6 +1,10 @@
 """Classify Venus weekly real-publish failures for explicit retry vs fix-first behavior.
 
-No automatic retries — classification supports operator judgment and state/artifacts only.
+``PublisherService`` may perform bounded ``media_publish`` retries for Meta
+code ``9007`` / subcode ``2207027`` (container not ready) before surfacing a
+failure; this module classifies the final exception / error string for operator
+judgment and state artifacts. There is no additional automatic retry loop at
+the Venus weekly orchestration layer.
 """
 from __future__ import annotations
 
@@ -85,6 +89,17 @@ def classify_exception(exc: BaseException) -> PublishFailureClassification:
             message=f"HTTP {code}: {msg}",
         )
     if isinstance(exc, MetaAPIError):
+        if exc.meta_error_code == 9007:
+            try:
+                sub = int(exc.meta_error_subcode) if exc.meta_error_subcode is not None else None
+            except (TypeError, ValueError):
+                sub = None
+            if sub == 2207027:
+                return PublishFailureClassification(
+                    error_type="meta_container_not_ready",
+                    publish_retryable=True,
+                    message=str(exc),
+                )
         code = int(exc.status_code)
         if code in (429, 500, 502, 503, 504):
             return PublishFailureClassification(
@@ -181,6 +196,44 @@ def classify_message(message: str | None) -> PublishFailureClassification:
     return classify_exception(RuntimeError(message))
 
 
+def classify_publish_result_meta(
+    *,
+    error: str | None,
+    meta_error: dict | None,
+) -> PublishFailureClassification:
+    """Classify a failed ``PublishResult`` using structured Meta fields when present."""
+    if meta_error and isinstance(meta_error, dict):
+        raw_code = meta_error.get("meta_error_code")
+        raw_sub = meta_error.get("meta_error_subcode")
+        try:
+            c = int(raw_code) if raw_code is not None else None
+            s = int(raw_sub) if raw_sub is not None else None
+        except (TypeError, ValueError):
+            c, s = None, None
+        st_raw = meta_error.get("meta_status_code")
+        try:
+            st = int(st_raw) if st_raw is not None else 400
+        except (TypeError, ValueError):
+            st = 400
+        url = meta_error.get("meta_url")
+        body = meta_error.get("meta_error_body")
+        j = meta_error.get("meta_error_json")
+        syn = MetaAPIError(
+            status_code=st,
+            url=str(url) if isinstance(url, str) else "https://graph.instagram.com/<redacted>",
+            response_text=str(body) if body is not None else "",
+            response_json=j if isinstance(j, (dict, list)) else None,
+            meta_error_code=c,
+            meta_error_subcode=s,
+            meta_error_type=meta_error.get("meta_error_type") if isinstance(meta_error.get("meta_error_type"), str) else None,
+            meta_error_message=meta_error.get("meta_error_message")
+            if isinstance(meta_error.get("meta_error_message"), str)
+            else None,
+        )
+        return classify_exception(syn)
+    return classify_message(error or "")
+
+
 def next_publish_attempt_count(state: dict[str, Any]) -> int:
     """1-based attempt index for the next run (counts prior recorded outcomes)."""
     rp = state.get("real_publish")
@@ -198,5 +251,6 @@ __all__ = [
     "PublishFailureClassification",
     "classify_exception",
     "classify_message",
+    "classify_publish_result_meta",
     "next_publish_attempt_count",
 ]

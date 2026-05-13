@@ -169,6 +169,64 @@ def test_venus_pluto_opposition_tension_aspect_aware_copy(tmp_path: Path) -> Non
     assert "границ" in pkg.compensation.lower()
 
 
+def test_mercury_jupiter_sextile_flow_caption_instagram_ready(tmp_path: Path) -> None:
+    manifest = {
+        "version": "catstyle-image-generation-jobs-v0",
+        "date": "2026-06-10",
+        "editorial_profile": "charged",
+        "sky_scan_mode": "day-window",
+        "sky_scan_step_hours_utc": 2,
+        "manual_aspect_override": {
+            "enabled": True,
+            "planet_a": "Mercury",
+            "planet_b": "Jupiter",
+            "aspect_type": "sextile",
+            "mode": "flow",
+        },
+        "selected_candidate": {
+            "planet_a": "Mercury",
+            "planet_b": "Jupiter",
+            "aspect_type": "sextile",
+            "mode_recommendation": "flow",
+            "total_score": 0,
+            "source": "manual_override",
+            "manual_override_sky_timing_match": True,
+            "orb": 0.35,
+            "closest_hour_utc": 8,
+            "window_first_seen_hour_utc": 0,
+            "window_last_seen_hour_utc": 22,
+        },
+        "jobs": [
+            {
+                "job_id": "j1",
+                "planet_a": "Mercury",
+                "planet_b": "Jupiter",
+                "aspect_type": "sextile",
+                "editorial_profile": "charged",
+                "mode": "flow",
+                "prompt_index": 1,
+                "variant_index": 0,
+                "suggested_output_name": "catstyle_2026-06-10_001_mercury_jupiter_sextile_flow.png",
+                "status": "pending",
+            },
+        ],
+    }
+    mp = _write_manifest(tmp_path, manifest)
+    gen = tmp_path / "gen_mj"
+    gen.mkdir()
+    (gen / "catstyle_2026-06-10_001_mercury_jupiter_sextile_flow.png").write_bytes(b"\x89PNG\r\n\x1a\n")
+    pkg = build_catstyle_post_package(mp, generated_images_dir=gen)
+    assert "Пакет Catstyle для ручной сборки" not in pkg.caption
+    assert "Меркурий" in pkg.caption and "Юпитер" in pkg.caption
+    assert "20 минут" in pkg.caption or "гипотез" in pkg.caption.lower()
+    assert "**Про сроки:**" in pkg.caption
+    assert "Окно аспекта" in pkg.caption
+    assert "1–2 дня" in pkg.caption or "около 3 дней" in pkg.caption
+    cap_l = pkg.caption.lower()
+    assert "utc" not in cap_l
+    assert "орбис" not in cap_l
+
+
 def test_pluto_mars_square_tension_aspect_aware_copy(tmp_path: Path) -> None:
     manifest = {
         "date": "2026-08-11",
@@ -401,7 +459,7 @@ def test_unsupported_aspect_moon_saturn_opposition_still_generic(tmp_path: Path)
     }
     mp = _write_manifest(tmp_path, manifest)
     pkg = build_catstyle_post_package(mp)
-    assert "Пакет Catstyle для ручной сборки поста" in pkg.caption
+    assert "Пакет Catstyle для ручной сборки поста" not in pkg.caption
 
 
 def test_generic_pack_when_not_jupiter_mars_square(tmp_path: Path) -> None:

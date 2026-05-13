@@ -10,9 +10,13 @@ from unittest.mock import patch
 
 import pytest
 
-from astro_content_agent.content.catstyle.models import CatstyleDailyPackResult
+from astro_content_agent.content.catstyle.models import (
+    CatstyleCandidate,
+    CatstyleCandidateRankingResult,
+    CatstyleDailyPackResult,
+    CatstylePromptPack,
+)
 from astro_content_agent.content.catstyle.render_style_profiles_v1 import get_render_style_profile
-from astro_content_agent.content.catstyle.models import CatstylePromptPack
 from astro_content_agent.services.content.catstyle_image_generation_jobs import (
     CatstyleImageGenerationJobsResult,
     _write_utf8_text,
@@ -237,6 +241,8 @@ def test_output_writes_manifest_and_prompt_files(tmp_path: Path) -> None:
     assert (out / "job_01_prompt.txt").read_text(encoding="utf-8").strip() == "prompt line one"
     assert (out / "job_02_prompt.txt").read_text(encoding="utf-8").strip() == "prompt line two"
     manifest = json.loads((out / "image_generation_jobs.json").read_text(encoding="utf-8"))
+    assert manifest["sky_scan_mode"] == "day-window"
+    assert manifest["sky_scan_step_hours_utc"] == 2
     assert manifest["style_reference"]["source"] == "approved_registry"
     assert manifest["jobs"][0]["shot_role"] == "hero_poster"
     assert manifest["jobs"][1]["shot_role"] == "alternate_action_angle"
@@ -348,6 +354,7 @@ def test_manual_override_build_jobs_and_manifest(tmp_path: Path) -> None:
                 planet_b_override="Mars",
                 aspect_type_override="square",
                 mode_override="tension",
+                scan_mode="noon",
             )
     m_daily.assert_not_called()
     m_pack.assert_called_once()
@@ -378,6 +385,8 @@ def test_manual_override_build_jobs_and_manifest(tmp_path: Path) -> None:
     assert manifest["manual_aspect_override"]["planet_a"] == "Pluto"
     assert manifest["selected_candidate"]["manual_aspect_override"] is True
     assert manifest["secondary_supportive_candidate"] is None
+    assert manifest["sky_scan_mode"] == "manual_override"
+    assert manifest["sky_scan_step_hours_utc"] is None
     summary = (tmp_path / "ov" / "manifest_summary.txt").read_text(encoding="utf-8")
     assert "Manual aspect override" in summary
 
@@ -403,6 +412,7 @@ def test_manual_override_jobs_count_one_prompt_variant(tmp_path: Path) -> None:
             aspect_type_override="square",
             mode_override="tension",
             jobs_count=1,
+            scan_mode="noon",
         )
     req = m_pack.call_args[0][0]
     assert req.variants_count == 1
@@ -459,6 +469,7 @@ def test_manual_override_post_package_roundtrip(tmp_path: Path) -> None:
             planet_b_override="Pluto",
             aspect_type_override="opposition",
             mode_override="tension",
+            scan_mode="noon",
         )
     mp = out / "image_generation_jobs.json"
     manifest = json.loads(mp.read_text(encoding="utf-8"))
@@ -672,8 +683,9 @@ def test_moon_saturn_prompt_text_keeps_unicode_glyphs_no_mojibake(tmp_path: Path
     )
     assert r.jobs, "expected at least one generated job"
     blob = r.jobs[0].prompt_text
-    assert "☾" in blob
-    assert "♄" in blob
+    # Reference glyphs appear as overlay targets in [IDENTITY MARKERS] / canon text (encoding must stay UTF-8).
+    assert "\u263e" in blob or "\u263d" in blob or "☾" in blob
+    assert "\u2644" in blob or "♄" in blob
     assert "—" in blob
     assert "â˜¾" not in blob
     assert "â™„" not in blob
@@ -691,3 +703,94 @@ def test_utf8_writer_roundtrip_preserves_glyphs_and_em_dash(tmp_path: Path) -> N
     assert "â˜¾" not in got
     assert "â™„" not in got
     assert "â€”" not in got
+
+
+def test_manual_override_day_window_merges_timing_when_scan_matches(tmp_path: Path) -> None:
+    c = CatstyleCandidate(
+        planet_a="Jupiter",
+        planet_b="Mercury",
+        aspect_type="sextile",
+        mode_recommendation="flow",
+        visual_score=6,
+        emotional_score=6,
+        comedy_score=6,
+        clarity_score=6,
+        total_score=30,
+        reason="unit",
+        recommended_scene_angle="x",
+        orb=0.5,
+        source="seed",
+        closest_hour_utc=10,
+        window_first_seen_hour_utc=0,
+        window_last_seen_hour_utc=22,
+        window_samples_seen=12,
+    )
+    fake = CatstylePromptPack(
+        image_prompts=["a"],
+        image_prompt_shot_roles=["hero_poster"],
+        animation_prompt="anim",
+        negative_prompt="neg",
+        carousel_idea="car",
+    )
+    out = tmp_path / "mw"
+    with patch(
+        "astro_content_agent.services.content.catstyle_image_generation_jobs.generate_catstyle_prompt_pack",
+        return_value=fake,
+    ):
+        with patch(
+            "astro_content_agent.services.content.catstyle_manual_override_timing.scan_catstyle_sky_aspect_windows",
+            return_value=CatstyleCandidateRankingResult(ranked=[c], unsupported=[]),
+        ) as m_scan:
+            r = build_catstyle_image_generation_jobs(
+                date(2026, 6, 10),
+                editorial_profile="charged",
+                output_dir=out,
+                planet_a_override="Mercury",
+                planet_b_override="Jupiter",
+                aspect_type_override="sextile",
+                mode_override="flow",
+                scan_mode="day-window",
+                step_hours=2,
+            )
+    m_scan.assert_called_once()
+    assert r.selected_candidate is not None
+    assert r.selected_candidate.get("manual_override_sky_timing_match") is True
+    assert r.selected_candidate.get("closest_hour_utc") == 10
+    assert r.selected_candidate.get("window_start_hour_utc") == 0
+    assert r.selected_candidate.get("window_end_hour_utc") == 22
+    manifest = json.loads((out / "image_generation_jobs.json").read_text(encoding="utf-8"))
+    assert manifest["sky_scan_mode"] == "day-window"
+    assert manifest["sky_scan_step_hours_utc"] == 2
+
+
+def test_manual_override_day_window_honest_miss_when_scan_empty(tmp_path: Path) -> None:
+    fake = CatstylePromptPack(
+        image_prompts=["a"],
+        image_prompt_shot_roles=["hero_poster"],
+        animation_prompt="anim",
+        negative_prompt="neg",
+        carousel_idea="car",
+    )
+    out = tmp_path / "mw_miss"
+    with patch(
+        "astro_content_agent.services.content.catstyle_image_generation_jobs.generate_catstyle_prompt_pack",
+        return_value=fake,
+    ):
+        with patch(
+            "astro_content_agent.services.content.catstyle_manual_override_timing.scan_catstyle_sky_aspect_windows",
+            return_value=CatstyleCandidateRankingResult(ranked=[], unsupported=[]),
+        ):
+            r = build_catstyle_image_generation_jobs(
+                date(2026, 6, 10),
+                editorial_profile="charged",
+                output_dir=out,
+                planet_a_override="Mercury",
+                planet_b_override="Jupiter",
+                aspect_type_override="sextile",
+                mode_override="flow",
+                scan_mode="day-window",
+            )
+    assert r.selected_candidate.get("manual_override_sky_timing_match") is False
+    assert r.selected_candidate.get("closest_hour_utc") is None
+    manifest = json.loads((out / "image_generation_jobs.json").read_text(encoding="utf-8"))
+    assert manifest["sky_scan_mode"] == "day-window"

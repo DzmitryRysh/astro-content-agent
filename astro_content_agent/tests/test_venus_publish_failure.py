@@ -7,6 +7,7 @@ import pytest
 from astro_content_agent.services.content.venus_publish_failure import (
     classify_exception,
     classify_message,
+    classify_publish_result_meta,
     next_publish_attempt_count,
 )
 from astro_content_agent.services.instagram.client import MetaAPIError, MetaInstagramClient, redact_access_token_from_url
@@ -82,6 +83,36 @@ def test_classify_draft_not_approved() -> None:
     c = classify_exception(PublisherService.DraftNotApprovedError("not approved"))
     assert c.error_type == "draft_not_approved"
     assert c.publish_retryable is False
+
+
+def test_classify_meta_api_error_9007_subcode_retryable() -> None:
+    c = classify_exception(
+        MetaAPIError(
+            status_code=400,
+            url="https://graph.instagram.com/x?access_token=<REDACTED>",
+            response_text="{}",
+            meta_error_code=9007,
+            meta_error_subcode=2207027,
+            meta_error_message="Media ID is not available",
+        )
+    )
+    assert c.error_type == "meta_container_not_ready"
+    assert c.publish_retryable is True
+
+
+def test_classify_publish_result_meta_from_dict() -> None:
+    c = classify_publish_result_meta(
+        error="Media ID is not available | status=400 | code=9007 | subcode=2207027",
+        meta_error={
+            "meta_status_code": 400,
+            "meta_url": "https://graph.instagram.com/x?access_token=<REDACTED>",
+            "meta_error_code": 9007,
+            "meta_error_subcode": 2207027,
+            "meta_error_message": "Media ID is not available",
+        },
+    )
+    assert c.error_type == "meta_container_not_ready"
+    assert c.publish_retryable is True
 
 
 def test_classify_message_unknown() -> None:

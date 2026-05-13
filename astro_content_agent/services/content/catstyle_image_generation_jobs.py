@@ -14,6 +14,9 @@ from astro_content_agent.astro.ephemeris import PlanetPosition
 from astro_content_agent.content.catstyle.approved_reference_registry import resolve_approved_reference
 from astro_content_agent.content.catstyle.models import CatstylePromptRequest
 from astro_content_agent.services.content.catstyle_daily_pack import generate_catstyle_daily_pack
+from astro_content_agent.services.content.catstyle_manual_override_timing import (
+    merge_manual_override_day_window_into_primary,
+)
 from astro_content_agent.services.content.catstyle_editorial_selection import normalize_editorial_profile
 from astro_content_agent.services.content.catstyle_prompt_generator import (
     generate_catstyle_prompt_pack,
@@ -371,6 +374,8 @@ def build_catstyle_image_generation_jobs(
     primary: dict[str, Any]
     pp: dict[str, Any]
     style_reference_meta: dict[str, Any] | None = None
+    manifest_sky_scan_mode: str | None = None
+    manifest_sky_scan_step: int | None = None
 
     if override_quad is not None:
         o_pa, o_pb, o_asp, o_mode = override_quad
@@ -416,6 +421,24 @@ def build_catstyle_image_generation_jobs(
         except ValueError as e:
             raise ValueError(f"Cannot build prompts for manual aspect override: {e}") from e
         pp = dict(pack_obj.model_dump(mode="json"))
+        sm_manual = str(scan_mode).strip().lower()
+        if sm_manual == "day-window":
+            manifest_sky_scan_mode = "day-window"
+            manifest_sky_scan_step = max(1, int(step_hours))
+            merge_manual_override_day_window_into_primary(
+                primary,
+                day=day,
+                request_planet_a=pa_n,
+                request_planet_b=pb_n,
+                request_aspect_type=o_asp,
+                step_hours=max(1, int(step_hours)),
+                compute_positions_fn=compute_positions_fn,
+                orb_config=orb_config,
+            )
+        else:
+            manifest_sky_scan_mode = "manual_override"
+            manifest_sky_scan_step = None
+            primary["manual_override_sky_timing_match"] = False
     else:
         pack = generate_catstyle_daily_pack(
             day,
@@ -435,6 +458,9 @@ def build_catstyle_image_generation_jobs(
 
         iso = pack.date
         profile = pack.editorial_profile
+        sm = str(scan_mode).strip().lower()
+        manifest_sky_scan_mode = sm
+        manifest_sky_scan_step = int(step_hours) if sm == "day-window" else None
 
         if pack.selected_count == 0 or not pack.selected_candidates or not pack.prompt_packs:
             return CatstyleImageGenerationJobsResult(
@@ -624,6 +650,8 @@ def build_catstyle_image_generation_jobs(
             "version": "catstyle-image-generation-jobs-v0",
             "date": iso,
             "editorial_profile": profile,
+            "sky_scan_mode": manifest_sky_scan_mode,
+            "sky_scan_step_hours_utc": manifest_sky_scan_step,
             "selected_candidate": primary,
             "secondary_supportive_candidate": secondary,
             "jobs": [j.model_dump(mode="json") for j in jobs],
