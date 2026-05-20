@@ -4,6 +4,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal
 
+from astro_content_agent.content.catstyle.catstyle_global_quality_lock_v1 import (
+    CATSTYLE_GLOBAL_QUALITY_LOCK_BLOCK,
+    CATSTYLE_GLOBAL_QUALITY_NEGATIVE_EXTRAS,
+)
 from astro_content_agent.content.catstyle.character_skins_v0 import get_character_skin
 from astro_content_agent.content.catstyle.models import CatstylePromptPack
 
@@ -223,7 +227,7 @@ def compose_premium_catstyle_prompt(
             "Honor locked scene_template_profile beat: amplify the stated action, camera angle, and props - "
             "do not substitute a generic tableau."
         )
-    chunks: list[str] = [*locked]
+    chunks: list[str] = [*locked, CATSTYLE_GLOBAL_QUALITY_LOCK_BLOCK]
     mode_l = (profile.mode or "").strip().lower()
     if render_style_profile_key == "premium_comic_poster_v2" and mode_l != "flow":
         chunks.append(
@@ -274,6 +278,7 @@ def strengthen_negative_prompt(
         "random prop clutter without story purpose",
         "generic nursery-cartoon softness",
         "weak unclear interaction between the two planet-cats",
+        *CATSTYLE_GLOBAL_QUALITY_NEGATIVE_EXTRAS,
     ]
     if render_style_profile_key == "premium_comic_poster_v2":
         style_compact = [

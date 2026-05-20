@@ -411,6 +411,264 @@ def persist_catstyle_publish_artifacts(handoff_dir: Path, r: CatstyleRealPublish
     return jp, mp
 
 
+def _persist_handoff_blocked(
+    handoff_dir: Path,
+    *,
+    publish_status: str,
+    error_message: str | None = None,
+    error_type: str | None = None,
+    publish_retryable: bool | None = None,
+    detail: str | None = None,
+    extra: dict[str, Any] | None = None,
+) -> CatstyleRealPublishResult:
+    r = CatstyleRealPublishResult(
+        publish_status=publish_status,
+        error_message=error_message,
+        error_type=error_type,
+        publish_retryable=publish_retryable,
+        detail=detail,
+        extra=extra or {},
+        validate_only=False,
+    )
+    persist_catstyle_publish_artifacts(handoff_dir, r)
+    return r
+
+
+def run_catstyle_handoff_publish_workflow(
+    handoff_dir: Path,
+    *,
+    settings: Settings,
+    validate_only: bool,
+    do_publish: bool,
+    brand_profile_id_cli: str | None = None,
+    instagram_account_id_cli: str | None = None,
+    local_image_path: Path | None = None,
+    post_image_url: str | None = None,
+) -> tuple[int, CatstyleRealPublishResult | None]:
+    """
+    Shared publish / validate-only path used by ``publish_catstyle_real.py`` CLI and daily agent.
+
+    Returns ``(exit_code, result_or_none)``. ``result_or_none`` is set when artifacts were persisted.
+    """
+    from astro_content_agent.core.repo_env import resolve_publish_target_ids
+    from astro_content_agent.db.session import SessionLocal
+    from astro_content_agent.services.content.venus_publish_failure import PublishFailureClassification
+
+    handoff_dir = Path(handoff_dir).expanduser().resolve()
+    if not validate_only and not do_publish:
+        return 0, None
+
+    brand_id, ig_account_id = resolve_publish_target_ids(
+        cli_brand_profile_id=brand_profile_id_cli,
+        cli_instagram_account_id=instagram_account_id_cli,
+    )
+
+    try:
+        handoff = load_catstyle_handoff_json(handoff_dir)
+    except CatstyleRealPublishError as e:
+        r = _persist_handoff_blocked(handoff_dir, publish_status="blocked_handoff", error_message=str(e), error_type="invalid_handoff")
+        return 1, r
+
+    try:
+        assert_handoff_publishable(handoff)
+    except CatstyleRealPublishError as e:
+        r = _persist_handoff_blocked(
+            handoff_dir,
+            publish_status="blocked_not_ready",
+            error_message=str(e),
+            error_type="handoff_not_publishable",
+            publish_retryable=False,
+        )
+        return 1, r
+
+    try:
+        caption = read_caption_final(handoff_dir, handoff)
+        if not caption.strip():
+            raise CatstyleRealPublishError("caption_final is empty (caption_final.txt or publish_handoff.json).")
+    except CatstyleRealPublishError as e:
+        r = _persist_handoff_blocked(handoff_dir, publish_status="blocked_handoff", error_message=str(e), error_type="invalid_caption")
+        return 1, r
+
+    hook = str(handoff.get("hook") or "").strip()
+    if not hook:
+        msg = "publish_handoff.json missing non-empty hook."
+        r = _persist_handoff_blocked(handoff_dir, publish_status="blocked_handoff", error_message=msg, error_type="invalid_hook")
+        return 1, r
+
+    post_url = (post_image_url or "").strip() or None
+    if post_url and local_image_path is not None:
+        msg = "Pass at most one of post_image_url and local_image_path."
+        r = _persist_handoff_blocked(handoff_dir, publish_status="blocked_prerequisites", error_message=msg, error_type="invalid_args")
+        return 2, r
+
+    need_cloudinary = post_url is None
+    image_public_url: str | None = post_url
+
+    resolved_local: Path | None = None
+    try:
+        if post_url is None:
+            resolved_local = resolve_local_image_path_for_publish(
+                handoff_dir,
+                local_image_path=local_image_path,
+                handoff=handoff,
+            )
+    except CatstyleRealPublishError as e:
+        r = _persist_handoff_blocked(
+            handoff_dir, publish_status="blocked_prerequisites", error_message=str(e), error_type="missing_image"
+        )
+        return 1, r
+
+    if post_url is not None and not post_url.lower().startswith("https://"):
+        msg = "post_image_url must be an https:// URL."
+        r = _persist_handoff_blocked(handoff_dir, publish_status="blocked_prerequisites", error_message=msg, error_type="invalid_image_url")
+        return 1, r
+
+    missing_env = validate_catstyle_publish_environment(settings=settings, need_cloudinary_upload=need_cloudinary)
+    if missing_env:
+        msg = "Missing required environment variables: " + ", ".join(missing_env)
+        r = _persist_handoff_blocked(
+            handoff_dir,
+            publish_status="blocked_prerequisites",
+            error_message=msg,
+            error_type="missing_environment",
+            publish_retryable=False,
+            extra={"missing_environment_variables": missing_env},
+        )
+        return 1, r
+
+    if need_cloudinary:
+        try:
+            validate_cloudinary_config(settings)
+        except ValueError as e:
+            r = _persist_handoff_blocked(
+                handoff_dir,
+                publish_status="blocked_prerequisites",
+                error_message=str(e),
+                error_type="cloudinary_config_invalid",
+                publish_retryable=False,
+            )
+            return 1, r
+
+    if not brand_id or not ig_account_id:
+        msg = (
+            "Provide brand_profile_id and instagram_account_id (CLI or ACA_BRAND_PROFILE_ID / "
+            "ACA_INSTAGRAM_ACCOUNT_ID in repo-root .env)."
+        )
+        r = _persist_handoff_blocked(
+            handoff_dir,
+            publish_status="blocked_prerequisites",
+            error_message=msg,
+            error_type="missing_publish_targets",
+            publish_retryable=False,
+        )
+        return 1, r
+
+    db = SessionLocal()
+    try:
+        db_errs = validate_db_accounts(db, brand_profile_id=brand_id, instagram_account_id=ig_account_id)
+        if db_errs:
+            msg = "; ".join(db_errs)
+            r = _persist_handoff_blocked(
+                handoff_dir,
+                publish_status="blocked_prerequisites",
+                error_message=msg,
+                error_type="database_prerequisites",
+                publish_retryable=False,
+            )
+            return 1, r
+    finally:
+        db.close()
+
+    if validate_only:
+        db = SessionLocal()
+        try:
+            ig_client = build_meta_client(settings)
+            if ig_client is None:
+                msg = "INSTAGRAM_ACCESS_TOKEN is not set (internal check after env validation)."
+                r = _persist_handoff_blocked(
+                    handoff_dir,
+                    publish_status="blocked_prerequisites",
+                    error_message=msg,
+                    error_type="missing_instagram_token",
+                    publish_retryable=False,
+                )
+                return 1, r
+            r = run_catstyle_real_publish(
+                db,
+                settings=settings,
+                handoff_dir=handoff_dir,
+                handoff=handoff,
+                caption_final=caption,
+                hook=hook,
+                image_public_url=image_public_url,
+                brand_profile_id=brand_id,
+                instagram_account_id=ig_account_id,
+                ig_client=ig_client,
+                validate_only=True,
+            )
+        finally:
+            db.close()
+        persist_catstyle_publish_artifacts(handoff_dir, r)
+        return 0, r
+
+    if not do_publish:
+        return 0, None
+
+    if image_public_url is None:
+        assert resolved_local is not None
+        try:
+            cu = upload_local_image(settings, resolved_local)
+        except (ValueError, OSError, RuntimeError) as e:
+            cls = classify_exception(e)
+            r = CatstyleRealPublishResult(
+                publish_status="publish_failed",
+                error_type=cls.error_type,
+                error_message=cls.message,
+                publish_retryable=cls.publish_retryable,
+            )
+            persist_catstyle_publish_artifacts(handoff_dir, r)
+            return 1, r
+        image_public_url = cu.secure_url
+
+    ig_client = build_meta_client(settings)
+    if ig_client is None:
+        cls = PublishFailureClassification(
+            error_type="missing_instagram_token",
+            publish_retryable=False,
+            message="Set INSTAGRAM_ACCESS_TOKEN in environment (.env). Token value is not printed here.",
+        )
+        r = _persist_handoff_blocked(
+            handoff_dir,
+            publish_status="blocked_prerequisites",
+            error_message=cls.message,
+            error_type=cls.error_type,
+            publish_retryable=False,
+        )
+        return 1, r
+
+    db = SessionLocal()
+    try:
+        r = run_catstyle_real_publish(
+            db,
+            settings=settings,
+            handoff_dir=handoff_dir,
+            handoff=handoff,
+            caption_final=caption,
+            hook=hook,
+            image_public_url=image_public_url,
+            brand_profile_id=brand_id,
+            instagram_account_id=ig_account_id,
+            ig_client=ig_client,
+            validate_only=False,
+        )
+    finally:
+        db.close()
+
+    persist_catstyle_publish_artifacts(handoff_dir, r)
+    ok = r.publish_status == "published"
+    return 0 if ok else 1, r
+
+
 __all__ = [
     "CATSTYLE_READY_PUBLISH_STATUSES",
     "CatstyleRealPublishError",
@@ -430,4 +688,6 @@ __all__ = [
     "validate_catstyle_publish_environment",
     "validate_db_accounts",
     "resolve_local_image_path_for_publish",
+    "run_catstyle_handoff_publish_workflow",
+    "run_catstyle_real_publish",
 ]

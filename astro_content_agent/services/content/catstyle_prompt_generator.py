@@ -24,10 +24,17 @@ from astro_content_agent.content.catstyle.planet_canon import (
     build_planet_canon_prompt_fragment,
     get_planet_canon as get_planet_canon_v2,
 )
-from astro_content_agent.content.catstyle.planet_glyph_registry_v1 import (
-    canonical_glyph_char,
-    format_pair_flag_glyph_system_block,
+from astro_content_agent.content.catstyle.catstyle_global_quality_lock_v1 import (
+    CATSTYLE_GLOBAL_QUALITY_LOCK_BLOCK,
+    CATSTYLE_GLOBAL_QUALITY_NEGATIVE_EXTRAS,
 )
+from astro_content_agent.content.catstyle.mars_pluto_square_tension_canon_v1 import (
+    MARS_PLUTO_SQUARE_TENSION_NEGATIVE_EXTRAS,
+    MARS_PLUTO_SQUARE_TENSION_VISUAL_CANON,
+    is_mars_pluto_square_tension,
+    resolved_pair_flag_glyph_system_block,
+)
+from astro_content_agent.content.catstyle.planet_glyph_registry_v1 import canonical_glyph_char
 from astro_content_agent.content.catstyle.planet_identity_markers_v1 import (
     format_identity_markers_prompt_block,
     get_planet_identity_marker_profile,
@@ -75,6 +82,7 @@ _NEGATIVE_BASE_CHUNKS = [
     "disconnected sticker posing, over-rendered fur strands, over-rendered material noise",
     "malformed planetary glyphs, pseudo-symbols, fake astrological letters, distorted zodiac marks, invented sigils",
     "floating white sticker symbols, detached glow glyphs not locked to cloth, symbols pasted over faces or torsos",
+    *CATSTYLE_GLOBAL_QUALITY_NEGATIVE_EXTRAS,
 ]
 
 _FLOW_IMAGE_OPENING_V2 = (
@@ -605,20 +613,27 @@ def _moon_saturn_visual_correction_block(pa: str, pb: str, aspect_type: str, mod
     )
 
 
-def _pair_flag_glyph_system_block(pa: str, pb: str) -> str:
-    """System-wide cloth-integrated banner glyphs for the active planet pair (all modes)."""
-    return format_pair_flag_glyph_system_block(pa, pb).strip()
+def _pair_specific_visual_guards(pa: str, pb: str, aspect_type: str, mode: str) -> str:
+    """Moon/Saturn square tension patch + Mars/Pluto square tension premium canon (mutually exclusive pairs)."""
+    parts: list[str] = [
+        _moon_saturn_visual_correction_block(pa, pb, aspect_type, mode),
+    ]
+    if is_mars_pluto_square_tension(pa, pb, aspect_type, mode):
+        parts.append(MARS_PLUTO_SQUARE_TENSION_VISUAL_CANON)
+    return " ".join(p for p in parts if p).strip()
 
 
 def _prompt_choreography_middleware(
     req: CatstylePromptRequest, pa: str, pb: str, pair_guard: str
 ) -> str:
-    """Aspect choreography + optional planet lexicon + Mars scene decouple; Moon/Saturn square adds dedicated guard."""
-    blocks: list[str] = []
+    """Aspect choreography + global quality lock + pair flags + Mars scene decouple; pair-specific guards."""
+    blocks: list[str] = [CATSTYLE_GLOBAL_QUALITY_LOCK_BLOCK]
     if (req.mode or "").strip().lower() == "flow":
         blocks.append(_catstyle_flow_mode_visual_lock(req))
         blocks.append(_mercury_jupiter_flow_planetary_being_lock(req, pa, pb))
-    blocks.append(_pair_flag_glyph_system_block(pa, pb))
+    blocks.append(
+        resolved_pair_flag_glyph_system_block(pa, pb, req.aspect_type, req.mode)
+    )
     blocks.extend(
         [
             _aspect_choreography_block(req.aspect_type, req.mode),
@@ -677,7 +692,7 @@ def _pack_from_deep(
     shot_roles = shot_roles_for_variant_indices(n, req.shot_mode)
     line_a = _planet_cat_line(pa, canon_a, skin_a)
     line_b = _planet_cat_line(pb, canon_b, skin_b)
-    pair_guard = _moon_saturn_visual_correction_block(pa, pb, req.aspect_type, req.mode)
+    pair_guard = _pair_specific_visual_guards(pa, pb, req.aspect_type, req.mode)
     choreo_block = _prompt_choreography_middleware(req, pa, pb, pair_guard)
     anim_skin = _skin_animation_suffix(pa, pb, skin_a, skin_b)
 
@@ -755,7 +770,7 @@ def _pack_from_seed(
     shot_roles = shot_roles_for_variant_indices(n, req.shot_mode)
     line_a = _planet_cat_line(pa, canon_a, skin_a)
     line_b = _planet_cat_line(pb, canon_b, skin_b)
-    pair_guard = _moon_saturn_visual_correction_block(pa, pb, req.aspect_type, req.mode)
+    pair_guard = _pair_specific_visual_guards(pa, pb, req.aspect_type, req.mode)
     choreo_block = _prompt_choreography_middleware(req, pa, pb, pair_guard)
     anim_skin = _skin_animation_suffix(pa, pb, skin_a, skin_b)
 
@@ -844,7 +859,7 @@ def _pack_from_fallback(
     shot_roles = shot_roles_for_variant_indices(n, req.shot_mode)
     line_a = _planet_cat_line(pa, canon_a, skin_a)
     line_b = _planet_cat_line(pb, canon_b, skin_b)
-    pair_guard = _moon_saturn_visual_correction_block(pa, pb, req.aspect_type, req.mode)
+    pair_guard = _pair_specific_visual_guards(pa, pb, req.aspect_type, req.mode)
     choreo_block = _prompt_choreography_middleware(req, pa, pb, pair_guard)
     anim_skin = _skin_animation_suffix(pa, pb, skin_a, skin_b)
 
@@ -1001,8 +1016,18 @@ def _finalize_pack_with_art_direction(
     skin_a: str | None,
     skin_b: str | None,
 ) -> CatstylePromptPack:
+    def _append_extra_negatives(p: CatstylePromptPack) -> CatstylePromptPack:
+        extras: list[str] = list(CATSTYLE_GLOBAL_QUALITY_NEGATIVE_EXTRAS)
+        if is_mars_pluto_square_tension(pa, pb, req.aspect_type, req.mode):
+            extras.extend(MARS_PLUTO_SQUARE_TENSION_NEGATIVE_EXTRAS)
+        if not extras:
+            return p
+        tail = ", ".join(extras)
+        merged_neg = f"{p.negative_prompt.rstrip().rstrip(',')}, {tail}".strip()
+        return p.model_copy(update={"negative_prompt": merged_neg})
+
     if not req.premium_art_direction:
-        return pack
+        return _append_extra_negatives(pack)
     art_profile = build_catstyle_art_direction_profile(
         editorial_profile=req.editorial_profile,
         mode=req.mode,
@@ -1011,7 +1036,7 @@ def _finalize_pack_with_art_direction(
         skin_a=skin_a,
         skin_b=skin_b,
     )
-    return apply_art_direction_to_prompt_pack(pack, art_profile)
+    return _append_extra_negatives(apply_art_direction_to_prompt_pack(pack, art_profile))
 
 
 __all__ = [
