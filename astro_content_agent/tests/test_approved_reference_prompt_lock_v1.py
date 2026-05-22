@@ -70,7 +70,7 @@ def test_sun_uranus_includes_approved_reference_fidelity_language() -> None:
     joined = "\n".join(pack.image_prompts)
     assert "[SUN-URANUS REF FIDELITY]" in joined
     assert "orange-gold" in joined.lower()
-    assert "cyan-blue" in joined.lower()
+    assert "cyan" in joined.lower() and ("blue" in joined.lower() or "blue-green" in joined.lower())
     assert "\u2609" in joined
     assert "\u2645" in joined
     assert "red flag left" in joined.lower() or "flag left" in joined.lower()

@@ -29,8 +29,8 @@ SUPPORTED_PLANET_GLYPH_KEYS: Final[frozenset[str]] = frozenset(CANONICAL_PLANET_
 
 GLYPH_HARDENING: Final[dict[str, str]] = {
     "sun": (
-        "[Sun ☉ hardening] Paint **\u2609** as a clean solar-disk glyph with central dot—centered on the Sun banner—"
-        "not a generic coin, poker chip, or letter O with no interior read."
+        "[Sun ☉ hardening] Paint canonical **\u2609 (☉)** on the Sun banner: **circle with central dot**, "
+        "large, complete, clean, cloth-integrated—not partial, cropped, approximate, or a generic coin / letter O."
     ),
     "moon": (
         "[Moon ☽ hardening] Paint **\u263d (☽)** as a clear crescent-with-disc lunar mark on the Moon banner—"
@@ -59,8 +59,9 @@ GLYPH_HARDENING: Final[dict[str, str]] = {
         "clearly **Saturn**, not a bare **h** letterform, not a random hooked stroke, not a collapsed smear."
     ),
     "uranus": (
-        "[Uranus ♅ hardening] Use canonical **\u2645 (♅)** on Uranus's banner—Unicode standard astronomical Uranus; "
-        "not an invented H-with-orbit doodle, not a swapped Neptune mark."
+        "[Uranus ♅ hardening] Paint canonical **\u2645 (♅)** on Uranus's banner: **full glyph** with **vertical stem, "
+        "side arcs, lower circle**, large, complete, readable on cloth—not partial, cropped, fake rune, "
+        "H-with-orbit doodle, or swapped Neptune mark."
     ),
     "neptune": (
         "[Neptune ♆ hardening] Use canonical **\u2646 (♆)** on Neptune's banner—standard trident-derived Neptune glyph; "

@@ -65,8 +65,9 @@ def build_approved_reference_lock_block(hit: ResolvedApprovedReference) -> str:
     return (
         "[APPROVED CATSTYLE REFERENCE LOCK v1] "
         "Use the approved reference as the **primary visual anchor**: same universe, same premium comic-poster quality, "
-        "catplanet proportions, arena depth, zodiac floor, banners, lighting contrast, and cinematic scale. "
-        "Create a new variation, not a simplified redraw."
+        "**reference-level catplanet body identity** (planetary material bodies—not ordinary cats with effects), "
+        "**reference-level premium depth**, arena scale, zodiac floor, banners, lighting contrast. "
+        "Create a new variation, not a simplified redraw or downgrade into generic elemental cats."
     )
 
 

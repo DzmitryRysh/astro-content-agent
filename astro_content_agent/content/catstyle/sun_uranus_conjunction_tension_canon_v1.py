@@ -68,21 +68,27 @@ SUN_URANUS_APPROVED_REFERENCE_FIDELITY_BLOCK: Final[str] = (
 )
 
 SUN_URANUS_APPROVED_REFERENCE_FIDELITY_COMPACT: Final[str] = (
-    "[SUN-URANUS REF FIDELITY] Sun=orange-gold royal solar warrior (\u2609 red flag left); "
-    "Uranus=cyan-blue electric sharp disruptor (\u2645 blue flag right); orange-vs-blue battle-poster energy—not cute duel."
+    "[SUN-URANUS REF FIDELITY] Preserve approved **catplanet body identity** and **premium arena depth/scale**—"
+    "not ordinary cats with effects. Sun=solar-core plasma catplanet (\u2609 red flag left); "
+    "Uranus=ice-gas tilted-axis catplanet with ring/electric geometry (\u2645 blue flag right); "
+    "complete \u2609/\u2645 cloth glyphs; orange-vs-blue battle-poster energy—not cute simplified duel."
 )
 
 
 SUN_URANUS_CONJUNCTION_TENSION_NEGATIVE_EXTRAS: Final[tuple[str, ...]] = (
     "storybook illustration dominance",
-    "children-book style",
-    "soft watercolor look",
     "cozy cute low-drama conjunction scene",
-    "two cats merely pointing at each other",
     "static face-off with no fusion energy",
     "weak low-stakes argument pose",
     "cute yellow cat with no solar authority",
     "generic blue trickster cat with no electric disruption",
+    "ordinary cats with effects",
+    "generic elemental cats",
+    "incomplete flag glyphs",
+    "fake Uranus glyph",
+    "partial Sun glyph",
+    "plush toy body",
+    "weak planet texture",
     "fake astrology glyphs or wrong Uranus symbol on banners",
     "malformed Sun or Uranus planetary signs",
 )

@@ -30,6 +30,10 @@ from astro_content_agent.content.catstyle.planet_canon import (
     build_planet_canon_prompt_fragment,
     get_planet_canon as get_planet_canon_v2,
 )
+from astro_content_agent.content.catstyle.catplanet_body_identity_lock_v1 import (
+    CATPLANET_BODY_IDENTITY_LOCK_BLOCK,
+    sun_uranus_body_and_flag_lock_blocks,
+)
 from astro_content_agent.content.catstyle.catstyle_global_quality_lock_v1 import (
     CATSTYLE_GLOBAL_QUALITY_LOCK_BLOCK,
     CATSTYLE_GLOBAL_QUALITY_NEGATIVE_EXTRAS,
@@ -632,6 +636,7 @@ def _pair_specific_visual_guards(pa: str, pb: str, aspect_type: str, mode: str) 
         _moon_saturn_visual_correction_block(pa, pb, aspect_type, mode),
     ]
     if is_sun_uranus_conjunction_tension(pa, pb, aspect_type, mode):
+        parts.append(sun_uranus_body_and_flag_lock_blocks())
         parts.append(SUN_URANUS_CONJUNCTION_TENSION_VISUAL_CANON)
     if is_mars_pluto_square_tension(pa, pb, aspect_type, mode):
         parts.append(MARS_PLUTO_SQUARE_TENSION_VISUAL_CANON)
@@ -642,7 +647,10 @@ def _prompt_choreography_middleware(
     req: CatstylePromptRequest, pa: str, pb: str, pair_guard: str
 ) -> str:
     """Aspect choreography + global quality lock + pair flags + Mars scene decouple; pair-specific guards."""
-    blocks: list[str] = [CATSTYLE_GLOBAL_QUALITY_LOCK_BLOCK]
+    blocks: list[str] = [
+        CATSTYLE_GLOBAL_QUALITY_LOCK_BLOCK,
+        CATPLANET_BODY_IDENTITY_LOCK_BLOCK,
+    ]
     if (req.mode or "").strip().lower() == "flow":
         blocks.append(_catstyle_flow_mode_visual_lock(req))
         blocks.append(_mercury_jupiter_flow_planetary_being_lock(req, pa, pb))
