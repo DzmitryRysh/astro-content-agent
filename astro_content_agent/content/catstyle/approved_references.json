@@ -60,6 +60,18 @@
       "notes": "Approved Venus/Saturn tension reference: Venus as beauty/desire with rose, mirror and golden aura; Saturn as cold authority with chain, restriction and ringed-planet identity; epic cosmic arena scale with Earth cue.",
       "priority": 100,
       "active": true
+    },
+    {
+      "registry_key": "sun_uranus_conjunction_tension_v1",
+      "planet_a": "Sun",
+      "planet_b": "Uranus",
+      "aspect_type": "conjunction",
+      "mode": "tension",
+      "image_path": "references/catstyle_sun_uranus_conjunction_tension_approved.png",
+      "label": "Sun Uranus conjunction tension approved reference",
+      "notes": "",
+      "priority": 100,
+      "active": true
     }
   ]
 }
