@@ -7,6 +7,12 @@ from astro_content_agent.content.catstyle.hero_shots_v1 import (
     format_hero_shot_prompt_block,
     shot_roles_for_variant_indices,
 )
+from astro_content_agent.content.catstyle.approved_reference_prompt_lock_v1 import (
+    APPROVED_REFERENCE_NEGATIVE_EXTRAS,
+    apply_approved_reference_lock_to_prompt_pack,
+    approved_reference_negative_must_keep,
+    trim_negative_prompt_to_max,
+)
 from astro_content_agent.content.catstyle.approved_reference_registry import (
     resolve_approved_reference,
 )
@@ -1010,11 +1016,34 @@ def generate_catstyle_prompt_pack(req: CatstylePromptRequest) -> CatstylePromptP
         render_style_profile=render_prof_dict,
     )
     pack = _finalize_pack_with_art_direction(pack, req, pa, pb, skin_a, skin_b)
-    # Re-apply budget guard after premium art-direction append (can increase prompt length).
+    approved_hit = None
+    if not req.disable_approved_reference_prompt_lock:
+        approved_hit = resolve_approved_reference(pa, pb, req.aspect_type, req.mode)
+        if approved_hit is not None:
+            pack = apply_approved_reference_lock_to_prompt_pack(
+                pack,
+                approved_hit,
+                planet_a=pa,
+                planet_b=pb,
+                aspect_type=req.aspect_type,
+                mode=req.mode,
+            )
+    # Budget guard after art-direction and approved-reference lock (trim tail only when over cap).
     data2 = pack.model_dump(mode="json")
     prompts2 = [str(p) for p in (data2.get("image_prompts") or [])]
     data2["image_prompts"] = [_compact_prompt_to_budget(p) for p in prompts2]
-    return CatstylePromptPack.model_validate(data2)
+    pack = CatstylePromptPack.model_validate(data2)
+    keep_neg: tuple[str, ...] = ()
+    if approved_hit is not None:
+        keep_neg = approved_reference_negative_must_keep(pa, pb, req.aspect_type, req.mode)
+    capped_neg = trim_negative_prompt_to_max(
+        pack.negative_prompt,
+        must_keep=keep_neg,
+        drop_from="back_first" if approved_hit else "front_first",
+    )
+    if capped_neg != pack.negative_prompt:
+        pack = pack.model_copy(update={"negative_prompt": capped_neg})
+    return pack
 
 
 def _finalize_pack_with_art_direction(

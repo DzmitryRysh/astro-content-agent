@@ -410,6 +410,7 @@ def build_catstyle_image_generation_jobs(
             req_kw["shot_mode"] = shot_m
         if render_k is not None:
             req_kw["render_style_profile_key"] = render_k
+        req_kw["disable_approved_reference_prompt_lock"] = disable_approved_reference_auto
         if final_ref:
             pa_chk = pa_n.lower()
             pb_chk = pb_n.lower()
@@ -514,6 +515,7 @@ def build_catstyle_image_generation_jobs(
                     req_kw_refresh["shot_mode"] = shot_m
                 if render_k is not None:
                     req_kw_refresh["render_style_profile_key"] = render_k
+                req_kw_refresh["disable_approved_reference_prompt_lock"] = disable_approved_reference_auto
                 pp = generate_catstyle_prompt_pack(CatstylePromptRequest(**req_kw_refresh)).model_dump(
                     mode="json"
                 )

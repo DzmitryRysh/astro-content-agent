@@ -205,6 +205,13 @@ class CatstylePromptRequest(BaseModel):
             "do not copy Mars combat choreography onto these planet-cats (Catstyle v1)."
         ),
     )
+    disable_approved_reference_prompt_lock: bool = Field(
+        default=False,
+        description=(
+            "When True, skip [APPROVED CATSTYLE REFERENCE LOCK] prompt blocks even if an approved registry entry exists. "
+            "Typically aligned with disable_approved_reference_auto on image job builds."
+        ),
+    )
 
 
 class CatstylePromptPack(BaseModel):

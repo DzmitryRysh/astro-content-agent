@@ -54,6 +54,25 @@ SUN_URANUS_CONJUNCTION_TENSION_VISUAL_CANON: Final[str] = (
 )
 
 
+SUN_URANUS_APPROVED_REFERENCE_FIDELITY_BLOCK: Final[str] = (
+    "[SUN-URANUS APPROVED REFERENCE FIDELITY v1] When the approved Sun/Uranus conjunction+tension reference is active, "
+    "match its **premium battle-poster** DNA: **Sun** = orange-gold royal solar catplanet warrior—heavy, fierce, "
+    "solar authority / Leo-coded royal fire (never a simple cute orange cat). "
+    "**Uranus** = cyan-blue electric disruptor catplanet—fast, sharp, lightning-charged (never soft, striped, childish, generic, or weak). "
+    "Preserve **red Sun faction flag left** with canonical **\u2609 (☉)** and **blue Uranus faction flag right** with canonical **\u2645 (♅)**—"
+    "large heraldic cloth integration. Preserve **orange solar force versus blue electric Uranian force**, "
+    "**dynamic battle composition** with shockwave / flare / arc energy (not static pointing duel), "
+    "**high contrast**, **sharp linework**, **dramatic rim lighting**, **expensive poster finish**, "
+    "**dark monumental coliseum depth**, **Earth above arena**, **large readable zodiac circle floor**—"
+    "not a playful duel or flat simple confrontation."
+)
+
+SUN_URANUS_APPROVED_REFERENCE_FIDELITY_COMPACT: Final[str] = (
+    "[SUN-URANUS REF FIDELITY] Sun=orange-gold royal solar warrior (\u2609 red flag left); "
+    "Uranus=cyan-blue electric sharp disruptor (\u2645 blue flag right); orange-vs-blue battle-poster energy—not cute duel."
+)
+
+
 SUN_URANUS_CONJUNCTION_TENSION_NEGATIVE_EXTRAS: Final[tuple[str, ...]] = (
     "storybook illustration dominance",
     "children-book style",
@@ -69,6 +88,8 @@ SUN_URANUS_CONJUNCTION_TENSION_NEGATIVE_EXTRAS: Final[tuple[str, ...]] = (
 )
 
 __all__ = [
+    "SUN_URANUS_APPROVED_REFERENCE_FIDELITY_COMPACT",
+    "SUN_URANUS_APPROVED_REFERENCE_FIDELITY_BLOCK",
     "SUN_URANUS_CONJUNCTION_TENSION_NEGATIVE_EXTRAS",
     "SUN_URANUS_CONJUNCTION_TENSION_VISUAL_CANON",
     "is_sun_uranus_conjunction_tension",
