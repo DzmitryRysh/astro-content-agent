@@ -4,6 +4,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal
 
+from astro_content_agent.content.catstyle.approved_reference_prompt_lock_v1 import (
+    visual_fidelity_negative_must_keep,
+)
 from astro_content_agent.content.catstyle.catstyle_global_quality_lock_v1 import (
     CATSTYLE_GLOBAL_QUALITY_LOCK_BLOCK,
     CATSTYLE_GLOBAL_QUALITY_NEGATIVE_EXTRAS,
@@ -297,6 +300,8 @@ def strengthen_negative_prompt(
             "over-rendered fur strands and material gloss",
             "cluttered architecture detail spam",
             "weak bland composition with disconnected characters",
+            "underexposed overall scene",
+            "muddy crushed shadows",
         ]
         safety_terms = (
             "real weapons",
@@ -308,7 +313,9 @@ def strengthen_negative_prompt(
             "explicit",
         )
         carried_safety = [p for p in _split_chunks(base_negative) if any(t in p.lower() for t in safety_terms)]
-        merged = _dedupe_keep_order(style_compact + carried_safety)
+        merged = _dedupe_keep_order(
+            style_compact + list(visual_fidelity_negative_must_keep()) + carried_safety
+        )
         if (mode or "").strip().lower() == "flow":
             flow_extra = [
                 "tournament duel framing",

@@ -12,6 +12,7 @@ from astro_content_agent.content.catstyle.approved_reference_prompt_lock_v1 impo
     apply_approved_reference_lock_to_prompt_pack,
     approved_reference_negative_must_keep,
     trim_negative_prompt_to_max,
+    visual_fidelity_negative_must_keep,
 )
 from astro_content_agent.content.catstyle.approved_reference_registry import (
     resolve_approved_reference,
@@ -32,7 +33,17 @@ from astro_content_agent.content.catstyle.planet_canon import (
 )
 from astro_content_agent.content.catstyle.catplanet_body_identity_lock_v1 import (
     CATPLANET_BODY_IDENTITY_LOCK_BLOCK,
-    sun_uranus_body_and_flag_lock_blocks,
+    CATPLANET_BODY_NEGATIVE_EXTRAS,
+    sun_uranus_catplanet_body_lock_blocks,
+)
+from astro_content_agent.content.catstyle.flag_glyph_fidelity_lock_v1 import (
+    FLAG_GLYPH_FIDELITY_LOCK_BLOCK,
+    FLAG_GLYPH_FIDELITY_NEGATIVE_EXTRAS,
+    SUN_URANUS_FLAG_GLYPH_FIDELITY_BLOCK,
+)
+from astro_content_agent.content.catstyle.zodiac_arena_floor_lock_v1 import (
+    ZODIAC_ARENA_FLOOR_LOCK_BLOCK,
+    ZODIAC_ARENA_FLOOR_NEGATIVE_EXTRAS,
 )
 from astro_content_agent.content.catstyle.catstyle_global_quality_lock_v1 import (
     CATSTYLE_GLOBAL_QUALITY_LOCK_BLOCK,
@@ -88,6 +99,14 @@ _CATSTYLE_SUBJECT_GUARDS = (
     "No text in image, no logos, no brands."
 )
 
+_CATSTYLE_VISUAL_FIDELITY_NEGATIVE_CHUNK = ", ".join(
+    (
+        *CATPLANET_BODY_NEGATIVE_EXTRAS,
+        *ZODIAC_ARENA_FLOOR_NEGATIVE_EXTRAS,
+        *FLAG_GLYPH_FIDELITY_NEGATIVE_EXTRAS,
+    )
+)
+
 _NEGATIVE_BASE_CHUNKS = [
     "text, words, letters, captions, watermarks, logos, trademarks, QR codes",
     "photorealistic, hyperreal skin, photoreal materials, HDR glossy",
@@ -99,6 +118,7 @@ _NEGATIVE_BASE_CHUNKS = [
     "disconnected sticker posing, over-rendered fur strands, over-rendered material noise",
     "malformed planetary glyphs, pseudo-symbols, fake astrological letters, distorted zodiac marks, invented sigils",
     "floating white sticker symbols, detached glow glyphs not locked to cloth, symbols pasted over faces or torsos",
+    _CATSTYLE_VISUAL_FIDELITY_NEGATIVE_CHUNK,
     *CATSTYLE_GLOBAL_QUALITY_NEGATIVE_EXTRAS,
 ]
 
@@ -636,7 +656,8 @@ def _pair_specific_visual_guards(pa: str, pb: str, aspect_type: str, mode: str) 
         _moon_saturn_visual_correction_block(pa, pb, aspect_type, mode),
     ]
     if is_sun_uranus_conjunction_tension(pa, pb, aspect_type, mode):
-        parts.append(sun_uranus_body_and_flag_lock_blocks())
+        parts.append(sun_uranus_catplanet_body_lock_blocks())
+        parts.append(SUN_URANUS_FLAG_GLYPH_FIDELITY_BLOCK)
         parts.append(SUN_URANUS_CONJUNCTION_TENSION_VISUAL_CANON)
     if is_mars_pluto_square_tension(pa, pb, aspect_type, mode):
         parts.append(MARS_PLUTO_SQUARE_TENSION_VISUAL_CANON)
@@ -650,6 +671,7 @@ def _prompt_choreography_middleware(
     blocks: list[str] = [
         CATSTYLE_GLOBAL_QUALITY_LOCK_BLOCK,
         CATPLANET_BODY_IDENTITY_LOCK_BLOCK,
+        ZODIAC_ARENA_FLOOR_LOCK_BLOCK,
     ]
     if (req.mode or "").strip().lower() == "flow":
         blocks.append(_catstyle_flow_mode_visual_lock(req))
@@ -657,6 +679,7 @@ def _prompt_choreography_middleware(
     blocks.append(
         resolved_pair_flag_glyph_system_block(pa, pb, req.aspect_type, req.mode)
     )
+    blocks.append(FLAG_GLYPH_FIDELITY_LOCK_BLOCK)
     blocks.extend(
         [
             _aspect_choreography_block(req.aspect_type, req.mode),
@@ -1041,13 +1064,21 @@ def generate_catstyle_prompt_pack(req: CatstylePromptRequest) -> CatstylePromptP
     prompts2 = [str(p) for p in (data2.get("image_prompts") or [])]
     data2["image_prompts"] = [_compact_prompt_to_budget(p) for p in prompts2]
     pack = CatstylePromptPack.model_validate(data2)
-    keep_neg: tuple[str, ...] = ()
-    if approved_hit is not None:
-        keep_neg = approved_reference_negative_must_keep(pa, pb, req.aspect_type, req.mode)
+    keep_neg: tuple[str, ...] = (
+        approved_reference_negative_must_keep(pa, pb, req.aspect_type, req.mode)
+        if approved_hit is not None
+        else visual_fidelity_negative_must_keep()
+    )
+    if (req.mode or "").strip().lower() == "flow":
+        keep_neg = keep_neg + (
+            "underexposed overall scene",
+            "muddy crushed shadows",
+            "malformed astrological glyphs painted in-image",
+        )
     capped_neg = trim_negative_prompt_to_max(
         pack.negative_prompt,
         must_keep=keep_neg,
-        drop_from="back_first" if approved_hit else "front_first",
+        drop_from="back_first",
     )
     if capped_neg != pack.negative_prompt:
         pack = pack.model_copy(update={"negative_prompt": capped_neg})
@@ -1070,8 +1101,10 @@ def _finalize_pack_with_art_direction(
             extras.extend(MARS_PLUTO_SQUARE_TENSION_NEGATIVE_EXTRAS)
         if not extras:
             return p
-        tail = ", ".join(extras)
-        merged_neg = f"{p.negative_prompt.rstrip().rstrip(',')}, {tail}".strip()
+        merged_neg = _merge_negative_prompt(
+            [p.negative_prompt] if p.negative_prompt else [],
+            extras,
+        )
         return p.model_copy(update={"negative_prompt": merged_neg})
 
     if not req.premium_art_direction:

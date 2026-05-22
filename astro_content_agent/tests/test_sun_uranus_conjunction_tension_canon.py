@@ -77,6 +77,16 @@ def test_prompt_requires_canonical_glyphs() -> None:
     assert "\u2609" in joined
     assert "\u2645" in joined
     assert "Sun glyph" in joined or "Sun (\u2609)" in joined
+    assert "[FLAG GLYPH FIDELITY LOCK v1]" in joined
+    assert "[SUN-URANUS FLAG GLYPH FIDELITY v1]" in joined
+
+
+def test_prompt_includes_zodiac_arena_floor_lock() -> None:
+    pack = generate_catstyle_prompt_pack(_req())
+    low = "\n".join(pack.image_prompts).lower()
+    assert "[zodiac arena floor lock v1]" in low
+    assert "large readable zodiac wheel" in low
+    assert "random magic circle" in low
 
 
 def test_negative_prompt_includes_pair_and_global_anti_storybook() -> None:

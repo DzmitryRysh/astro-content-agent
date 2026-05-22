@@ -4,8 +4,17 @@ from __future__ import annotations
 from typing import Final
 
 from astro_content_agent.content.catstyle.approved_reference_registry import ResolvedApprovedReference
+from astro_content_agent.content.catstyle.catplanet_body_identity_lock_v1 import (
+    CATPLANET_BODY_NEGATIVE_EXTRAS,
+)
 from astro_content_agent.content.catstyle.catstyle_global_quality_lock_v1 import (
     CATSTYLE_GLOBAL_QUALITY_NEGATIVE_EXTRAS,
+)
+from astro_content_agent.content.catstyle.flag_glyph_fidelity_lock_v1 import (
+    FLAG_GLYPH_FIDELITY_NEGATIVE_EXTRAS,
+)
+from astro_content_agent.content.catstyle.zodiac_arena_floor_lock_v1 import (
+    ZODIAC_ARENA_FLOOR_NEGATIVE_EXTRAS,
 )
 from astro_content_agent.content.catstyle.mars_pluto_square_tension_canon_v1 import (
     MARS_PLUTO_SQUARE_TENSION_NEGATIVE_EXTRAS,
@@ -57,11 +66,26 @@ _BASE_NEGATIVE_GUARD_FOR_APPROVED_REF: Final[tuple[str, ...]] = (
 )
 
 
+_CATSTYLE_VISUAL_FIDELITY_NEGATIVE_COMPACT: Final[str] = ", ".join(
+    (
+        *CATPLANET_BODY_NEGATIVE_EXTRAS,
+        *ZODIAC_ARENA_FLOOR_NEGATIVE_EXTRAS,
+        *FLAG_GLYPH_FIDELITY_NEGATIVE_EXTRAS,
+    )
+)
+
+
+def visual_fidelity_negative_must_keep() -> tuple[str, ...]:
+    """One compact comma-chunk reserved under trim (matches base fidelity negative chunk)."""
+    return (_CATSTYLE_VISUAL_FIDELITY_NEGATIVE_COMPACT,)
+
+
 def approved_reference_negative_must_keep(
     planet_a: str, planet_b: str, aspect_type: str, mode: str
 ) -> tuple[str, ...]:
     return (
-        APPROVED_REFERENCE_NEGATIVE_EXTRAS
+        visual_fidelity_negative_must_keep()
+        + APPROVED_REFERENCE_NEGATIVE_EXTRAS
         + _pair_negative_must_keep(planet_a, planet_b, aspect_type, mode)
         + _GLOBAL_NEGATIVE_GUARD_FOR_APPROVED_REF
         + _BASE_NEGATIVE_GUARD_FOR_APPROVED_REF
@@ -248,32 +272,12 @@ def apply_approved_reference_lock_to_prompt_pack(
     ]
     neg = pack.negative_prompt
     must_keep = approved_reference_negative_must_keep(planet_a, planet_b, aspect_type, mode)
-    reserved_for_extras = sum(len(e) + 2 for e in APPROVED_REFERENCE_NEGATIVE_EXTRAS) + 16
-    pre_merge_cap = max(400, _NEGATIVE_PROMPT_MAX_LEN - reserved_for_extras)
-    if len(neg) > pre_merge_cap:
-        neg = trim_negative_prompt_to_max(
-            neg,
-            max_len=pre_merge_cap,
-            must_keep=must_keep,
-            drop_from="back_first",
-        )
     merged_neg = merge_negative_prompt_with_extras(neg, APPROVED_REFERENCE_NEGATIVE_EXTRAS)
-    while _extras_missing_from_negative(merged_neg, APPROVED_REFERENCE_NEGATIVE_EXTRAS) and len(neg) > 400:
-        missing = _extras_missing_from_negative(merged_neg, APPROVED_REFERENCE_NEGATIVE_EXTRAS)
-        room = sum(len(m) + 2 for m in missing) + 24
-        neg2 = trim_global_quality_negatives_for_room(neg, target_max_len=max(400, len(neg) - room))
-        if neg2 == neg:
-            neg = trim_negative_prompt_to_max(
-                neg,
-                max_len=max(400, len(neg) - room),
-                must_keep=must_keep,
-                drop_from="back_first",
-            )
-        else:
+    if _extras_missing_from_negative(merged_neg, APPROVED_REFERENCE_NEGATIVE_EXTRAS):
+        neg2 = trim_global_quality_negatives_for_room(neg, target_max_len=max(400, len(neg) - 48))
+        if neg2 != neg:
             neg = neg2
-        merged_neg = merge_negative_prompt_with_extras(neg, APPROVED_REFERENCE_NEGATIVE_EXTRAS)
-        if _extras_missing_from_negative(merged_neg, APPROVED_REFERENCE_NEGATIVE_EXTRAS) == missing:
-            break
+            merged_neg = merge_negative_prompt_with_extras(neg, APPROVED_REFERENCE_NEGATIVE_EXTRAS)
     merged_neg = merge_negative_prompt_with_extras(merged_neg, _BASE_NEGATIVE_GUARD_FOR_APPROVED_REF)
     merged_neg = trim_negative_prompt_to_max(
         merged_neg,
@@ -291,6 +295,7 @@ def apply_approved_reference_lock_to_prompt_pack(
 __all__ = [
     "APPROVED_REFERENCE_NEGATIVE_EXTRAS",
     "REFERENCE_FIDELITY_GRADING_BLOCK",
+    "visual_fidelity_negative_must_keep",
     "apply_approved_reference_lock_to_prompt_pack",
     "build_approved_reference_lock_block",
     "build_approved_reference_prompt_lock_text",
