@@ -29,6 +29,10 @@ from astro_content_agent.services.content.catstyle_reference_candidates import (
     reference_candidate_dir,
 )
 from astro_content_agent.services.content import catstyle_reference_approval as approval_service
+from astro_content_agent.tests.catstyle_reference_test_helpers import (
+    write_png_signature_stub,
+    write_valid_reference_png,
+)
 
 
 def _load_cli(script_name: str, module_name: str):
@@ -253,8 +257,7 @@ def test_approval_candidate_cli_updates_registry(tmp_path: Path) -> None:
     registry_path.parent.mkdir(parents=True, exist_ok=True)
     registry_path.write_text('{"version":"catstyle-approved-references-v1","entries":[]}\n', encoding="utf-8")
     src = repo / "candidates" / "pick.png"
-    src.parent.mkdir(parents=True, exist_ok=True)
-    src.write_bytes(b"\x89PNG\r\n\x1a\n" + b"PICK")
+    write_valid_reference_png(src, color=(90, 120, 200))
 
     res = approval_service.approve_catstyle_reference(
         source_image=src,
@@ -309,12 +312,14 @@ def test_approve_reference_candidate_cli_runs(monkeypatch, tmp_path: Path) -> No
     registry_path.parent.mkdir(parents=True, exist_ok=True)
     registry_path.write_text('{"version":"catstyle-approved-references-v1","entries":[]}\n', encoding="utf-8")
     src = repo / "pick.png"
-    src.write_bytes(b"\x89PNG\r\n\x1a\n")
+    write_valid_reference_png(src)
 
     import astro_content_agent.content.catstyle.approved_reference_registry as reg_mod
 
     monkeypatch.setattr(reg_mod, "catstyle_repo_root", lambda: repo)
     monkeypatch.setattr(reg_mod, "approved_references_json_path", lambda: registry_path)
+    monkeypatch.setattr(approval_service, "catstyle_repo_root", lambda: repo)
+    monkeypatch.setattr(approval_service, "approved_references_json_path", lambda: registry_path)
 
     cli = _load_cli("approve_catstyle_reference_candidate.py", "_approve_ref_cand_cli")
     monkeypatch.setattr(
@@ -336,4 +341,37 @@ def test_approve_reference_candidate_cli_runs(monkeypatch, tmp_path: Path) -> No
         ],
     )
     assert cli.main() == 0
-    assert resolve_approved_reference("Sun", "Uranus", "conjunction", "tension") is not None
+    hit = resolve_approved_reference(
+        "Sun", "Uranus", "conjunction", "tension", registry=read_registry_entries(registry_path)
+    )
+    assert hit is not None
+    assert "catstyle_sun_uranus_conjunction_tension_approved.png" in hit.image_path.replace("\\", "/")
+
+
+def test_approval_workflow_does_not_touch_project_references_dir(tmp_path: Path) -> None:
+    """Approval must target an isolated repo root, not the real ``references/`` tree."""
+    repo = tmp_path / "isolated_repo"
+    registry_path = repo / "astro_content_agent" / "content" / "catstyle" / "approved_references.json"
+    registry_path.parent.mkdir(parents=True, exist_ok=True)
+    registry_path.write_text('{"version":"catstyle-approved-references-v1","entries":[]}\n', encoding="utf-8")
+    src = repo / "candidate.png"
+    write_valid_reference_png(src)
+    project_refs = Path(__file__).resolve().parents[2] / "references"
+    project_refs.mkdir(parents=True, exist_ok=True)
+    prod = project_refs / "catstyle_sun_uranus_conjunction_tension_approved.png"
+    prod_before = prod.read_bytes() if prod.is_file() else None
+
+    approval_service.approve_catstyle_reference(
+        source_image=src,
+        planet_a="Sun",
+        planet_b="Uranus",
+        aspect_type="conjunction",
+        mode="tension",
+        repo_root=repo,
+        registry_json_path=registry_path,
+    )
+    isolated = repo / "references" / "catstyle_sun_uranus_conjunction_tension_approved.png"
+    assert isolated.is_file()
+    assert isolated.stat().st_size > 10_000
+    if prod_before is not None:
+        assert prod.read_bytes() == prod_before

@@ -16,6 +16,11 @@ from astro_content_agent.content.catstyle.approved_reference_registry import (
     write_registry_entries,
 )
 from astro_content_agent.content.catstyle.planet_canon_v1 import normalize_planet_name
+from astro_content_agent.services.content.catstyle_reference_image_validation import (
+    CatstyleReferenceImageValidationError,
+    reference_image_quality_ok,
+    validate_reference_image_source,
+)
 
 
 class CatstyleReferenceApprovalError(ValueError):
@@ -95,8 +100,10 @@ def approve_catstyle_reference(
     root = (repo_root or catstyle_repo_root()).expanduser().resolve()
     reg_path = registry_json_path or approved_references_json_path()
     src = Path(source_image).expanduser().resolve()
-    if not src.is_file():
-        raise CatstyleReferenceApprovalError(f"Source image does not exist or is not a file: {src}")
+    try:
+        validate_reference_image_source(src)
+    except CatstyleReferenceImageValidationError as exc:
+        raise CatstyleReferenceApprovalError(str(exc)) from exc
 
     mode_l = _validate_mode(mode)
     asp_l = (aspect_type or "").strip().lower()
@@ -130,6 +137,12 @@ def approve_catstyle_reference(
         raise CatstyleReferenceApprovalError(
             "An approved reference already exists for this planet pair, aspect, and mode. "
             "Pass --overwrite to replace the image and update the registry entry."
+        )
+
+    if abs_target.is_file() and reference_image_quality_ok(abs_target) and not overwrite:
+        raise CatstyleReferenceApprovalError(
+            f"Production reference image already exists at {rel_target} "
+            f"({abs_target.stat().st_size} bytes). Pass --overwrite to replace with a new valid PNG."
         )
 
     shutil.copy2(src, abs_target)

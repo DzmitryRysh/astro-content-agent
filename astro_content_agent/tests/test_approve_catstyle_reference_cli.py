@@ -15,6 +15,11 @@ from astro_content_agent.content.catstyle.approved_reference_registry import (
     resolve_approved_reference,
 )
 from astro_content_agent.services.content import catstyle_reference_approval as approval_service
+from astro_content_agent.services.content.catstyle_reference_image_validation import PNG_SIGNATURE
+from astro_content_agent.tests.catstyle_reference_test_helpers import (
+    write_png_signature_stub,
+    write_valid_reference_png,
+)
 
 
 def _load_cli(script_name: str, module_name: str):
@@ -35,9 +40,8 @@ def _write_seed_registry(path: Path) -> None:
     path.write_text('{"version":"catstyle-approved-references-v1","entries":[]}\n', encoding="utf-8")
 
 
-def _write_png(path: Path, stamp: bytes = b"PNGDATA") -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(b"\x89PNG\r\n\x1a\n" + stamp)
+def _write_png(path: Path, *, color: tuple[int, int, int] = (40, 80, 120)) -> None:
+    write_valid_reference_png(path, color=color)
 
 
 def test_approval_service_copies_image_and_creates_registry_entry(tmp_path: Path) -> None:
@@ -104,8 +108,8 @@ def test_approval_service_overwrite_updates_existing_entry(tmp_path: Path) -> No
     _write_seed_registry(registry_path)
     src1 = repo / "a.png"
     src2 = repo / "b.png"
-    _write_png(src1, b"A")
-    _write_png(src2, b"B")
+    _write_png(src1, color=(10, 20, 30))
+    _write_png(src2, color=(200, 50, 50))
     approval_service.approve_catstyle_reference(
         source_image=src1,
         planet_a="Moon",
@@ -133,7 +137,51 @@ def test_approval_service_overwrite_updates_existing_entry(tmp_path: Path) -> No
     assert len(rows) == 1
     assert rows[0].label == "v2"
     target = repo / "references" / "catstyle_moon_saturn_square_tension_approved.png"
-    assert target.read_bytes().endswith(b"B")
+    assert target.stat().st_size > 10_000
+    assert target.read_bytes()[:8] == PNG_SIGNATURE
+    assert target.read_bytes() != src1.read_bytes()
+
+
+def test_approval_rejects_stub_png_signature(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    registry_path = repo / "astro_content_agent" / "content" / "catstyle" / "approved_references.json"
+    _write_seed_registry(registry_path)
+    stub = repo / "stub.png"
+    write_png_signature_stub(stub)
+    with pytest.raises(approval_service.CatstyleReferenceApprovalError, match="8-byte PNG signature stub"):
+        approval_service.approve_catstyle_reference(
+            source_image=stub,
+            planet_a="Sun",
+            planet_b="Uranus",
+            aspect_type="conjunction",
+            mode="tension",
+            repo_root=repo,
+            registry_json_path=registry_path,
+        )
+
+
+def test_production_reference_not_overwritten_by_invalid_source(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    registry_path = repo / "astro_content_agent" / "content" / "catstyle" / "approved_references.json"
+    _write_seed_registry(registry_path)
+    target = repo / "references" / "catstyle_sun_uranus_conjunction_tension_approved.png"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    write_valid_reference_png(target, color=(1, 2, 3))
+    before = target.read_bytes()
+    stub = repo / "bad.png"
+    write_png_signature_stub(stub)
+    with pytest.raises(approval_service.CatstyleReferenceApprovalError, match="8-byte PNG signature stub"):
+        approval_service.approve_catstyle_reference(
+            source_image=stub,
+            planet_a="Sun",
+            planet_b="Uranus",
+            aspect_type="conjunction",
+            mode="tension",
+            overwrite=True,
+            repo_root=repo,
+            registry_json_path=registry_path,
+        )
+    assert target.read_bytes() == before
 
 
 def test_approve_cli_and_list_cli_with_temp_registry(

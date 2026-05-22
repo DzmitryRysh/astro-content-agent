@@ -21,6 +21,7 @@ from astro_content_agent.services.content.catstyle_creative_publish_stability im
     evaluate_creative_publish_stability,
 )
 from astro_content_agent.services.content.catstyle_real_publish import run_catstyle_handoff_publish_workflow
+from astro_content_agent.content.catstyle.approved_reference_registry import catstyle_repo_root
 from astro_content_agent.services.content.catstyle_reference_candidates import (
     collect_candidate_image_paths,
     format_approval_cli_command,
@@ -35,6 +36,12 @@ _MIN_PNG = base64.b64decode(
 
 def _synthesize_png_placeholders_for_stub_qc(gen_dir: Path, jobs_res: CatstyleImageGenerationJobsResult) -> None:
     """Stub image provider writes JSON placeholders; Catstyle QC expects PNGs at ``suggested_output_name``."""
+    gen_resolved = gen_dir.expanduser().resolve()
+    refs_dir = (catstyle_repo_root() / "references").resolve()
+    if gen_resolved == refs_dir or refs_dir in gen_resolved.parents:
+        raise RuntimeError(
+            f"Refusing to write stub QC PNGs under production references directory: {gen_resolved}"
+        )
     gen_dir.mkdir(parents=True, exist_ok=True)
     for j in jobs_res.jobs:
         name = str(j.suggested_output_name or "").strip()
