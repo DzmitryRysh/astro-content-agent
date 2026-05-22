@@ -37,7 +37,22 @@ def main() -> int:
     ap.add_argument("--scene-template", default=None)
     ap.add_argument("--render-style-profile", default="premium_comic_poster_v2")
     ap.add_argument("--shot-mode", choices=("hero_pair", "epic_arena_showdown", "standard"), default="epic_arena_showdown")
-    ap.add_argument("--jobs-count", type=int, choices=(1, 2), default=1)
+    ap.add_argument(
+        "--jobs-count",
+        type=int,
+        choices=(1, 2),
+        default=None,
+        help="Image jobs to emit (default: 2 with --reference-candidates, else 1).",
+    )
+    ap.add_argument(
+        "--reference-candidates",
+        action="store_true",
+        dest="reference_candidates",
+        help=(
+            "Reference candidate mode for unstable pairs: generate candidate images (default 2 jobs), "
+            "write visual review checklist, do not publish. Outputs under catstyle_reference_candidates/<date>/<pair>/."
+        ),
+    )
     ap.add_argument("--planet-a", default=None, dest="planet_a")
     ap.add_argument("--planet-b", default=None, dest="planet_b")
     ap.add_argument("--aspect-type", default=None, dest="aspect_type")
@@ -85,6 +100,8 @@ def main() -> int:
     args = ap.parse_args()
     work = Path(args.work_root).expanduser().resolve() if args.work_root else Path.cwd().resolve()
 
+    jobs_count = args.jobs_count if args.jobs_count is not None else (2 if args.reference_candidates else 1)
+
     try:
         r = run_catstyle_daily_agent(
             args.date,
@@ -97,7 +114,7 @@ def main() -> int:
             scene_template=args.scene_template,
             render_style_profile=args.render_style_profile,
             shot_mode=args.shot_mode,
-            jobs_count=args.jobs_count,
+            jobs_count=jobs_count,
             planet_a_override=args.planet_a,
             planet_b_override=args.planet_b,
             aspect_type_override=args.aspect_type,
@@ -112,6 +129,7 @@ def main() -> int:
             style_reference_image_path=args.style_reference_image,
             disable_approved_reference_auto=args.disable_approved_reference_auto,
             force_publish_unstable=args.force_publish_unstable,
+            reference_candidates=args.reference_candidates,
             repo_root_for_dotenv=REPO_ROOT,
         )
     except ValueError as e:
@@ -146,6 +164,16 @@ def main() -> int:
         print("  publish_artifacts:")
         for p in r.publish_result_paths:
             print(f"    - {p}")
+    if r.reference_candidates_dir:
+        print(f"  reference_candidates_dir: {r.reference_candidates_dir}")
+    if r.candidate_image_paths:
+        print("  candidate_images:")
+        for p in r.candidate_image_paths:
+            print(f"    - {p}")
+    if r.visual_review_path:
+        print(f"  visual_review:       {r.visual_review_path}")
+    if r.next_approval_command:
+        print(f"  next_approval_cmd:   {r.next_approval_command}")
     if r.errors:
         print("  errors:")
         for e in r.errors:

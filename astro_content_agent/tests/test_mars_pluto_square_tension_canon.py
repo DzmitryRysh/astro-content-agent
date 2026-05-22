@@ -4,6 +4,8 @@ from __future__ import annotations
 from astro_content_agent.content.catstyle.mars_pluto_square_tension_canon_v1 import (
     MARS_PLUTO_SQUARE_TENSION_VISUAL_CANON,
     is_mars_pluto_square_tension,
+)
+from astro_content_agent.content.catstyle.pair_flag_glyph_resolution_v1 import (
     resolved_pair_flag_glyph_system_block,
 )
 from astro_content_agent.content.catstyle.models import CatstylePromptRequest

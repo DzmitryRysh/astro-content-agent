@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import date
 import base64
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +21,12 @@ from astro_content_agent.services.content.catstyle_creative_publish_stability im
     evaluate_creative_publish_stability,
 )
 from astro_content_agent.services.content.catstyle_real_publish import run_catstyle_handoff_publish_workflow
+from astro_content_agent.services.content.catstyle_reference_candidates import (
+    collect_candidate_image_paths,
+    format_approval_cli_command,
+    reference_candidate_dir,
+    write_reference_candidate_artifacts,
+)
 
 _MIN_PNG = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
@@ -92,6 +99,10 @@ class CatstyleDailyAgentResult:
     publish_exit_code: int | None = None
     publish_status: str | None = None
     publish_result_paths: list[str] = field(default_factory=list)
+    reference_candidates_dir: str | None = None
+    candidate_image_paths: list[str] = field(default_factory=list)
+    visual_review_path: str | None = None
+    next_approval_command: str | None = None
     log_lines: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
 
@@ -123,6 +134,7 @@ def run_catstyle_daily_agent(
     style_reference_image_path: str | None = None,
     disable_approved_reference_auto: bool = False,
     force_publish_unstable: bool = False,
+    reference_candidates: bool = False,
     repo_root_for_dotenv: Path | None = None,
 ) -> CatstyleDailyAgentResult:
     """
@@ -152,6 +164,15 @@ def run_catstyle_daily_agent(
             **kwargs,
         )
         return base
+
+    if reference_candidates:
+        if publish or validate_only:
+            log.append(
+                "NOTE: --reference-candidates mode ignores --publish and --validate-only (no Instagram publish)."
+            )
+        publish = False
+        validate_only = False
+        approve = False
 
     approve_effective = bool(approve or validate_only or publish)
 
@@ -192,8 +213,18 @@ def run_catstyle_daily_agent(
     aspect_line = _aspect_label(sel if isinstance(sel, dict) else None)
     log.append(f"  Selected aspect: {aspect_line}")
 
+    pa_ctx, pb_ctx, asp_ctx, mode_ctx = _aspect_context(sel if isinstance(sel, dict) else None)
+    exec_output_dir: Path | None = None
+    if reference_candidates:
+        cand_root = reference_candidate_dir(root, day, pa_ctx, pb_ctx, asp_ctx, mode_ctx)
+        exec_output_dir = (cand_root / "images").resolve()
+        exec_output_dir.mkdir(parents=True, exist_ok=True)
+        log.append(f"[reference-candidates] Output folder: {cand_root}")
+
     log.append(f"[2/5] Execute image jobs (provider={provider})")
-    exec_res = execute_catstyle_image_jobs(mp, provider_name=provider, output_dir=None, overwrite=overwrite)
+    exec_res = execute_catstyle_image_jobs(
+        mp, provider_name=provider, output_dir=exec_output_dir, overwrite=overwrite
+    )
     gen_dir = Path(exec_res.outputs_dir).resolve()
     log.append(f"  output_dir: {gen_dir}")
     log.append(f"  executor status: {exec_res.status}")
@@ -224,6 +255,53 @@ def run_catstyle_daily_agent(
             generated_images_dir=str(gen_dir),
             selected_aspect=aspect_line,
             image_executor_status=exec_res.status,
+        )
+
+    if reference_candidates:
+        cand_root = reference_candidate_dir(root, day, pa_ctx, pb_ctx, asp_ctx, mode_ctx)
+        images_dir = gen_dir
+        shutil.copy2(mp, cand_root / "image_generation_jobs.json")
+        cand_paths = collect_candidate_image_paths(images_dir, jobs_res.jobs)
+        review_path, _meta_path = write_reference_candidate_artifacts(
+            cand_root,
+            date_iso=iso,
+            planet_a=pa_ctx,
+            planet_b=pb_ctx,
+            aspect_type=asp_ctx,
+            mode=mode_ctx,
+            candidate_image_paths=cand_paths,
+            manifest_path=cand_root / "image_generation_jobs.json",
+            jobs_count=jobs_count,
+            provider=provider,
+        )
+        next_cmd = format_approval_cli_command(
+            image_path=cand_paths[0] if cand_paths else images_dir / "SELECTED.png",
+            planet_a=pa_ctx,
+            planet_b=pb_ctx,
+            aspect_type=asp_ctx,
+            mode=mode_ctx,
+        )
+        log.append(f"[reference-candidates] Folder: {cand_root}")
+        log.append(f"[reference-candidates] Jobs: {len(jobs_res.jobs)}  images: {len(cand_paths)}")
+        for cp in cand_paths:
+            log.append(f"  candidate: {cp}")
+        log.append(f"[reference-candidates] Review: {review_path}")
+        log.append(f"[reference-candidates] Next: {next_cmd}")
+        return CatstyleDailyAgentResult(
+            exit_code=0,
+            date=iso,
+            status="reference_candidates_ok",
+            manifest_path=str(mp),
+            image_jobs_dir=str(jobs_dir),
+            generated_images_dir=str(images_dir),
+            selected_aspect=aspect_line,
+            image_executor_status=exec_res.status,
+            reference_candidates_dir=str(cand_root),
+            candidate_image_paths=[str(p) for p in cand_paths],
+            visual_review_path=str(review_path),
+            next_approval_command=next_cmd,
+            log_lines=log,
+            errors=errs,
         )
 
     pkg_root = root / "catstyle_post_packages" / iso
@@ -262,7 +340,6 @@ def run_catstyle_daily_agent(
         )
 
     publish_paths: list[str] = []
-    pa_ctx, pb_ctx, asp_ctx, mode_ctx = _aspect_context(sel if isinstance(sel, dict) else None)
 
     if publish and not validate_only:
         stability = evaluate_creative_publish_stability(

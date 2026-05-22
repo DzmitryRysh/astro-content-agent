@@ -32,7 +32,14 @@ from astro_content_agent.content.catstyle.mars_pluto_square_tension_canon_v1 imp
     MARS_PLUTO_SQUARE_TENSION_NEGATIVE_EXTRAS,
     MARS_PLUTO_SQUARE_TENSION_VISUAL_CANON,
     is_mars_pluto_square_tension,
+)
+from astro_content_agent.content.catstyle.pair_flag_glyph_resolution_v1 import (
     resolved_pair_flag_glyph_system_block,
+)
+from astro_content_agent.content.catstyle.sun_uranus_conjunction_tension_canon_v1 import (
+    SUN_URANUS_CONJUNCTION_TENSION_NEGATIVE_EXTRAS,
+    SUN_URANUS_CONJUNCTION_TENSION_VISUAL_CANON,
+    is_sun_uranus_conjunction_tension,
 )
 from astro_content_agent.content.catstyle.planet_glyph_registry_v1 import canonical_glyph_char
 from astro_content_agent.content.catstyle.planet_identity_markers_v1 import (
@@ -614,10 +621,12 @@ def _moon_saturn_visual_correction_block(pa: str, pb: str, aspect_type: str, mod
 
 
 def _pair_specific_visual_guards(pa: str, pb: str, aspect_type: str, mode: str) -> str:
-    """Moon/Saturn square tension patch + Mars/Pluto square tension premium canon (mutually exclusive pairs)."""
+    """Moon/Saturn patch + pair-specific premium canons (Mars/Pluto, Sun/Uranus, …)."""
     parts: list[str] = [
         _moon_saturn_visual_correction_block(pa, pb, aspect_type, mode),
     ]
+    if is_sun_uranus_conjunction_tension(pa, pb, aspect_type, mode):
+        parts.append(SUN_URANUS_CONJUNCTION_TENSION_VISUAL_CANON)
     if is_mars_pluto_square_tension(pa, pb, aspect_type, mode):
         parts.append(MARS_PLUTO_SQUARE_TENSION_VISUAL_CANON)
     return " ".join(p for p in parts if p).strip()
@@ -1018,6 +1027,8 @@ def _finalize_pack_with_art_direction(
 ) -> CatstylePromptPack:
     def _append_extra_negatives(p: CatstylePromptPack) -> CatstylePromptPack:
         extras: list[str] = list(CATSTYLE_GLOBAL_QUALITY_NEGATIVE_EXTRAS)
+        if is_sun_uranus_conjunction_tension(pa, pb, req.aspect_type, req.mode):
+            extras.extend(SUN_URANUS_CONJUNCTION_TENSION_NEGATIVE_EXTRAS)
         if is_mars_pluto_square_tension(pa, pb, req.aspect_type, req.mode):
             extras.extend(MARS_PLUTO_SQUARE_TENSION_NEGATIVE_EXTRAS)
         if not extras:

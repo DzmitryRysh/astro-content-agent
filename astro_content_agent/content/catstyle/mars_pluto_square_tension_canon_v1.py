@@ -10,9 +10,6 @@ from __future__ import annotations
 from typing import Final
 
 from astro_content_agent.content.catstyle.planet_canon_v1 import normalize_planet_name
-from astro_content_agent.content.catstyle.planet_glyph_registry_v1 import format_pair_flag_glyph_system_block
-
-
 # Marked stable for daily-agent auto-publish (pair-specific canon without approved PNG required).
 MARS_PLUTO_SQUARE_TENSION_CREATIVE_PUBLISH_STABLE: Final[bool] = True
 
@@ -34,17 +31,6 @@ def is_mars_pluto_square_tension_creative_publish_stable(
     return MARS_PLUTO_SQUARE_TENSION_CREATIVE_PUBLISH_STABLE and is_mars_pluto_square_tension(
         planet_a, planet_b, aspect_type, mode
     )
-
-
-def resolved_pair_flag_glyph_system_block(
-    planet_a: str, planet_b: str, aspect_type: str, mode: str
-) -> str:
-    """Left/port = Pluto ♇, right/starboard = Mars ♂ for Mars–Pluto square + tension."""
-    if is_mars_pluto_square_tension(planet_a, planet_b, aspect_type, mode):
-        return format_pair_flag_glyph_system_block("Pluto", "Mars").strip()
-    pa = normalize_planet_name(planet_a)
-    pb = normalize_planet_name(planet_b)
-    return format_pair_flag_glyph_system_block(pa, pb).strip()
 
 
 MARS_PLUTO_SQUARE_TENSION_VISUAL_CANON: Final[str] = (
@@ -89,5 +75,4 @@ __all__ = [
     "MARS_PLUTO_SQUARE_TENSION_VISUAL_CANON",
     "is_mars_pluto_square_tension",
     "is_mars_pluto_square_tension_creative_publish_stable",
-    "resolved_pair_flag_glyph_system_block",
 ]

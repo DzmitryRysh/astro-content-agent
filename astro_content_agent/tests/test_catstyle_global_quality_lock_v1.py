@@ -21,8 +21,10 @@ def _req() -> CatstylePromptRequest:
 def test_global_lock_in_image_prompt() -> None:
     pack = generate_catstyle_prompt_pack(_req())
     joined = "\n".join(pack.image_prompts)
-    assert "[CATSTYLE GLOBAL QUALITY LOCK v1]" in joined
+    assert "[CATSTYLE GLOBAL QUALITY LOCK v2]" in joined
     assert "premium cinematic comic-poster" in joined.lower()
+    assert "sharper linework" in joined.lower()
+    assert "storybook" in joined.lower()
     assert "coliseum" in joined.lower()
     assert "earth" in joined.lower()
     assert "zodiac" in joined.lower()
@@ -36,3 +38,5 @@ def test_global_anti_storybook_negatives() -> None:
     assert "children-book" in neg or "children-book style" in neg
     assert "watercolor" in neg
     assert "toy-like" in neg
+    assert "static standing" in neg or "static face-off" in neg
+    assert "sharper linework" in "\n".join(pack.image_prompts).lower()
