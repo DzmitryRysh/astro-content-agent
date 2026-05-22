@@ -188,6 +188,16 @@ def _manual_aspect_override_manifest_block(pa: str, pb: str, asp: str, mode: str
     return {"enabled": True, "planet_a": pa, "planet_b": pb, "aspect_type": asp, "mode": mode}
 
 
+def _approved_reference_log_lines(meta: dict[str, Any]) -> list[str]:
+    if not meta.get("approved_reference_used"):
+        return []
+    path = meta.get("approved_reference_image_path") or meta.get("path") or ""
+    return [
+        f"Using approved Catstyle reference image: {path}",
+        "Reference source: approved_reference_registry",
+    ]
+
+
 def _resolve_final_style_reference(
     *,
     explicit_path: str | None,
@@ -199,25 +209,47 @@ def _resolve_final_style_reference(
 ) -> tuple[str | None, dict[str, Any]]:
     """Return ``(path_or_none, meta)`` for jobs/manifest (explicit CLI wins over registry)."""
     if explicit_path:
-        return explicit_path, {
+        resolved = str(Path(explicit_path).expanduser().resolve())
+        return resolved, {
             "source": "explicit",
-            "path": explicit_path,
+            "path": resolved,
+            "style_reference_image_path": resolved,
+            "approved_reference_used": False,
+            "approved_reference_registry_key": None,
+            "approved_reference_image_path": None,
         }
     if disable_approved_reference_auto:
         return None, {
             "source": "none",
             "auto_resolve_disabled": True,
+            "approved_reference_used": False,
+            "approved_reference_registry_key": None,
+            "approved_reference_image_path": None,
+            "style_reference_image_path": None,
         }
     hit = resolve_approved_reference(planet_a, planet_b, aspect_type, mode)
     if hit is not None:
-        return hit.image_path, {
+        ref_path = str(Path(hit.image_path).expanduser().resolve())
+        meta = {
             "source": "approved_registry",
-            "path": hit.image_path,
+            "path": ref_path,
+            "style_reference_image_path": ref_path,
             "registry_key": hit.registry_key,
             "label": hit.label,
             "priority": hit.priority,
+            "approved_reference_used": True,
+            "approved_reference_registry_key": hit.registry_key,
+            "approved_reference_image_path": ref_path,
         }
-    return None, {"source": "none"}
+        meta["log_lines"] = _approved_reference_log_lines(meta)
+        return ref_path, meta
+    return None, {
+        "source": "none",
+        "approved_reference_used": False,
+        "approved_reference_registry_key": None,
+        "approved_reference_image_path": None,
+        "style_reference_image_path": None,
+    }
 
 
 def _manifest_summary_text(
@@ -246,7 +278,15 @@ def _manifest_summary_text(
                 f"source: {src}",
             ]
         )
-        if style_reference.get("path"):
+        if style_reference.get("approved_reference_used") is not None:
+            lines.append(f"approved_reference_used: {style_reference.get('approved_reference_used')}")
+        if style_reference.get("approved_reference_registry_key"):
+            lines.append(f"approved_reference_registry_key: {style_reference.get('approved_reference_registry_key')}")
+        if style_reference.get("approved_reference_image_path"):
+            lines.append(f"approved_reference_image_path: {style_reference.get('approved_reference_image_path')}")
+        if style_reference.get("style_reference_image_path"):
+            lines.append(f"style_reference_image_path: {style_reference.get('style_reference_image_path')}")
+        elif style_reference.get("path"):
             lines.append(f"path: {style_reference.get('path')}")
         if style_reference.get("registry_key"):
             lines.append(f"registry_key: {style_reference.get('registry_key')}")
@@ -254,6 +294,8 @@ def _manifest_summary_text(
             lines.append(f"label: {style_reference.get('label')}")
         if style_reference.get("auto_resolve_disabled"):
             lines.append("auto_resolve_disabled: true")
+        for log_line in style_reference.get("log_lines") or []:
+            lines.append(log_line)
         lines.append("")
     if manual_aspect_override:
         lines.extend(
@@ -690,6 +732,10 @@ def build_catstyle_image_generation_jobs(
         _write_utf8_text(out / "manifest_summary.txt", summary)
         files_written.append("manifest_summary.txt")
 
+    build_message: str | None = None
+    if style_reference_meta and style_reference_meta.get("approved_reference_used"):
+        build_message = "; ".join(_approved_reference_log_lines(style_reference_meta))
+
     return CatstyleImageGenerationJobsResult(
         date=iso,
         editorial_profile=profile,
@@ -700,7 +746,7 @@ def build_catstyle_image_generation_jobs(
         output_dir=out_resolved,
         manifest_path=manifest_path,
         files_written=files_written,
-        message=None,
+        message=build_message,
         style_reference_meta=style_reference_meta,
     )
 

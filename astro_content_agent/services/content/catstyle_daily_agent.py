@@ -207,8 +207,10 @@ def run_catstyle_daily_agent(
         aspect_type_override=aspect_type_override,
         mode_override=mode_override,
     )
+    for ref_line in (jobs_res.style_reference_meta or {}).get("log_lines") or []:
+        log.append(f"  {ref_line}")
 
-    if jobs_res.message or not jobs_res.jobs:
+    if not jobs_res.jobs:
         msg = jobs_res.message or "No image jobs were created for this date/configuration."
         return _fail(1, "jobs_failed", msg, image_jobs_dir=str(jobs_dir))
 

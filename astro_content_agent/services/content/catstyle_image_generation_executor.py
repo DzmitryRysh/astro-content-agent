@@ -116,6 +116,25 @@ def _provider_result_to_stub_record(
     )
 
 
+def _emit_reference_logs(data: dict[str, Any], job_row: dict[str, Any]) -> list[str]:
+    """Return log lines for approved/explicit reference usage (also suitable for execution manifest)."""
+    lines: list[str] = []
+    style_ref = data.get("style_reference")
+    if isinstance(style_ref, dict) and style_ref.get("approved_reference_used"):
+        for line in style_ref.get("log_lines") or []:
+            if line not in lines:
+                lines.append(line)
+        if not lines:
+            path = style_ref.get("approved_reference_image_path") or style_ref.get("path") or ""
+            lines.append(f"Using approved Catstyle reference image: {path}")
+            lines.append("Reference source: approved_reference_registry")
+    elif str(job_row.get("style_reference_image_path") or "").strip():
+        lines.append(
+            f"Using explicit style reference image: {job_row.get('style_reference_image_path')}"
+        )
+    return lines
+
+
 def execute_catstyle_image_jobs(
     jobs_manifest_path: Path,
     provider_name: str = "stub",
@@ -193,10 +212,19 @@ def execute_catstyle_image_jobs(
     stub_files_written: list[str] = []
     skipped = 0
     seq = 0
+    reference_log_lines: list[str] = []
 
     for row in pending:
         seq += 1
-        job_in = {**row, "_stub_output_seq": seq}
+        for log_line in _emit_reference_logs(data, row):
+            if log_line not in reference_log_lines:
+                reference_log_lines.append(log_line)
+                print(log_line, flush=True)
+        style_src = None
+        style_block = data.get("style_reference")
+        if isinstance(style_block, dict):
+            style_src = style_block.get("source")
+        job_in = {**row, "_stub_output_seq": seq, "reference_source": style_src}
         res = provider.generate(job_in, out, overwrite)
         outputs.append(_provider_result_to_stub_record(row, seq, res))
         if res.status == "skipped_existing":
@@ -212,6 +240,7 @@ def execute_catstyle_image_jobs(
         "jobs_processed": len(pending),
         "status": done_status,
         "message": done_message,
+        "reference_log_lines": reference_log_lines,
         "outputs": [o.model_dump(mode="json") for o in outputs],
         "skipped_existing_count": skipped,
         "stub_files_written": stub_files_written,

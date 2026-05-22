@@ -63,9 +63,10 @@ def test_approved_reference_lock_preserves_body_identity_and_depth() -> None:
     pack = generate_catstyle_prompt_pack(_sun_uranus_req())
     joined = "\n".join(pack.image_prompts).lower()
     assert "[approved catstyle reference lock v1]" in joined
-    assert "planet-body identity" in joined or "catplanet body identity" in joined
-    assert "premium depth" in joined or "reference-level premium depth" in joined
-    assert "ordinary cats with effects" in joined or "not ordinary cats with effects" in joined
+    assert "visual dna" in joined or "strict visual dna" in joined
+    assert "arena depth" in joined or "coliseum depth" in joined
+    assert "sibling image from the same campaign" in joined
+    assert "ordinary fur cats" in joined or "not ordinary" in joined
 
 
 def test_negative_prompt_body_and_glyph_extras_compact_deduped() -> None:
@@ -76,7 +77,8 @@ def test_negative_prompt_body_and_glyph_extras_compact_deduped() -> None:
     norm = [" ".join(p.lower().split()) for p in parts]
     assert len(parts) == len(set(norm)), "exact duplicate negative chunks"
     low = neg.lower()
-    assert "ordinary cats with effects" in low
+    assert "ordinary cats with effects" in low or "ordinary fur cats" in low
+    assert "reference-lite reinterpretation" in low or "losing approved reference visual dna" in low
     assert "generic elemental cats" in low
     assert "incomplete flag glyphs" in low
     assert "fake uranus glyph" in low

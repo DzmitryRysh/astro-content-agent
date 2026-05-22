@@ -37,10 +37,12 @@ SUN_URANUS_CONJUNCTION_TENSION_VISUAL_CANON: Final[str] = (
     "**Tension = unstable ignition**—solar flare meets lightning strike; identity shocked awake. "
     "**Premium cinematic comic-poster** in the **cosmic zodiac coliseum arena** (monumental tiered architecture, tournament scale). "
     "**Earth disk above** the arena vault; **zodiac circle engraved into stone floor / stone brick paving**. "
-    "**Sun planet-cat** reads as **radiant solar core**—kingly identity, willpower, golden heat, central solar authority, "
-    "corona flare and solar-wind pressure (never a cute yellow fat pet with no solar majesty). "
-    "**Uranus planet-cat** reads as **electric blue-white disruption**—lightning arcs, rebellion charge, sudden breakthrough, "
-    "glitch liberation, futuristic chaos (never a generic blue trickster mascot with no electric menace). "
+    "**Approved-reference benchmark:** when the Sun/Uranus approved reference is active, use it as the **benchmark for all future Sun/Uranus images**—"
+    "match its premium density, coliseum scale, and catplanet reads. "
+    "**Sun planet-cat** = dense **solar-core** surface, royal armor, staff, heavy solar authority, corona flare "
+    "(never a simple colored cat with fire effects). "
+    "**Uranus planet-cat** = dense **cyan ice-gas** planet surface, armor/chain/rock debris, electric orbit motifs, dangerous disruptor "
+    "(never soft plush, striped tiger, or ordinary blue cat with lightning). "
     "**Mandatory staging:** **Sun on the left or center-left** as the radiant solar force; **Uranus on the right or center-right** "
     "as the electric disruptive force—preserve at poster scale. "
     "**Fusion beat:** visible **energy collision/fusion** between them—**dynamic movement**, **shockwave**, "
@@ -68,10 +70,11 @@ SUN_URANUS_APPROVED_REFERENCE_FIDELITY_BLOCK: Final[str] = (
 )
 
 SUN_URANUS_APPROVED_REFERENCE_FIDELITY_COMPACT: Final[str] = (
-    "[SUN-URANUS REF FIDELITY] Preserve approved **catplanet body identity** and **premium arena depth/scale**—"
-    "not ordinary cats with effects. Sun=solar-core plasma catplanet (\u2609 red flag left); "
-    "Uranus=ice-gas tilted-axis catplanet with ring/electric geometry (\u2645 blue flag right); "
-    "complete \u2609/\u2645 cloth glyphs; orange-vs-blue battle-poster energy—not cute simplified duel."
+    "[SUN-URANUS REF FIDELITY] **Benchmark for all future Sun/Uranus images.** "
+    "Sun: dense solar-core surface, royal armor, staff, heavy solar authority (\u2609 red flag left). "
+    "Uranus: dense cyan ice-gas surface, armor/chain/rock debris, electric orbit motifs, dangerous disruptor (\u2645 blue flag right). "
+    "Match approved render density, monumental coliseum depth, zodiac floor, high contrast—campaign sibling 85–95% consistency; "
+    "not simple colored cats or reference-lite redraw."
 )
 
 
@@ -83,6 +86,13 @@ SUN_URANUS_CONJUNCTION_TENSION_NEGATIVE_EXTRAS: Final[tuple[str, ...]] = (
     "cute yellow cat with no solar authority",
     "generic blue trickster cat with no electric disruption",
     "ordinary cats with effects",
+    "ordinary fur cats",
+    "reference-lite reinterpretation",
+    "simplified mascot redraw",
+    "soft cartoon redraw",
+    "low-density render",
+    "flat arena backdrop",
+    "losing approved reference visual DNA",
     "generic elemental cats",
     "incomplete flag glyphs",
     "fake Uranus glyph",

@@ -40,6 +40,15 @@ def test_resolved_flags_sun_left_uranus_right() -> None:
     assert "\u2645" in txt
 
 
+def test_prompt_includes_benchmark_for_future_sun_uranus_images() -> None:
+    pack = generate_catstyle_prompt_pack(_req())
+    low = "\n".join(pack.image_prompts).lower()
+    assert "benchmark for all future sun/uranus images" in low
+    assert "dense solar-core" in low or "solar-core" in low
+    assert "ice-gas" in low
+    assert "do not reduce" not in low or "never a simple colored cat" in low
+
+
 def test_prompt_includes_pair_canon_and_fusion_language() -> None:
     pack = generate_catstyle_prompt_pack(_req())
     joined = "\n".join(pack.image_prompts)

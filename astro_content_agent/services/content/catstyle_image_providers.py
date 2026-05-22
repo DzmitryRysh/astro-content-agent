@@ -10,6 +10,7 @@ from typing import Any, Literal, Protocol, runtime_checkable
 import httpx
 from pydantic import BaseModel, Field
 
+from astro_content_agent.content.catstyle.approved_reference_registry import catstyle_repo_root
 from astro_content_agent.core.config import get_settings
 from astro_content_agent.services.ai.client import OpenAIClientFactory
 
@@ -251,23 +252,12 @@ class OpenAICatstyleImageProvider:
                 metadata={**meta_base, "prompt_preview": preview},
             )
 
-        prompt = _build_combined_prompt(job)
-        prompt = _fit_provider_prompt(prompt)
-        final_prompt_length = len(prompt)
-        if not prompt.strip():
-            return CatstyleImageProviderResult(
-                provider=self.provider_name,
-                job_id=job_id,
-                status="failed",
-                message="Job has no prompt_text (empty after combining with negative_prompt).",
-                metadata={**meta_base, "prompt_preview": preview, "final_prompt_length": final_prompt_length},
-            )
-
         ref_path: Path | None = None
         if style_reference_image_path:
             ref_path = Path(style_reference_image_path).expanduser()
             if not ref_path.is_absolute():
-                ref_path = (Path.cwd() / ref_path).resolve()
+                candidate = (catstyle_repo_root() / ref_path).resolve()
+                ref_path = candidate if candidate.is_file() else (Path.cwd() / ref_path).resolve()
             else:
                 ref_path = ref_path.resolve()
             style_reference_image_path = str(ref_path)
@@ -285,12 +275,32 @@ class OpenAICatstyleImageProvider:
                         "reference_skip_reason": "reference_file_missing",
                         "generation_mode": "text_generate",
                         "reference_used": False,
-                        "final_prompt_length": final_prompt_length,
+                        "final_prompt_length": None,
                     },
                 )
             meta_base["reference_skip_reason"] = None
             meta_base["reference_used"] = True
             meta_base["generation_mode"] = "image_edit"
+            ref_src = str(job.get("reference_source") or "").strip()
+            meta_base["reference_source"] = ref_src or "style_reference_image"
+
+        prompt = _build_combined_prompt(job)
+        if ref_path is not None:
+            prompt = (
+                "Use the provided reference image as the strict primary visual DNA anchor "
+                "(campaign sibling; preserve render density, catplanet bodies, arena scale). "
+                f"{prompt}"
+            )
+        prompt = _fit_provider_prompt(prompt)
+        final_prompt_length = len(prompt)
+        if not prompt.strip():
+            return CatstyleImageProviderResult(
+                provider=self.provider_name,
+                job_id=job_id,
+                status="failed",
+                message="Job has no prompt_text (empty after combining with negative_prompt).",
+                metadata={**meta_base, "prompt_preview": preview, "final_prompt_length": final_prompt_length},
+            )
 
         client = self._effective_client(str(api_key).strip())
         resp: Any

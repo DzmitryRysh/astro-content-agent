@@ -168,7 +168,12 @@ def main() -> int:
     print(f"  editorial_profile: {result.editorial_profile}")
     meta = result.style_reference_meta or {}
     src = meta.get("source")
-    if src == "approved_registry" and meta.get("path"):
+    if meta.get("approved_reference_used"):
+        for line in meta.get("log_lines") or []:
+            print(f"  {line}")
+        if meta.get("approved_reference_registry_key"):
+            print(f"  approved_reference_registry_key: {meta.get('approved_reference_registry_key')}")
+    elif src == "approved_registry" and meta.get("path"):
         print(f"  style reference:   approved reference auto-resolved: {meta.get('path')}")
     elif src == "explicit" and meta.get("path"):
         print(f"  style reference:   explicit style reference: {meta.get('path')}")

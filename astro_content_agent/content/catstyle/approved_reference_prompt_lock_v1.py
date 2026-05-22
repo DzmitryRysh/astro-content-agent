@@ -21,12 +21,20 @@ from astro_content_agent.content.catstyle.sun_uranus_conjunction_tension_canon_v
 _ASPECT_TYPE_MARKER = "Aspect type:"
 
 APPROVED_REFERENCE_NEGATIVE_EXTRAS: Final[tuple[str, ...]] = (
-    "simplified redraw",
-    "flat remake",
-    "weak arena",
-    "generic cute cats",
-    "watercolor/storybook drift",
-    "losing approved reference composition",
+    "reference-lite reinterpretation",
+    "simplified mascot redraw",
+    "soft cartoon redraw",
+    "ordinary fur cats",
+    "low-density render",
+    "flat arena backdrop",
+    "weak planet-body texture",
+    "losing approved reference visual DNA",
+)
+
+REFERENCE_FIDELITY_GRADING_BLOCK: Final[str] = (
+    "[REFERENCE FIDELITY GRADING v1] Target **85–95% visual consistency** with the approved reference—"
+    "a **sibling image from the same campaign** with a **new pose/action variation** only; "
+    "not reference-lite theme borrowing or a softer cartoon redraw."
 )
 
 _NEGATIVE_PROMPT_MAX_LEN = 1200
@@ -64,10 +72,12 @@ def build_approved_reference_lock_block(hit: ResolvedApprovedReference) -> str:
     """Concise generic lock when an approved registry row is active."""
     return (
         "[APPROVED CATSTYLE REFERENCE LOCK v1] "
-        "Use the approved reference as the **primary visual anchor**: same universe, same premium comic-poster quality, "
-        "**reference-level catplanet body identity** (planetary material bodies—not ordinary cats with effects), "
-        "**reference-level premium depth**, arena scale, zodiac floor, banners, lighting contrast. "
-        "Create a new variation, not a simplified redraw or downgrade into generic elemental cats."
+        "Treat the approved reference as **strict visual DNA**—same **exact visual universe**, "
+        "**sibling image from the same campaign**, not loose theme inspiration. "
+        "Match reference **render density**, **premium comic-poster finish**, **character volume and proportions**, "
+        "**catplanet surface texture strength**, **arena depth/scale**, and **lighting contrast**. "
+        "Do **not** simplify into soft cartoon redraw, ordinary fur cats with pasted effects, or reference-lite reinterpretation. "
+        "New pose/action variation only—preserve the reference look."
     )
 
 
@@ -87,8 +97,11 @@ def build_approved_reference_prompt_lock_text(
     aspect_type: str,
     mode: str,
 ) -> str:
-    """Generic lock + optional compact pair-specific approved fidelity."""
-    parts = [build_approved_reference_lock_block(hit)]
+    """Generic lock + grading + optional compact pair-specific approved fidelity."""
+    parts = [
+        build_approved_reference_lock_block(hit),
+        REFERENCE_FIDELITY_GRADING_BLOCK,
+    ]
     if is_sun_uranus_conjunction_tension(planet_a, planet_b, aspect_type, mode):
         parts.append(SUN_URANUS_APPROVED_REFERENCE_FIDELITY_COMPACT)
     return " ".join(p for p in parts if p).strip()
@@ -277,6 +290,7 @@ def apply_approved_reference_lock_to_prompt_pack(
 
 __all__ = [
     "APPROVED_REFERENCE_NEGATIVE_EXTRAS",
+    "REFERENCE_FIDELITY_GRADING_BLOCK",
     "apply_approved_reference_lock_to_prompt_pack",
     "build_approved_reference_lock_block",
     "build_approved_reference_prompt_lock_text",

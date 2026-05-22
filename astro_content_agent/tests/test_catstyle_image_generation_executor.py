@@ -251,6 +251,54 @@ def test_execute_openai_manifest_records_reference_usage_and_mode(
     assert isinstance(row.get("reference_path"), str) and row["reference_path"].endswith("style_ref.png")
 
 
+def test_execute_openai_uses_approved_registry_reference_from_manifest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from astro_content_agent.tests.catstyle_reference_test_helpers import write_valid_reference_png
+
+    mock_client = MagicMock()
+    mock_client.images.edit.return_value = SimpleNamespace(
+        data=[SimpleNamespace(b64_json=_MINI_PNG_B64, url=None)]
+    )
+    _fake_openai_provider_registry(monkeypatch, mock_client)
+
+    ref = tmp_path / "approved_sun_uranus.png"
+    write_valid_reference_png(ref)
+    job = _sample_job(1)
+    job["style_reference_image_path"] = str(ref.resolve())
+    mpath = tmp_path / "image_generation_jobs.json"
+    manifest = {
+        "version": "catstyle-image-generation-jobs-v0",
+        "date": "2099-09-01",
+        "editorial_profile": "charged",
+        "style_reference": {
+            "source": "approved_registry",
+            "approved_reference_used": True,
+            "approved_reference_registry_key": "sun_uranus_conjunction_tension_v1",
+            "approved_reference_image_path": str(ref.resolve()),
+            "style_reference_image_path": str(ref.resolve()),
+            "log_lines": [
+                f"Using approved Catstyle reference image: {ref.resolve()}",
+                "Reference source: approved_reference_registry",
+            ],
+        },
+        "jobs": [job],
+    }
+    mpath.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    out = tmp_path / "gen_su"
+    r = execute_catstyle_image_jobs(
+        mpath, provider_name="openai_image", output_dir=out, overwrite=False
+    )
+    assert r.outputs[0].status == "generated"
+    mock_client.images.generate.assert_not_called()
+    mock_client.images.edit.assert_called_once()
+    captured = capsys.readouterr().out
+    assert "Using approved Catstyle reference image" in captured
+    assert "Reference source: approved_reference_registry" in captured
+    exec_payload = json.loads((out / "image_generation_execution_stub.json").read_text(encoding="utf-8"))
+    assert "Using approved Catstyle reference image" in "\n".join(exec_payload.get("reference_log_lines") or [])
+
+
 def test_default_output_dir_openai_is_generated_images(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     mock_client = MagicMock()
     mock_client.images.generate.return_value = SimpleNamespace(

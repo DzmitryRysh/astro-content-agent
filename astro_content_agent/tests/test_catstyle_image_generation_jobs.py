@@ -530,11 +530,13 @@ def test_manifest_includes_style_reference_image_path(tmp_path: Path) -> None:
             output_dir=out,
             style_reference_image_path="C:/refs/pluto_mars_style.png",
         )
-    assert r.jobs[0].style_reference_image_path == "C:/refs/pluto_mars_style.png"
+    assert Path(r.jobs[0].style_reference_image_path or "").resolve() == Path("C:/refs/pluto_mars_style.png").resolve()
     assert r.style_reference_meta is not None
     assert r.style_reference_meta.get("source") == "explicit"
     manifest = json.loads((out / "image_generation_jobs.json").read_text(encoding="utf-8"))
-    assert manifest["jobs"][0]["style_reference_image_path"] == "C:/refs/pluto_mars_style.png"
+    assert Path(manifest["jobs"][0]["style_reference_image_path"]).resolve() == Path(
+        "C:/refs/pluto_mars_style.png"
+    ).resolve()
     assert manifest["style_reference"]["source"] == "explicit"
 
 
@@ -599,7 +601,7 @@ def test_build_catstyle_image_generation_jobs_cli_shows_auto_resolved_reference(
     finally:
         sys.argv = old
     out = capsys.readouterr().out
-    assert "approved reference auto-resolved:" in out
+    assert "Using approved Catstyle reference image" in out
 
 
 def test_build_catstyle_image_generation_jobs_cli_explicit_style_reference_line(
@@ -794,3 +796,75 @@ def test_manual_override_day_window_honest_miss_when_scan_empty(tmp_path: Path) 
     assert r.selected_candidate.get("closest_hour_utc") is None
     manifest = json.loads((out / "image_generation_jobs.json").read_text(encoding="utf-8"))
     assert manifest["sky_scan_mode"] == "day-window"
+
+
+def test_sun_uranus_manual_override_attaches_approved_reference_image(tmp_path: Path) -> None:
+    r = build_catstyle_image_generation_jobs(
+        date(2099, 9, 1),
+        output_dir=tmp_path / "sun_uranus_jobs",
+        planet_a_override="Sun",
+        planet_b_override="Uranus",
+        aspect_type_override="conjunction",
+        mode_override="tension",
+        jobs_count=1,
+        scan_mode="noon",
+        render_style_profile_key="premium_comic_poster_v2",
+        world_template_key="cosmic_zodiac_arena",
+        shot_mode="epic_arena_showdown",
+    )
+    assert r.style_reference_meta is not None
+    assert r.style_reference_meta.get("approved_reference_used") is True
+    assert r.style_reference_meta.get("registry_key") == "sun_uranus_conjunction_tension_v1"
+    ref_path = r.style_reference_meta.get("approved_reference_image_path")
+    assert ref_path
+    assert r.jobs[0].style_reference_image_path == ref_path
+    assert "sun_uranus" in ref_path.replace("\\", "/").lower()
+    assert r.message and "Using approved Catstyle reference image" in r.message
+    manifest = json.loads((tmp_path / "sun_uranus_jobs" / "image_generation_jobs.json").read_text(encoding="utf-8"))
+    sr = manifest["style_reference"]
+    assert sr["approved_reference_used"] is True
+    assert sr["approved_reference_registry_key"] == "sun_uranus_conjunction_tension_v1"
+    assert sr["approved_reference_image_path"] == ref_path
+    assert sr["style_reference_image_path"] == ref_path
+    assert manifest["jobs"][0]["style_reference_image_path"] == ref_path
+
+
+def test_explicit_style_reference_overrides_approved_registry(tmp_path: Path) -> None:
+    from astro_content_agent.tests.catstyle_reference_test_helpers import write_valid_reference_png
+
+    explicit = tmp_path / "operator_ref.png"
+    write_valid_reference_png(explicit)
+    r = build_catstyle_image_generation_jobs(
+        date(2099, 9, 2),
+        output_dir=tmp_path / "explicit_ref",
+        planet_a_override="Sun",
+        planet_b_override="Uranus",
+        aspect_type_override="conjunction",
+        mode_override="tension",
+        jobs_count=1,
+        scan_mode="noon",
+        style_reference_image_path=str(explicit),
+    )
+    resolved = str(explicit.resolve())
+    assert r.style_reference_meta.get("source") == "explicit"
+    assert r.style_reference_meta.get("approved_reference_used") is False
+    assert r.jobs[0].style_reference_image_path == resolved
+    manifest = json.loads((tmp_path / "explicit_ref" / "image_generation_jobs.json").read_text(encoding="utf-8"))
+    assert manifest["style_reference"]["style_reference_image_path"] == resolved
+
+
+def test_unstable_pair_without_approved_reference_does_not_set_used(tmp_path: Path) -> None:
+    r = build_catstyle_image_generation_jobs(
+        date(2099, 9, 3),
+        output_dir=tmp_path / "unstable",
+        planet_a_override="Neptune",
+        planet_b_override="Moon",
+        aspect_type_override="square",
+        mode_override="tension",
+        jobs_count=1,
+        scan_mode="noon",
+    )
+    assert r.jobs[0].style_reference_image_path is None
+    assert r.style_reference_meta is not None
+    assert r.style_reference_meta.get("approved_reference_used") is False
+    assert r.style_reference_meta.get("source") == "none"

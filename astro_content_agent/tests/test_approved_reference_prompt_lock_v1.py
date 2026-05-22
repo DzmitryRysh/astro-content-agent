@@ -35,10 +35,14 @@ def test_prompt_includes_approved_reference_lock_when_registry_hit() -> None:
     assert hit is not None
     pack = generate_catstyle_prompt_pack(_sun_uranus_req())
     joined = "\n".join(pack.image_prompts)
+    low = joined.lower()
     assert "[APPROVED CATSTYLE REFERENCE LOCK v1]" in joined
-    assert "primary visual anchor" in joined.lower()
-    assert "same universe" in joined.lower()
-    assert "not a simplified redraw" in joined.lower()
+    assert "sibling image from the same campaign" in low
+    assert "visual dna" in low or "strict visual dna" in low
+    assert "render density" in low
+    assert "premium comic-poster finish" in low
+    assert "85–95%" in joined or "85-95%" in low
+    assert "[REFERENCE FIDELITY GRADING v1]" in joined
 
 
 def test_lock_appears_after_style_opener_not_before() -> None:
@@ -68,20 +72,30 @@ def test_premium_art_direction_false_keeps_art_direction_profile_none() -> None:
 def test_sun_uranus_includes_approved_reference_fidelity_language() -> None:
     pack = generate_catstyle_prompt_pack(_sun_uranus_req())
     joined = "\n".join(pack.image_prompts)
+    low = joined.lower()
     assert "[SUN-URANUS REF FIDELITY]" in joined
-    assert "orange-gold" in joined.lower()
-    assert "cyan" in joined.lower() and ("blue" in joined.lower() or "blue-green" in joined.lower())
+    assert "benchmark for all future sun/uranus images" in low
+    assert "solar-core" in low or "solar core" in low
+    assert "royal armor" in low
+    assert "staff" in low
+    assert "ice-gas" in low
+    assert "electric orbit" in low or "electric orbit motifs" in low
     assert "\u2609" in joined
     assert "\u2645" in joined
-    assert "red flag left" in joined.lower() or "flag left" in joined.lower()
+    assert "red flag left" in low or "flag left" in low
 
 
-def test_negative_prompt_anti_simplification_when_approved() -> None:
+def test_negative_prompt_anti_drift_when_approved() -> None:
     pack = generate_catstyle_prompt_pack(_sun_uranus_req())
     neg = pack.negative_prompt.lower()
     assert len(pack.negative_prompt) <= 1200
-    assert "simplified redraw" in neg
-    assert "flat remake" in neg
+    parts = [p.strip() for p in pack.negative_prompt.split(",") if p.strip()]
+    norm = [" ".join(p.lower().split()) for p in parts]
+    assert len(parts) == len(set(norm))
+    assert "reference-lite reinterpretation" in neg
+    assert "simplified mascot redraw" in neg
+    assert "ordinary fur cats" in neg
+    assert "losing approved reference visual dna" in neg
     assert "watercolor" in neg or "storybook" in neg
 
 
