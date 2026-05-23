@@ -380,6 +380,7 @@ def build_catstyle_image_generation_jobs(
     )
     manual_block: dict[str, Any] | None = None
     secondary: dict[str, Any] | None = None
+    sky_weather_stack: dict[str, Any] | None = None
     iso: str
     profile: str
     primary: dict[str, Any]
@@ -489,6 +490,7 @@ def build_catstyle_image_generation_jobs(
         primary = dict(pack.selected_candidates[0])
         pp = dict(pack.prompt_packs[0])
         secondary = pack.secondary_supportive_candidate
+        sky_weather_stack = pack.sky_weather_stack
 
         pa_sel = normalize_planet_name(str(primary["planet_a"]))
         pb_sel = normalize_planet_name(str(primary["planet_b"]))
@@ -669,6 +671,8 @@ def build_catstyle_image_generation_jobs(
             "secondary_supportive_candidate": secondary,
             "jobs": [j.model_dump(mode="json") for j in jobs],
         }
+        if sky_weather_stack is not None:
+            manifest["sky_weather_stack"] = sky_weather_stack
         if manual_block is not None:
             manifest["manual_aspect_override"] = manual_block
         if style_reference_meta is not None:

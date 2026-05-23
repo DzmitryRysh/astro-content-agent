@@ -3,8 +3,13 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import date
+from typing import Any
 from astro_content_agent.astro.ephemeris import PlanetPosition
-from astro_content_agent.content.catstyle.models import CatstyleDailyPackResult, CatstylePromptRequest
+from astro_content_agent.content.catstyle.models import (
+    CatstyleCandidate,
+    CatstyleDailyPackResult,
+    CatstylePromptRequest,
+)
 from astro_content_agent.services.content.catstyle_editorial_selection import (
     EDITORIAL_PROFILE_DEFAULT,
     EditorialProfile,
@@ -18,6 +23,29 @@ from astro_content_agent.services.content.catstyle_sky_aspect_scan import (
     scan_catstyle_sky_aspect_windows,
     scan_catstyle_sky_aspects,
 )
+from astro_content_agent.services.content.catstyle_sky_weather_stack_v1 import (
+    apply_stack_to_selected_dict,
+    build_sky_weather_stack,
+    is_transpersonal_to_personal,
+    resolve_stack_primary_candidate,
+    stack_to_manifest_dict,
+)
+
+
+def _stack_overrides_editorial_primary(stack_primary: CatstyleCandidate, stack: Any) -> bool:
+    """Use stack primary for the post only when it is a flash or transpersonal hard hit."""
+    slot = getattr(stack, "primary_aspect", None)
+    if slot is None:
+        return False
+    dur = getattr(slot, "duration_category", None)
+    if dur == "short_flash":
+        return True
+    asp = (stack_primary.aspect_type or "").strip().lower()
+    if asp in ("conjunction", "square", "opposition") and is_transpersonal_to_personal(
+        stack_primary.planet_a, stack_primary.planet_b
+    ):
+        return True
+    return False
 
 
 def generate_catstyle_daily_pack(
@@ -98,7 +126,12 @@ def generate_catstyle_daily_pack(
     else:
         editorial_ordered = sort_candidates_for_editorial_profile(ranked_list, profile)
 
+    sky_stack = build_sky_weather_stack(ranked_list, editorial_profile=profile) if ranked_list else None
     selected = editorial_ordered[:n]
+    if sky_stack is not None and n > 0:
+        stack_primary = resolve_stack_primary_candidate(ranked_list, sky_stack)
+        if stack_primary is not None and _stack_overrides_editorial_primary(stack_primary, sky_stack):
+            selected = [stack_primary]
 
     sel_dicts: list[dict] = []
     packs: list[dict] = []
@@ -121,7 +154,10 @@ def generate_catstyle_daily_pack(
             req_kw["render_style_profile_key"] = render_k
         req = CatstylePromptRequest(**req_kw)
         pack = generate_catstyle_prompt_pack(req)
-        sel_dicts.append(candidate_to_editorial_dict(c, profile))
+        row = candidate_to_editorial_dict(c, profile)
+        if sky_stack is not None and len(sel_dicts) == 0:
+            row = apply_stack_to_selected_dict(row, sky_stack)
+        sel_dicts.append(row)
         packs.append(pack.model_dump(mode="json"))
 
     primary = sel_dicts[0] if sel_dicts else None
@@ -143,6 +179,7 @@ def generate_catstyle_daily_pack(
         prompt_packs=packs,
         primary_candidate=primary,
         secondary_supportive_candidate=secondary,
+        sky_weather_stack=stack_to_manifest_dict(sky_stack) if sky_stack else None,
     )
 
 

@@ -25,6 +25,32 @@ def test_resolve_mercury_jupiter_sextile_flow() -> None:
     assert "20" in hit.primary_action or "20 минут" in hit.primary_action
 
 
+def test_mercury_uranus_opposition_has_bioastrologiya_source_items() -> None:
+    hit = resolve_catstyle_compensation("Mercury", "Uranus", "opposition", "tension")
+    assert hit is not None
+    assert hit.registry_key == "mercury_uranus_opposition_tension_v1"
+    source = [s.lower() for s in hit.source_compensation_actions]
+    assert any("стеб" in s or "ржать" in s for s in source)
+    assert any("астролог" in s for s in source)
+    assert any("фантаст" in s for s in source)
+    assert any("диссертац" in s for s in source)
+    assert any("математ" in s or "прогноз" in s or "скорочт" in s or "памят" in s for s in source)
+    assert any("друз" in s or "клуб" in s for s in source)
+    assert any("формула" in s for s in source)
+
+
+def test_mercury_uranus_public_adaptation_has_source_flavor() -> None:
+    hit = resolve_catstyle_compensation("Uranus", "Mercury", "opposition", "tension")
+    assert hit is not None
+    pub = (hit.public_compensation_adaptation or "").lower()
+    assert "стёб" in pub or "стеб" in pub
+    assert "друз" in pub
+    assert any(x in pub for x in ("фантаст", "будущ", "прогноз", "математ", "формула"))
+    assert "умную искру" in pub or "искр" in pub
+    assert "прогул" not in pub
+    assert "дыши" not in pub
+
+
 def test_resolve_sun_uranus_conjunction_tension_order_insensitive() -> None:
     hit = resolve_catstyle_compensation("Uranus", "Sun", "conjunction", "tension")
     assert hit is not None

@@ -39,6 +39,14 @@ class CatstyleCompensationEntry(BaseModel):
         default=None,
         description="Optional: how to relieve / work with this aspect.",
     )
+    source_compensation_actions: list[str] = Field(
+        default_factory=list,
+        description="Raw Bioastrologiya/source relief channels (structured archive).",
+    )
+    public_compensation_adaptation: str | None = Field(
+        default=None,
+        description="Natural-language public caption adaptation of source compensation (not a dry list).",
+    )
 
 
 def _safe_planet_name(name: str) -> str | None:
@@ -71,6 +79,8 @@ def _entry(
     compensation_actions: list[str],
     pressure_phrasing: str | None = None,
     relieve_phrasing: str | None = None,
+    source_compensation_actions: list[str] | None = None,
+    public_compensation_adaptation: str | None = None,
 ) -> CatstyleCompensationEntry:
     return CatstyleCompensationEntry(
         registry_key=registry_key,
@@ -83,6 +93,8 @@ def _entry(
         compensation_actions=compensation_actions,
         pressure_phrasing=pressure_phrasing,
         relieve_phrasing=relieve_phrasing,
+        source_compensation_actions=list(source_compensation_actions or ()),
+        public_compensation_adaptation=public_compensation_adaptation,
     )
 
 
@@ -241,6 +253,102 @@ CATSTYLE_COMPENSATION_STARTER_REGISTRY: Final[tuple[CatstyleCompensationEntry, .
             "поставь одну чёткую границу ресурсов",
             "назначь один дедлайн и критерий результата",
             "без фальшивого оптимизма и без паралича страхом",
+        ],
+    ),
+    _entry(
+        registry_key="mercury_uranus_opposition_tension_v1",
+        planet_a="Mercury",
+        planet_b="Uranus",
+        aspect_type="opposition",
+        mode="tension",
+        pressure_phrasing=(
+            "Уран давит на Меркурий: мысли скачут, техника может капризничать, "
+            "разговоры и документы требуют больше внимания."
+        ),
+        relieve_phrasing=(
+            "Компенсация — направить Уран–Меркурий в умную искру и игру ума, а не в срыв и скандал."
+        ),
+        primary_action=(
+            "выбери один канал умной искры на сегодня — юмор без яда, разговор с другом, "
+            "фантастика или тема будущего, прогноз/математика/скорочтение или Формула-1"
+        ),
+        why_it_helps=(
+            "так нервная скорость становится интересом и обсуждением, а не ошибкой в бумагах "
+            "и резким словом"
+        ),
+        source_compensation_actions=[
+            "ржать и стебать",
+            "астрология, эзотерика",
+            "читать фантастику или про будущее",
+            "диссертация",
+            "математика, прогнозы, скорочтение, суперпамять",
+            "обсуждать с друзьями, клуб дома",
+            "Формула-1",
+        ],
+        public_compensation_adaptation=(
+            "Дай Уран–Меркурию умную искру: юмор и стёб без яда, обсуждение идеи с друзьями, "
+            "фантастика или темы будущего, астрология/эзотерика, прогнозы, математика, скорочтение, "
+            "тренировка памяти, Формула-1 — туда, где нервная скорость становится интересом, "
+            "а не скандалом."
+        ),
+        compensation_actions=[
+            "юмор и стёб без яда — снять напряжение словом, не уколом",
+            "обсудить идею с другом или домашним клубом",
+            "фантастика, будущее, астрология/эзотерика — канал для скачущей мысли",
+            "прогнозы, математика, скорочтение, память — скорость ума с опорой",
+            "Формула-1 или другой драйв скорости — в игру, не в спор",
+            "важные сообщения и документы — всё же перепроверить перед отправкой",
+        ],
+    ),
+    _entry(
+        registry_key="mercury_neptune_opposition_tension_v1",
+        planet_a="Mercury",
+        planet_b="Neptune",
+        aspect_type="opposition",
+        mode="tension",
+        pressure_phrasing="Меркурий хочет ясности, Нептун размывает факты — легко поверить намёку без проверки.",
+        relieve_phrasing="Компенсация — письменная фиксация и один прямой вопрос.",
+        primary_action="запиши ключевое письменно и задай один прямой вопрос вместо догадок",
+        why_it_helps="так ты не строишь день на тумане, сохраняя чувствительность к нюансам",
+        compensation_actions=[
+            "запиши договорённости и сроки письменно",
+            "проверь факты до вывода",
+            "отложи крупные заключения, пока картина не прояснится",
+            "один прямой вопрос вместо цепочки намёков",
+        ],
+    ),
+    _entry(
+        registry_key="mars_uranus_square_tension_v1",
+        planet_a="Mars",
+        planet_b="Uranus",
+        aspect_type="square",
+        mode="tension",
+        pressure_phrasing="Марс хочет действовать сейчас, Уран рвёт правила — импульс и взрыв в одном флаконе.",
+        relieve_phrasing="Компенсация — физическая разрядка и одно осознанное изменение, не серия срывов.",
+        primary_action="дай телу физическую разрядку и отложь одно «срочно» решение на 20 минут",
+        why_it_helps="так жар уходит в тело, а не в разнос сцены или переписки",
+        compensation_actions=[
+            "физическая разрядка до важного разговора",
+            "одно изменение с планом, не десять в панике",
+            "не отвечай импульсом на провокацию",
+            "запиши, что именно бесит, до действия",
+        ],
+    ),
+    _entry(
+        registry_key="venus_pluto_square_tension_v1",
+        planet_a="Venus",
+        planet_b="Pluto",
+        aspect_type="square",
+        mode="tension",
+        pressure_phrasing="Венера тянет к контакту, Плутон — к полной правде и контролю; притяжение легко становится проверкой.",
+        relieve_phrasing="Компенсация — честная граница без театра.",
+        primary_action="сформулируй одну честную границу и проверь, не платишь ли самооценкой за интенсивность",
+        why_it_helps="так магнетизм остаётся выбором, а не одержимостью",
+        compensation_actions=[
+            "одна граница без шантажа себе",
+            "не обменивай самооценку на «это судьба»",
+            "переведи притяжение в творчество или спокойный разговор",
+            "пауза перед проверкой партнёра/ситуации",
         ],
     ),
     _entry(

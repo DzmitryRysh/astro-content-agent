@@ -178,6 +178,17 @@ def _compensation_used(
     return False
 
 
+def _sky_weather_stack_from_jobs(jobs_res: CatstyleImageGenerationJobsResult | None) -> dict[str, Any] | None:
+    if jobs_res is None or not jobs_res.manifest_path:
+        return None
+    try:
+        raw = json.loads(Path(jobs_res.manifest_path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    stack = raw.get("sky_weather_stack")
+    return stack if isinstance(stack, dict) else None
+
+
 def _stability_block(
     pa: str,
     pb: str,
@@ -253,6 +264,37 @@ def build_daily_agent_summary_payload(
     if not result.package_dir:
         caption_mode = None
 
+    sky_stack = _sky_weather_stack_from_jobs(jobs_res)
+    sky_weather_summary: dict[str, Any] | None = None
+    if sky_stack:
+        primary = sky_stack.get("primary_aspect") if isinstance(sky_stack.get("primary_aspect"), dict) else {}
+        bgs = sky_stack.get("background_aspects")
+        bg0 = bgs[0] if isinstance(bgs, list) and bgs and isinstance(bgs[0], dict) else None
+        sky_weather_summary = {
+            "combined_weather_label": sky_stack.get("combined_weather_label"),
+            "combined_pressure_summary": sky_stack.get("combined_pressure_summary"),
+            "compensation_focus": sky_stack.get("compensation_focus"),
+            "selection_reason": sky_stack.get("selection_reason"),
+            "primary": {
+                "planet_a": primary.get("planet_a"),
+                "planet_b": primary.get("planet_b"),
+                "aspect_type": primary.get("aspect_type"),
+                "mode": primary.get("mode_recommendation"),
+                "duration_category": primary.get("duration_category"),
+            },
+            "background": (
+                {
+                    "planet_a": bg0.get("planet_a"),
+                    "planet_b": bg0.get("planet_b"),
+                    "aspect_type": bg0.get("aspect_type"),
+                    "mode": bg0.get("mode_recommendation"),
+                    "duration_category": bg0.get("duration_category"),
+                }
+                if bg0
+                else None
+            ),
+        }
+
     publish_extra: dict[str, Any] = {}
     if publish_result is not None:
         publish_extra = {
@@ -276,6 +318,7 @@ def build_daily_agent_summary_payload(
             "mode": mo or None,
             "label": result.selected_aspect or None,
         },
+        "sky_weather_stack": sky_weather_summary,
         "render_style_profile": run_params.render_style_profile,
         "shot_mode": run_params.shot_mode,
         "scan_mode": run_params.scan_mode,
@@ -352,6 +395,31 @@ def render_daily_agent_summary_markdown(data: dict[str, Any]) -> str:
         f"- **mode:** {sel.get('mode') or '—'}",
         f"- **label:** {sel.get('label') or '—'}",
         "",
+    ]
+    stack = data.get("sky_weather_stack")
+    if stack:
+        prim = stack.get("primary") or {}
+        bg = stack.get("background")
+        lines.extend(
+            [
+                "## Sky weather stack",
+                f"- **combined_weather_label:** {stack.get('combined_weather_label') or '—'}",
+                f"- **primary:** {prim.get('planet_a')} {prim.get('aspect_type')} {prim.get('planet_b')} "
+                f"({prim.get('duration_category') or '—'})",
+            ]
+        )
+        if bg:
+            lines.append(
+                f"- **background:** {bg.get('planet_a')} {bg.get('aspect_type')} {bg.get('planet_b')} "
+                f"({bg.get('duration_category') or '—'})"
+            )
+        else:
+            lines.append("- **background:** —")
+        lines.append(f"- **why_selected:** {stack.get('selection_reason') or '—'}")
+        lines.append(f"- **compensation_focus:** {stack.get('compensation_focus') or '—'}")
+        lines.append("")
+    lines.extend(
+        [
         "## Creative setup",
         f"- **render_style_profile:** {data.get('render_style_profile') or '—'}",
         f"- **shot_mode:** {data.get('shot_mode') or '—'}",
@@ -392,7 +460,8 @@ def render_daily_agent_summary_markdown(data: dict[str, Any]) -> str:
         f"- **instagram_container_id:** {pub.get('instagram_container_id') or '—'}",
         "",
         "## Artifacts",
-    ]
+        ]
+    )
     for key in (
         "manifest_path",
         "image_jobs_dir",

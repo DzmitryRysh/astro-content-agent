@@ -13,6 +13,16 @@ from astro_content_agent.content.catstyle.transit_pair_seed_v0 import (
 )
 
 
+def format_public_compensation_paragraph(entry: CatstyleCompensationEntry) -> str:
+    """Natural-language compensation for captions (prefers public adaptation over bullet list)."""
+    pub = (entry.public_compensation_adaptation or "").strip()
+    if pub:
+        return pub
+    if entry.relieve_phrasing:
+        return entry.relieve_phrasing.strip()
+    return f"{CAPTION_COMPENSATION_MARKER} {entry.primary_action}."
+
+
 def format_compensation_package_block(entry: CatstyleCompensationEntry) -> str:
     """Human-facing compensation section for post_package (not caption-internal jargon)."""
     lines: list[str] = ["Как снять давление аспекта:"]
@@ -20,6 +30,13 @@ def format_compensation_package_block(entry: CatstyleCompensationEntry) -> str:
         lines.append(f"Давление: {entry.pressure_phrasing}")
     if entry.relieve_phrasing:
         lines.append(f"Смысл: {entry.relieve_phrasing}")
+    pub = (entry.public_compensation_adaptation or "").strip()
+    if pub:
+        lines.append(f"Публичная адаптация: {pub}")
+    if entry.source_compensation_actions:
+        lines.append("Источник (Bioastrologiya):")
+        for bullet in entry.source_compensation_actions:
+            lines.append(f"• {bullet}")
     for bullet in entry.compensation_actions:
         lines.append(f"• {bullet}")
     return "\n".join(lines)
@@ -137,5 +154,6 @@ __all__ = [
     "apply_structured_compensation_to_post_copy",
     "format_caption_compensation_lines",
     "format_compensation_package_block",
+    "format_public_compensation_paragraph",
     "inject_compensation_into_caption",
 ]

@@ -58,6 +58,11 @@ class CatstyleCaptionContext:
     compensation_why: str | None
     pressure_phrasing: str | None
     aspect_timing: CatstyleAspectTimingMetadata | None
+    sky_weather_stack: dict[str, Any] | None = None
+    background_aspect: dict[str, Any] | None = None
+    combined_weather_label: str | None = None
+    combined_pressure_summary: str | None = None
+    stack_compensation_focus: str | None = None
 
 
 def caption_banned_phrases() -> tuple[str, ...]:
@@ -209,6 +214,17 @@ def build_catstyle_caption_context(
     sa_ctx = sign_context_line_ru(pa, sa) if use_sign_in_public_caption(pa) else None
     sb_ctx = sign_context_line_ru(pb, sb) if use_sign_in_public_caption(pb) else None
 
+    stack_raw = manifest.get("sky_weather_stack")
+    if not isinstance(stack_raw, dict) and row:
+        nested = row.get("sky_weather_stack")
+        stack_raw = nested if isinstance(nested, dict) else stack_raw
+    stack: dict[str, Any] | None = stack_raw if isinstance(stack_raw, dict) else None
+    bg_aspect: dict[str, Any] | None = None
+    if stack:
+        bgs = stack.get("background_aspects")
+        if isinstance(bgs, list) and bgs and isinstance(bgs[0], dict):
+            bg_aspect = bgs[0]
+
     return CatstyleCaptionContext(
         planet_a=pa,
         planet_b=pb,
@@ -229,10 +245,16 @@ def build_catstyle_caption_context(
         compensation_why=comp.why_it_helps if comp else None,
         pressure_phrasing=comp.pressure_phrasing if comp else None,
         aspect_timing=timing,
+        sky_weather_stack=stack,
+        background_aspect=bg_aspect,
+        combined_weather_label=str(stack.get("combined_weather_label") or "") if stack else None,
+        combined_pressure_summary=str(stack.get("combined_pressure_summary") or "") if stack else None,
+        stack_compensation_focus=str(stack.get("compensation_focus") or "") if stack else None,
     )
 
 
 def context_to_llm_payload(ctx: CatstyleCaptionContext) -> dict[str, Any]:
+    comp_entry = resolve_catstyle_compensation(ctx.planet_a, ctx.planet_b, ctx.aspect_type, ctx.mode)
     return {
         "planet_a": ctx.planet_a,
         "planet_b": ctx.planet_b,
@@ -256,6 +278,12 @@ def context_to_llm_payload(ctx: CatstyleCaptionContext) -> dict[str, Any]:
         "compensation_guidance": ctx.compensation_guidance,
         "compensation_primary_action": ctx.compensation_primary_action,
         "compensation_why": ctx.compensation_why,
+        "public_compensation_adaptation": (
+            comp_entry.public_compensation_adaptation if comp_entry else None
+        ),
+        "source_compensation_actions": (
+            list(comp_entry.source_compensation_actions) if comp_entry else []
+        ),
         "pressure_phrasing": ctx.pressure_phrasing,
         "caption_structure": [
             "planet_a_meaning",
@@ -268,6 +296,22 @@ def context_to_llm_payload(ctx: CatstyleCaptionContext) -> dict[str, Any]:
         ],
         "banned_phrases": list(_CAPTION_BANNED_PHRASES),
         "length_chars": "900-1500",
+        "sky_weather_stack": ctx.sky_weather_stack,
+        "background_aspect": ctx.background_aspect,
+        "combined_weather_label": ctx.combined_weather_label,
+        "combined_pressure_summary": ctx.combined_pressure_summary,
+        "stack_compensation_focus": ctx.stack_compensation_focus,
+        "stacked_caption_structure": (
+            [
+                "primary_aspect_plain_language",
+                "background_pressure_brief",
+                "how_they_combine_in_real_life",
+                "compensation",
+                "one_concrete_action_today",
+            ]
+            if ctx.background_aspect
+            else None
+        ),
     }
 
 

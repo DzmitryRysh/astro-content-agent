@@ -303,6 +303,10 @@ class CatstyleDailyPackResult(BaseModel):
     prompt_packs: list[dict]
     primary_candidate: dict | None = None
     secondary_supportive_candidate: dict | None = None
+    sky_weather_stack: dict | None = Field(
+        default=None,
+        description="Daily sky weather stack v1: primary flash + background pressure aspects.",
+    )
 
 
 CatstyleAspectTimingPhase = Literal["applying", "exact", "separating", "unknown"]
