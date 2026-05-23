@@ -180,6 +180,30 @@ def test_post_package_uses_fallback_caption_without_llm(tmp_path: Path) -> None:
     assert pkg.caption.count("**Про сроки:**") == 1
 
 
+def test_mercury_uranus_fallback_uses_life_hook_not_textbook() -> None:
+    from astro_content_agent.services.content.catstyle_caption_generator import _DRY_TEXTBOOK_OPENING_MARKERS
+
+    manifest = {
+        "date": "2026-05-22",
+        "selected_candidate": {
+            "planet_a": "Mercury",
+            "planet_b": "Uranus",
+            "aspect_type": "opposition",
+            "mode_recommendation": "tension",
+        },
+    }
+    ctx = build_catstyle_caption_context(manifest)
+    payload = context_to_llm_payload(ctx)
+    assert payload.get("caption_opening_style") == "life_situation_hook_then_planet_meanings"
+    result = build_fallback_caption(ctx)
+    low = result.caption.lower()
+    assert "если день" in low[:200]
+    assert "меркурий" in low and "уран" in low
+    assert "в оппозиции" not in low[:180]
+    for banned in _DRY_TEXTBOOK_OPENING_MARKERS:
+        assert banned not in low[:300]
+
+
 def test_llm_prompt_builder_instructions_file_exists() -> None:
     path = (
         Path(__file__).resolve().parents[1]

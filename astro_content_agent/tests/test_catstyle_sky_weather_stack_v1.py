@@ -65,6 +65,16 @@ def test_mercury_uranus_opposition_prioritized_as_short_flash_primary() -> None:
     assert stack.primary_aspect.duration_category == "short_flash"
 
 
+def test_mercury_uranus_mars_pluto_stack_weather_label() -> None:
+    ranked = [
+        _candidate("Mars", "Pluto", "square", total_score=42, w_first=0, w_last=22),
+        _candidate("Mercury", "Uranus", "opposition", total_score=35, w_first=10, w_last=12),
+    ]
+    stack = build_sky_weather_stack(ranked, editorial_profile="charged")
+    assert stack is not None
+    assert stack.combined_weather_label == "Суета и раздражительность"
+
+
 def test_mars_pluto_square_can_be_pressure_background() -> None:
     mars_pluto = _candidate("Mars", "Pluto", "square", total_score=40, w_first=0, w_last=22)
     assert infer_duration_category(mars_pluto) == "pressure_background"
@@ -178,6 +188,62 @@ def test_stacked_fallback_caption_names_planets_early_no_outer_signs() -> None:
     assert "плутон в" not in head
 
 
+def test_stacked_caption_life_hook_opening_not_textbook() -> None:
+    from astro_content_agent.services.content.catstyle_caption_generator import _DRY_TEXTBOOK_OPENING_MARKERS
+    from astro_content_agent.services.content.catstyle_aspect_timing import build_aspect_timing_from_manifest
+    from astro_content_agent.services.content.catstyle_caption_polish import append_timing_once
+    from datetime import date
+
+    manifest = {
+        "date": "2026-05-22",
+        "selected_candidate": {
+            "planet_a": "Mercury",
+            "planet_b": "Uranus",
+            "aspect_type": "opposition",
+            "mode_recommendation": "tension",
+            "closest_hour_utc": 12,
+            "uranus_sign": "Gemini",
+        },
+        "sky_weather_stack": {
+            "primary_aspect": {
+                "planet_a": "Mercury",
+                "planet_b": "Uranus",
+                "aspect_type": "opposition",
+                "mode_recommendation": "tension",
+                "duration_category": "short_flash",
+            },
+            "background_aspects": [
+                {
+                    "planet_a": "Mars",
+                    "planet_b": "Pluto",
+                    "aspect_type": "square",
+                    "mode_recommendation": "tension",
+                    "duration_category": "pressure_background",
+                }
+            ],
+            "combined_weather_label": "Суета и раздражительность",
+            "combined_pressure_summary": "y",
+            "compensation_focus": "умная искра",
+            "selection_reason": "z",
+        },
+    }
+    ctx = build_catstyle_caption_context(manifest)
+    result = build_fallback_caption(ctx)
+    head = result.caption[:500].lower()
+    assert head.startswith("**суета") or "если день" in head[:120]
+    assert "меркурий" in head and "уран" in head
+    assert "связ" in head and ("слов" in head or "бумаг" in head)
+    assert "внезап" in head or "полом" in head or "нервн" in head
+    for banned in _DRY_TEXTBOOK_OPENING_MARKERS:
+        assert banned not in head
+    assert "уран в" not in head
+    assert "стёб" in result.caption.lower() or "стеб" in result.caption.lower()
+    timing = build_aspect_timing_from_manifest(manifest)
+    assert timing is not None
+    with_timing = append_timing_once(result.caption, timing, date(2026, 5, 22), "Mercury")
+    assert with_timing.count("**Про сроки:**") == 1
+
+
 def test_stacked_fallback_mercury_uranus_bioastrologiya_compensation_not_generic() -> None:
     manifest = {
         "date": "2026-05-22",
@@ -206,15 +272,17 @@ def test_stacked_fallback_mercury_uranus_bioastrologiya_compensation_not_generic
                     "duration_category": "pressure_background",
                 }
             ],
-            "combined_weather_label": "x",
+            "combined_weather_label": "Суета и раздражительность",
             "combined_pressure_summary": "y",
             "compensation_focus": "умная искра",
             "selection_reason": "z",
         },
     }
     ctx = build_catstyle_caption_context(manifest)
+    assert ctx.combined_weather_label == "Суета и раздражительность"
     result = build_fallback_caption(ctx)
     low = result.caption.lower()
+    assert "если день" in low[:200] or "суета" in low[:80]
     assert "стёб" in low or "стеб" in low
     assert "друз" in low or "обсужден" in low
     assert any(x in low for x in ("фантаст", "формула", "прогноз", "математ", "скорочт"))
@@ -231,6 +299,7 @@ def test_stacked_caption_includes_compensation(tmp_path: Path) -> None:
             "planet_b": "Uranus",
             "aspect_type": "opposition",
             "mode_recommendation": "tension",
+            "closest_hour_utc": 12,
         },
         "sky_weather_stack": {
             "primary_aspect": {
@@ -249,7 +318,7 @@ def test_stacked_caption_includes_compensation(tmp_path: Path) -> None:
                     "duration_category": "pressure_background",
                 }
             ],
-            "combined_weather_label": "x",
+            "combined_weather_label": "Суета и раздражительность",
             "combined_pressure_summary": "y",
             "compensation_focus": "перепроверить",
             "selection_reason": "z",
@@ -274,3 +343,6 @@ def test_stacked_caption_includes_compensation(tmp_path: Path) -> None:
     assert CAPTION_COMPENSATION_MARKER.lower() in low
     assert "стёб" in low or "стеб" in low or "формула" in low
     assert "практический шаг" in low
+    assert "если день" in low[:250] or "суета" in low[:80]
+    assert "уран в" not in low
+    assert pkg.caption.count("**Про сроки:**") == 1

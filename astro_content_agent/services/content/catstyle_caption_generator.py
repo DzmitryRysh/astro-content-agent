@@ -76,26 +76,66 @@ def _validate_output(data: CatstyleCaptionLLMOutput) -> CatstyleCaptionLLMOutput
     return CatstyleCaptionLLMOutput(hook=hook, caption=cap, compensation=comp)
 
 
-def _stacked_primary_lead(ctx: CatstyleCaptionContext) -> str:
-    """Opening line for stacked weather: outer function on personal, no outer sign copy."""
-    comp = resolve_catstyle_compensation(ctx.planet_a, ctx.planet_b, ctx.aspect_type, ctx.mode)
-    if comp and comp.pressure_phrasing:
-        return comp.pressure_phrasing.rstrip(".") + "."
-    oriented = None
-    from astro_content_agent.content.catstyle.transit_pair_seed_v0 import orient_outer_personal
+_DRY_TEXTBOOK_OPENING_MARKERS: tuple[str, ...] = (
+    "в оппозиции к",
+    "в соединении с",
+    "в квадрате к",
+    "сегодня их соединение",
+    "сегодня их оппозиция",
+    "этот аспект",
+    "данный аспект",
+    "аспект — это",
+)
 
-    oriented = orient_outer_personal(ctx.planet_a, ctx.planet_b)
-    pa_label = planet_display_ru(ctx.planet_a)
-    pb_label = planet_display_ru(ctx.planet_b)
-    if oriented:
-        outer, personal = oriented
-        outer_label = planet_display_ru(outer)
-        personal_label = planet_display_ru(personal)
-        return (
-            f"Сегодня {personal_label} попадает под напряжение {outer_label}: "
-            f"день требует внимания к {personal_label.lower()} и к тому, как звучит {outer_label}."
-        )
-    return f"Сегодня {pa_label} и {pb_label} встречаются в напряженном аспекте — обе темы на виду."
+
+def _resolve_weather_label(ctx: CatstyleCaptionContext) -> str | None:
+    label = (ctx.combined_weather_label or "").strip()
+    if label and label not in ("x", "y"):
+        return label
+    comp = resolve_catstyle_compensation(ctx.planet_a, ctx.planet_b, ctx.aspect_type, ctx.mode)
+    if comp and comp.caption_weather_label:
+        return comp.caption_weather_label.strip()
+    return None
+
+
+def _stacked_primary_opening(ctx: CatstyleCaptionContext) -> str:
+    """Life-situation hook first, then planet pair — no textbook or sign-based outer copy."""
+    comp = resolve_catstyle_compensation(ctx.planet_a, ctx.planet_b, ctx.aspect_type, ctx.mode)
+    body = ""
+    if comp and (comp.caption_life_hook_opening or "").strip():
+        body = comp.caption_life_hook_opening.strip()
+    elif comp and comp.pressure_phrasing:
+        body = comp.pressure_phrasing.rstrip(".") + "."
+    else:
+        from astro_content_agent.content.catstyle.transit_pair_seed_v0 import orient_outer_personal
+
+        oriented = orient_outer_personal(ctx.planet_a, ctx.planet_b)
+        if oriented:
+            outer, personal = oriented
+            body = (
+                f"Если день идёт через сбои, звонки и бумаги на повышенных оборотах — "
+                f"смотри на {planet_display_ru(personal)}–{planet_display_ru(outer)}."
+            )
+        else:
+            pa_label = planet_display_ru(ctx.planet_a)
+            pb_label = planet_display_ru(ctx.planet_b)
+            body = f"Если день идёт рывками и срывами — смотри на {pa_label}–{pb_label}."
+    label = _resolve_weather_label(ctx)
+    if label:
+        return f"**{label}**\n\n{body}"
+    return body
+
+
+def _stacked_risk_line(ctx: CatstyleCaptionContext) -> str:
+    comp = resolve_catstyle_compensation(ctx.planet_a, ctx.planet_b, ctx.aspect_type, ctx.mode)
+    if comp and (comp.caption_risk_line or "").strip():
+        return comp.caption_risk_line.strip()
+    if comp and comp.pressure_phrasing:
+        return f"**Риск:** {comp.pressure_phrasing.rstrip('.')}."
+    return (
+        "**Риск:** легко сорваться на резкое слово, ошибиться в документе "
+        "или ответить на пике раздражения."
+    )
 
 
 def _stacked_background_line(bg: dict[str, Any]) -> str:
@@ -144,18 +184,18 @@ def build_stacked_fallback_caption(ctx: CatstyleCaptionContext) -> CatstyleCapti
     if not bg:
         return build_fallback_caption(ctx)
 
-    primary_lead = _stacked_primary_lead(ctx)
+    primary_opening = _stacked_primary_opening(ctx)
     background_lead = _stacked_background_line(bg)
+    risk_line = _stacked_risk_line(ctx)
     combine = (
-        "Вместе это даёт день, где легко сорваться на резкое слово, "
-        "ошибку в бумагах или нервное решение — если не развести скорость и фоновое давление."
+        "Вместе вспышка по связи и словам накладывается на фоновое давление — "
+        "день «суета и раздражительность», если не развести скорость и контроль."
     )
-    if ctx.combined_pressure_summary:
+    label = _resolve_weather_label(ctx)
+    if label == "Суета и раздражительность":
         combine = (
-            "Вместе это даёт день, где быстрый удар по "
-            f"{planet_display_ru(ctx.planet_a).lower()}–{planet_display_ru(ctx.planet_b).lower()} "
-            "накладывается на более долгое давление фона — легко сорваться на резкое слово, "
-            "ошибку в бумагах или нервное решение."
+            "Вместе это и есть «суета и раздражительность»: быстрые сбои и слова "
+            "плюс фоновое желание продавить — легко сорваться, если не поймать ритм."
         )
 
     comp_entry = resolve_catstyle_compensation(ctx.planet_a, ctx.planet_b, ctx.aspect_type, ctx.mode)
@@ -174,8 +214,9 @@ def build_stacked_fallback_caption(ctx: CatstyleCaptionContext) -> CatstyleCapti
     bg_comp_sentence = _stacked_background_compensation_sentence(bg)
 
     paragraphs = [
-        primary_lead,
+        primary_opening,
         background_lead,
+        risk_line,
         combine,
         f"**Компенсация (Уран–Меркурий):** {primary_comp}",
     ]
@@ -189,7 +230,11 @@ def build_stacked_fallback_caption(ctx: CatstyleCaptionContext) -> CatstyleCapti
     caption = "\n\n".join(paragraphs)
     pa_label = planet_display_ru(ctx.planet_a)
     pb_label = planet_display_ru(ctx.planet_b)
-    hook = f"{pa_label} и {pb_label} + фон: день двойного давления — один честный шаг."
+    weather = _resolve_weather_label(ctx)
+    if weather:
+        hook = f"{weather}: {pa_label}–{pb_label} и фон — один честный шаг сегодня."
+    else:
+        hook = f"{pa_label}–{pb_label} + фон: день двойного давления — один честный шаг."
     polished = polish_caption_for_package(_sanitize_text(caption), ctx)
     return CatstyleCaptionResult(
         hook=hook,
@@ -257,15 +302,23 @@ def build_fallback_caption(ctx: CatstyleCaptionContext) -> CatstyleCaptionResult
     else:
         comp_summary = comp_block.split(chr(10))[0] if comp_block else "сними накал одним ясным действием."
 
-    paragraphs = [
-        f"**{pa_label}{sign_a}** — {p1}",
-        f"**{pb_label}{sign_b}** — {p2}",
-        f"В **{asp_ru}** ({ctx.mode}) эти две силы встречаются так: {ctx.aspect_interaction}",
-        feel,
-        f"**Точка давления:** {risk}",
-        f"**Компенсация:** {comp_summary}",
-        f"{CAPTION_COMPENSATION_MARKER} {action}.\nЗачем это работает: {why}",
-    ]
+    if comp_entry and (comp_entry.caption_life_hook_opening or "").strip():
+        paragraphs = [
+            _stacked_primary_opening(ctx),
+            _stacked_risk_line(ctx),
+            f"**Компенсация:** {comp_summary}",
+            f"{CAPTION_COMPENSATION_MARKER} {action}.\nЗачем это работает: {why}",
+        ]
+    else:
+        paragraphs = [
+            f"**{pa_label}{sign_a}** — {p1}",
+            f"**{pb_label}{sign_b}** — {p2}",
+            f"В **{asp_ru}** ({ctx.mode}) эти две силы встречаются так: {ctx.aspect_interaction}",
+            feel,
+            f"**Точка давления:** {risk}",
+            f"**Компенсация:** {comp_summary}",
+            f"{CAPTION_COMPENSATION_MARKER} {action}.\nЗачем это работает: {why}",
+        ]
     caption = "\n\n".join(paragraphs)
     hook = (
         f"{pa_label} и {pb_label}, {asp_ru}: "
@@ -374,5 +427,6 @@ __all__ = [
     "OpenAICatstyleCaptionGenerator",
     "build_fallback_caption",
     "build_stacked_fallback_caption",
+    "_DRY_TEXTBOOK_OPENING_MARKERS",
     "generate_catstyle_caption",
 ]

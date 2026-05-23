@@ -197,7 +197,14 @@ def _background_selection_score(c: CatstyleCandidate, primary_pk: frozenset[str]
 
 def _combined_label(primary: SkyWeatherAspectSlot, backgrounds: list[SkyWeatherAspectSlot]) -> str:
     if backgrounds:
-        return f"{primary.planet_a}–{primary.planet_b} flash + {backgrounds[0].planet_a}–{backgrounds[0].planet_b} pressure"
+        pk_p = _pair_key(primary.planet_a, primary.planet_b)
+        pk_b = _pair_key(backgrounds[0].planet_a, backgrounds[0].planet_b)
+        if pk_p == frozenset({"Mercury", "Uranus"}) and pk_b == frozenset({"Mars", "Pluto"}):
+            return "Суета и раздражительность"
+        return (
+            f"{primary.planet_a}–{primary.planet_b} flash + "
+            f"{backgrounds[0].planet_a}–{backgrounds[0].planet_b} pressure"
+        )
     return f"{primary.planet_a}–{primary.planet_b} daily weather"
 
 

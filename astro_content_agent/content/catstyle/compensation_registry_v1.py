@@ -47,6 +47,18 @@ class CatstyleCompensationEntry(BaseModel):
         default=None,
         description="Natural-language public caption adaptation of source compensation (not a dry list).",
     )
+    caption_weather_label: str | None = Field(
+        default=None,
+        description="Human-readable sky weather label for stacked posts (e.g. «Суета и раздражительность»).",
+    )
+    caption_life_hook_opening: str | None = Field(
+        default=None,
+        description="Instagram-friendly opening: life situation first, then planet pair and simple meanings.",
+    )
+    caption_risk_line: str | None = Field(
+        default=None,
+        description="Short risk paragraph after primary/background setup.",
+    )
 
 
 def _safe_planet_name(name: str) -> str | None:
@@ -81,6 +93,9 @@ def _entry(
     relieve_phrasing: str | None = None,
     source_compensation_actions: list[str] | None = None,
     public_compensation_adaptation: str | None = None,
+    caption_weather_label: str | None = None,
+    caption_life_hook_opening: str | None = None,
+    caption_risk_line: str | None = None,
 ) -> CatstyleCompensationEntry:
     return CatstyleCompensationEntry(
         registry_key=registry_key,
@@ -95,6 +110,9 @@ def _entry(
         relieve_phrasing=relieve_phrasing,
         source_compensation_actions=list(source_compensation_actions or ()),
         public_compensation_adaptation=public_compensation_adaptation,
+        caption_weather_label=caption_weather_label,
+        caption_life_hook_opening=caption_life_hook_opening,
+        caption_risk_line=caption_risk_line,
     )
 
 
@@ -290,6 +308,17 @@ CATSTYLE_COMPENSATION_STARTER_REGISTRY: Final[tuple[CatstyleCompensationEntry, .
             "фантастика или темы будущего, астрология/эзотерика, прогнозы, математика, скорочтение, "
             "тренировка памяти, Формула-1 — туда, где нервная скорость становится интересом, "
             "а не скандалом."
+        ),
+        caption_weather_label="Суета и раздражительность",
+        caption_life_hook_opening=(
+            "Если день идёт через сбои, звонки, документы и разговоры на повышенных оборотах — "
+            "смотри на Меркурий–Уран.\n\n"
+            "Меркурий отвечает за связь, слова и бумаги, а Уран добавляет внезапность, "
+            "поломки и нервный разряд."
+        ),
+        caption_risk_line=(
+            "**Риск:** легко сорваться на резкое слово, ошибиться в документе или сообщении "
+            "и ответить на пике раздражения — особенно если фон давит сильнее обычного."
         ),
         compensation_actions=[
             "юмор и стёб без яда — снять напряжение словом, не уколом",

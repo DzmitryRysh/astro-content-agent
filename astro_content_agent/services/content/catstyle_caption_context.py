@@ -284,6 +284,14 @@ def context_to_llm_payload(ctx: CatstyleCaptionContext) -> dict[str, Any]:
         "source_compensation_actions": (
             list(comp_entry.source_compensation_actions) if comp_entry else []
         ),
+        "caption_weather_label": comp_entry.caption_weather_label if comp_entry else None,
+        "caption_life_hook_opening": comp_entry.caption_life_hook_opening if comp_entry else None,
+        "caption_risk_line": comp_entry.caption_risk_line if comp_entry else None,
+        "caption_opening_style": (
+            "life_situation_hook_then_planet_meanings"
+            if comp_entry and comp_entry.caption_life_hook_opening
+            else "standard"
+        ),
         "pressure_phrasing": ctx.pressure_phrasing,
         "caption_structure": [
             "planet_a_meaning",
