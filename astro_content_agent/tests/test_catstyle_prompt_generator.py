@@ -951,6 +951,52 @@ def test_premium_render_style_opens_prompt_without_legacy_flat_cartoon_anchor() 
     assert "[shot role v1 - premium hero framing]" in low
 
 
+def test_premium_cg_keyart_render_style_in_prompt_and_opener_contract() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Sun",
+            planet_b="Uranus",
+            aspect_type="conjunction",
+            mode="tension",
+            premium_art_direction=False,
+            render_style_profile_key="premium_cg_keyart_v1",
+            world_template_key="cosmic_zodiac_arena",
+            shot_mode="epic_arena_showdown",
+        )
+    )
+    p0 = pack.image_prompts[0]
+    low = p0.lower()
+    assert low.startswith("premium stylized cgi key-art illustration")
+    assert "[style hardlock cg v1 - key art mandate]" in low
+    assert "[render style v1 - high-priority visual finish]" in low
+    assert "stylized cgi" in low or "key-art" in low
+    assert "volumetric" in low
+    assert pack.render_style_profile is not None
+    assert pack.render_style_profile["key"] == "premium_cg_keyart_v1"
+    neg = pack.negative_prompt.lower()
+    assert "watercolor" in neg
+    assert "storybook" in neg or "children's illustration" in neg
+
+
+def test_premium_comic_poster_v2_still_default_and_opener_unchanged() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Jupiter",
+            planet_b="Mars",
+            aspect_type="square",
+            mode="tension",
+            premium_art_direction=False,
+        )
+    )
+    assert pack.render_style_profile["key"] == "premium_comic_poster_v2"
+    assert pack.image_prompts[0].lower().startswith("premium cinematic comic-poster illustration")
+    assert "not 3d cgi" in pack.image_prompts[0].lower()
+
+
 def test_clean_cartoon_render_style_opens_with_cartoon_action_language() -> None:
     from astro_content_agent.content.catstyle.models import CatstylePromptRequest
 

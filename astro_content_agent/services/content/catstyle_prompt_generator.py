@@ -159,7 +159,12 @@ def _image_prompt_opening_prefix(render_prof: CatstyleRenderStyleProfile, *, mod
     base = _image_prompt_lead(render_prof)
     hb = render_prof.style_hardlock_block
     if hb and str(hb).strip():
-        return f"{base} [STYLE HARDLOCK v2 - premium poster mandate] {hb.strip()}".strip()
+        tag = (
+            "[STYLE HARDLOCK CG v1 - key art mandate]"
+            if render_prof.key == "premium_cg_keyart_v1"
+            else "[STYLE HARDLOCK v2 - premium poster mandate]"
+        )
+        return f"{base} {tag} {hb.strip()}".strip()
     return base
 
 

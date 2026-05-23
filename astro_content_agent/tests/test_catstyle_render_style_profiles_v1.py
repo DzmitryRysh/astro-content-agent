@@ -16,8 +16,9 @@ from astro_content_agent.content.catstyle.render_style_profiles_v1 import (
 def test_registry_contains_required_profiles() -> None:
     assert "premium_comic_poster_v1" in RENDER_STYLE_PROFILES
     assert "premium_comic_poster_v2" in RENDER_STYLE_PROFILES
+    assert "premium_cg_keyart_v1" in RENDER_STYLE_PROFILES
     assert "clean_cartoon_action_v1" in RENDER_STYLE_PROFILES
-    assert len(RENDER_STYLE_PROFILES) >= 3
+    assert len(RENDER_STYLE_PROFILES) >= 4
 
 
 def test_default_key_constant() -> None:
@@ -34,6 +35,7 @@ def test_lookup_and_list() -> None:
 def test_normalize_hyphens() -> None:
     assert normalize_render_style_profile_key("premium-comic-poster-v1") == "premium_comic_poster_v1"
     assert normalize_render_style_profile_key("premium-comic-poster-v2") == "premium_comic_poster_v2"
+    assert normalize_render_style_profile_key("premium-cg-keyart-v1") == "premium_cg_keyart_v1"
 
 
 def test_v2_has_hardlock_and_stronger_opening() -> None:
@@ -69,3 +71,24 @@ def test_negative_additions_nonempty() -> None:
 def test_image_prompt_opening_line_nonempty_per_profile() -> None:
     for prof in list_render_style_profiles():
         assert prof.image_prompt_opening_line.strip()
+
+
+def test_premium_cg_keyart_profile_cg_language_and_anti_painterly_negatives() -> None:
+    cg = get_render_style_profile("premium_cg_keyart_v1")
+    open_low = cg.image_prompt_opening_line.lower()
+    assert "stylized cgi" in open_low or "cgi key-art" in open_low
+    assert "key-art" in open_low or "key art" in open_low.replace("-", " ")
+    assert "volumetric" in open_low
+    assert "material" in open_low
+    assert cg.style_hardlock_block
+    assert "painterly comic" in cg.style_hardlock_block.lower() or "hand-painted" in cg.style_hardlock_block.lower()
+    neg_joined = " ".join(cg.negative_prompt_additions).lower()
+    assert "watercolor" in neg_joined
+    assert "storybook" in neg_joined
+    assert "painterly comic" in neg_joined or "hand-painted" in neg_joined
+
+
+def test_v2_profile_unchanged_rejects_cgi_in_opening() -> None:
+    v2 = get_render_style_profile("premium_comic_poster_v2")
+    assert "not 3d cgi" in v2.image_prompt_opening_line.lower()
+    assert "hand-painted stylized 2d" in v2.image_prompt_opening_line.lower()

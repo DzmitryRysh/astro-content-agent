@@ -333,6 +333,52 @@ def strengthen_negative_prompt(
             ]
             merged = _dedupe_keep_order(merged + flow_extra)
         return ", ".join(merged)
+    if render_style_profile_key == "premium_cg_keyart_v1":
+        style_compact = [
+            "text / logos / watermarks / captions",
+            "photoreal / hyperreal portrait skin pores HDR",
+            "watercolor wash dominance",
+            "soft painterly comic brush texture dominance",
+            "visible hand-painted comic brushstroke mush",
+            "rough hand-painted texture dominance",
+            "children's illustration style",
+            "storybook illustration look",
+            "childish nursery / kawaii / chibi mascot look",
+            "sticker mascot center-float posing",
+            "flat vector / cheap icon / mobile-game icon look",
+            "crowded background, micro-detail clutter, filigree noise",
+            "microtexture noise and tiny crack clutter",
+            "excess particles clutter",
+            "cluttered architecture micro-detail spam",
+            "weak bland composition with disconnected characters",
+            "underexposed overall scene",
+            "muddy crushed shadows",
+        ]
+        safety_terms = (
+            "real weapons",
+            "blood",
+            "gore",
+            "toxic machismo",
+            "horror",
+            "fetish",
+            "explicit",
+        )
+        carried_safety = [p for p in _split_chunks(base_negative) if any(t in p.lower() for t in safety_terms)]
+        merged = _dedupe_keep_order(
+            style_compact + list(visual_fidelity_negative_must_keep()) + carried_safety
+        )
+        if (mode or "").strip().lower() == "flow":
+            flow_extra = [
+                "tournament duel framing",
+                "versus showdown poster symmetry",
+                "MMA brawl collision staging",
+                "squared-off combat stare-down as primary read",
+                "malformed astrological glyphs painted in-image",
+                "pseudo-runes or fake zodiac letters on flags",
+                "floating planetary glyph stickers pasted over faces or bodies instead of woven into flag cloth",
+            ]
+            merged = _dedupe_keep_order(merged + flow_extra)
+        return ", ".join(merged)
     universal.extend(
             [
                 "childish nursery illustration dominance",

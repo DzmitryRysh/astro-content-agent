@@ -207,6 +207,104 @@ RENDER_STYLE_PROFILES: dict[str, CatstyleRenderStyleProfile] = {
             "V2 premium battle poster—heroic coliseum-scale duel splash, dramatic rim/impact light, anti-nursery discipline."
         ),
     ),
+    "premium_cg_keyart_v1": CatstyleRenderStyleProfile(
+        key="premium_cg_keyart_v1",
+        label="Premium CG key art v1",
+        description=(
+            "Stylized CGI / 2.5D game key-art finish: crisp polished surfaces, volumetric lighting, and "
+            "premium splash-art clarity while preserving the Catstyle universe (catplanets, arena, flags, zodiac floor)."
+        ),
+        image_prompt_opening_line=(
+            "Premium stylized CGI key-art illustration of anthropomorphic planet-cats — polished 2.5D game splash-art "
+            "and collectible key-art finish with crisp material definition, clean specular reads, and volumetric heroic "
+            "lighting (NOT photoreal portrait, NOT flat mascot sticker art, NOT nursery storybook softness); "
+            "high-end stylized computer-graphics look with cinematic arena scale, epic dramatic action, and brand-consistent "
+            "catplanet identity—less hand-painted comic brush dominance, more CG polish and surface clarity."
+        ),
+        style_hardlock_block=(
+            "Prioritize stylized CG / key-art finish over painterly comic illustration: crisp polished surfaces, stronger "
+            "material definition, volumetric lighting, and clean plane modeling—reject watercolor washes, soft painterly "
+            "comic brush texture stacks, visible rough hand-painted dominance, and children's storybook illustration softness. "
+            "Still Catstyle universe: catplanet bodies (not ordinary cats), monumental cosmic coliseum, engraved zodiac "
+            "floor wheel, faction flags with canonical planetary glyphs woven in cloth, cosmic scale, epic dramatic duel "
+            "or alliance staging—characters remain the focal hierarchy. Texture rule: medium CG material groups, not "
+            "micro-noise or mushy brush speckle. Lighting: dramatic volumetric separation without HDR photoreal skin."
+        ),
+        style_core_line=(
+            "Ultra-premium stylized CGI KEY-ART presentation—high-end game splash-art / cinematic 2.5D render clarity "
+            "with heroic epic gravity; crisp surfaces and controlled CG specular (clean planes, no mush); explicitly NOT "
+            "watercolor storybook softness, NOT dominant hand-painted comic brush texture, NOT photoreal fur/skin/HDR portrait, "
+            "NOT flat mobile-game icon gloss or cheap chibi novelty."
+        ),
+        composition_line=(
+            "Key-art heroic framing: monumental scale via FG/MG/BG layering—foreground catplanets dominate with silhouette "
+            "authority; midground carries coliseum architecture weight; background opens into consequential cosmic depth; "
+            "reject centered sticker tableaus and empty minimalist staging."
+        ),
+        linework_line=(
+            "Clean graphic contour discipline supporting CG silhouette reads—crisp edge control without mushy ink-wash "
+            "brushstroke dominance."
+        ),
+        shading_line=(
+            "Stylized CG shading with readable plane shifts and polished surface modeling—volumetric form reads, not "
+            "soft painterly gradient mush or gritty comic speckle stacks."
+        ),
+        lighting_line=(
+            "Volumetric cinematic key light plus rim and impact accents—splash-art readability with depth cues; "
+            "no photoreal bounce spam or muddy noir crush."
+        ),
+        environment_line=(
+            "Catstyle arena staging locked to template beats—monumental coliseum, engraved zodiac floor, cosmic rim "
+            "and starfield depth—environment supports duel/alliance focal thrust without stealing characters."
+        ),
+        detail_line=(
+            "Purposeful CG medium-detail—armor planes, arena stone, flag cloth, controlled emblems; density serves "
+            "focal hierarchy, not ornamental micro-clutter or painterly noise."
+        ),
+        color_line=(
+            "Vivid disciplined harmonic contrasts supporting key-art focal thrust while honoring canon planet palettes."
+        ),
+        facial_expression_line=(
+            "Theatrical heroic acting with crisp readable eyes/jaws/paws—stylized CG clarity, not infant cute mush."
+        ),
+        must_have_lines=[
+            "High-end stylized CGI / 2.5D key-art finish reads at thumbnail.",
+            "Crisp polished surfaces and stronger material definition on catplanets.",
+            "Volumetric dramatic lighting with clean separation.",
+            "Catstyle universe preserved: arena, zodiac floor, flags, cosmic scale.",
+            "Epic dramatic action or alliance staging with clear focal thrust.",
+            "Brand-consistent catplanet identity—never generic animals.",
+        ],
+        avoid_lines=[
+            "Dominant hand-painted comic brush texture and visible ink-wash mush.",
+            "Watercolor or soft painterly illustration dominance.",
+            "Children's storybook or nursery bedtime softness.",
+            "Rough sketchy hand-painted texture stacks without CG polish.",
+            "Flat sticker mascot center-float on empty backdrops.",
+            "Photoreal fur/skin pores and HDR portrait lighting.",
+            "Hyper-microtexture noise and tiny crack clutter.",
+            "Weak bland compositions lacking heroic thrust.",
+        ],
+        negative_prompt_additions=[
+            "watercolor wash dominance",
+            "soft painterly comic brush texture dominance",
+            "visible hand-painted comic brushstroke mush",
+            "rough hand-painted texture dominance",
+            "children's illustration style",
+            "storybook illustration look",
+            "nursery bedtime softness",
+            "kawaii or chibi mascot flattening",
+            "sticker mascot center-float posing",
+            "flat vector / cheap icon look",
+            "photoreal / hyperreal portrait skin pores HDR",
+            "hyper-detailed microtexture noise and tiny crack clutter",
+            "muddy painterly gradient mush without readable planes",
+            "weak bland composition with disconnected characters",
+        ],
+        short_prompt_line=(
+            "Premium CG key art—stylized 2.5D splash-art polish, volumetric light, crisp materials, anti-painterly-comic drift."
+        ),
+    ),
     "clean_cartoon_action_v1": CatstyleRenderStyleProfile(
         key="clean_cartoon_action_v1",
         label="Clean cartoon action v1",
