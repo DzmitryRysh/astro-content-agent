@@ -119,16 +119,19 @@ def _manifest(
 
 def test_post_package_moon_saturn_includes_practical_compensation(tmp_path: Path) -> None:
     pkg = build_catstyle_post_package(
-        _manifest(tmp_path, planet_a="Moon", planet_b="Saturn", aspect_type="square", mode="tension")
+        _manifest(tmp_path, planet_a="Moon", planet_b="Saturn", aspect_type="square", mode="tension"),
+        use_llm_caption=False,
     )
     assert CAPTION_COMPENSATION_MARKER in pkg.caption
     assert "потребность" in pkg.caption.lower() or "потребность" in pkg.compensation.lower()
     assert "Пакет Catstyle для ручной сборки" not in pkg.caption
+    assert "метафора ритма" not in pkg.caption.lower()
 
 
 def test_post_package_neptune_moon_conjunction_registry(tmp_path: Path) -> None:
     pkg = build_catstyle_post_package(
-        _manifest(tmp_path, planet_a="Neptune", planet_b="Moon", aspect_type="conjunction", mode="tension")
+        _manifest(tmp_path, planet_a="Neptune", planet_b="Moon", aspect_type="conjunction", mode="tension"),
+        use_llm_caption=False,
     )
     assert CAPTION_COMPENSATION_MARKER in pkg.caption
     assert "границ" in pkg.caption.lower() or "границ" in pkg.compensation.lower()
@@ -146,7 +149,7 @@ def test_publish_handoff_caption_inherits_compensation_line(tmp_path: Path) -> N
     gen = tmp_path / "gen"
     gen.mkdir()
     (gen / "out.png").write_bytes(b"\x89PNG\r\n\x1a\n")
-    pkg = build_catstyle_post_package(mp, generated_images_dir=gen)
+    pkg = build_catstyle_post_package(mp, generated_images_dir=gen, use_llm_caption=False)
     pkg_dir = tmp_path / "pkg"
     write_catstyle_post_package(pkg, pkg_dir, overwrite=False)
     mr = build_catstyle_manual_review(pkg_dir)

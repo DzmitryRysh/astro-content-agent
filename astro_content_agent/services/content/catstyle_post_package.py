@@ -11,12 +11,16 @@ from pydantic import BaseModel, Field
 from astro_content_agent.content.catstyle.models import CatstyleAspectTimingMetadata
 from astro_content_agent.content.catstyle.transit_pair_seed_v0 import orient_outer_personal
 from astro_content_agent.services.content.catstyle_aspect_timing import (
-    append_ru_timing_to_caption,
     build_aspect_timing_from_manifest,
     render_aspect_timing_markdown_section,
 )
-from astro_content_agent.services.content.catstyle_compensation_copy import (
-    apply_structured_compensation_to_post_copy,
+from astro_content_agent.services.content.catstyle_caption_polish import append_timing_once
+from astro_content_agent.services.content.catstyle_caption_context import (
+    build_catstyle_caption_context,
+)
+from astro_content_agent.services.content.catstyle_caption_generator import (
+    CatstyleCaptionGenerator,
+    generate_catstyle_caption,
 )
 
 
@@ -465,6 +469,36 @@ def _ru_jupiter_saturn_square_tension() -> tuple[str, str, str, str, str]:
     return hook, caption, carousel, compensation, checklist
 
 
+def _carousel_and_checklist_for_profile(
+    profile_key: str,
+    pa: str | None,
+    pb: str | None,
+    asp: str | None,
+) -> tuple[str, str]:
+    """Carousel + checklist only (captions come from LLM/fallback generator)."""
+    if profile_key == "jupiter_mars_tension":
+        _h, _c, carousel, _comp, checklist = _ru_jupiter_mars_square()
+    elif profile_key == "mercury_jupiter_sextile_flow":
+        _h, _c, carousel, _comp, checklist = _ru_mercury_jupiter_sextile_flow()
+    elif profile_key == "pluto_mars_square_tension":
+        _h, _c, carousel, _comp, checklist = _ru_pluto_mars_square_tension()
+    elif profile_key == "venus_pluto_opposition_tension":
+        _h, _c, carousel, _comp, checklist = _ru_venus_pluto_opposition_tension()
+    elif profile_key == "moon_saturn_square_tension":
+        _h, _c, carousel, _comp, checklist = _ru_moon_saturn_square_tension()
+    elif profile_key == "venus_mars_square_tension":
+        _h, _c, carousel, _comp, checklist = _ru_venus_mars_square_tension()
+    elif profile_key == "mercury_neptune_square_tension":
+        _h, _c, carousel, _comp, checklist = _ru_mercury_neptune_square_tension()
+    elif profile_key == "sun_uranus_square_tension":
+        _h, _c, carousel, _comp, checklist = _ru_sun_uranus_square_tension()
+    elif profile_key == "jupiter_saturn_square_tension":
+        _h, _c, carousel, _comp, checklist = _ru_jupiter_saturn_square_tension()
+    else:
+        _h, _c, carousel, _comp, checklist = _ru_generic(pa, pb, asp)
+    return carousel, checklist
+
+
 def _ru_generic(pa: str | None, pb: str | None, asp: str | None) -> tuple[str, str, str, str, str]:
     label = " / ".join(str(x) for x in (pa, asp, pb) if x) or "Catstyle"
     hook = (
@@ -564,6 +598,8 @@ def build_catstyle_post_package(
     manifest_path: Path | str,
     *,
     generated_images_dir: Path | str | None = None,
+    use_llm_caption: bool | None = None,
+    caption_generator: CatstyleCaptionGenerator | None = None,
 ) -> CatstylePostPackage:
     mp = Path(manifest_path).expanduser().resolve()
     raw = load_catstyle_image_generation_manifest(mp)
@@ -634,38 +670,23 @@ def build_catstyle_post_package(
     pa_e, pb_e, asp_e, mode_e = _aspect_identity_from_sources(selected, jobs)
 
     profile_key = _classify_aspect_copy_profile(selected, jobs)
-    if profile_key == "jupiter_mars_tension":
-        hook, caption, carousel, compensation, checklist = _ru_jupiter_mars_square()
-    elif profile_key == "mercury_jupiter_sextile_flow":
-        hook, caption, carousel, compensation, checklist = _ru_mercury_jupiter_sextile_flow()
-    elif profile_key == "pluto_mars_square_tension":
-        hook, caption, carousel, compensation, checklist = _ru_pluto_mars_square_tension()
-    elif profile_key == "venus_pluto_opposition_tension":
-        hook, caption, carousel, compensation, checklist = _ru_venus_pluto_opposition_tension()
-    elif profile_key == "moon_saturn_square_tension":
-        hook, caption, carousel, compensation, checklist = _ru_moon_saturn_square_tension()
-    elif profile_key == "venus_mars_square_tension":
-        hook, caption, carousel, compensation, checklist = _ru_venus_mars_square_tension()
-    elif profile_key == "mercury_neptune_square_tension":
-        hook, caption, carousel, compensation, checklist = _ru_mercury_neptune_square_tension()
-    elif profile_key == "sun_uranus_square_tension":
-        hook, caption, carousel, compensation, checklist = _ru_sun_uranus_square_tension()
-    elif profile_key == "jupiter_saturn_square_tension":
-        hook, caption, carousel, compensation, checklist = _ru_jupiter_saturn_square_tension()
-    else:
-        hook, caption, carousel, compensation, checklist = _ru_generic(pa_e, pb_e, asp_e)
+    carousel, checklist = _carousel_and_checklist_for_profile(profile_key, pa_e, pb_e, asp_e)
 
-    hook, caption, carousel, compensation, checklist = apply_structured_compensation_to_post_copy(
-        pa_e,
-        pb_e,
-        asp_e,
-        mode_e,
-        hook=hook,
-        caption=caption,
-        carousel=carousel,
-        compensation=compensation,
-        checklist=checklist,
+    caption_ctx = build_catstyle_caption_context(
+        raw,
+        planet_a=pa_e,
+        planet_b=pb_e,
+        aspect_type=asp_e,
+        mode=mode_e,
     )
+    cap_result = generate_catstyle_caption(
+        caption_ctx,
+        generator=caption_generator,
+        use_llm=use_llm_caption,
+    )
+    hook = cap_result.hook
+    caption = cap_result.caption
+    compensation = cap_result.compensation
 
     aspect_timing = build_aspect_timing_from_manifest(raw)
     try:
@@ -674,7 +695,8 @@ def build_catstyle_post_package(
         post_d = date.today()
     oriented = orient_outer_personal(pa_e or "", pb_e or "") if pa_e and pb_e else None
     personal_for_timing = oriented[1] if oriented else pb_e
-    caption = append_ru_timing_to_caption(caption, aspect_timing, post_d, personal_for_timing)
+    if aspect_timing is not None:
+        caption = append_timing_once(caption, aspect_timing, post_d, personal_for_timing)
 
     return CatstylePostPackage(
         date=date_iso,
