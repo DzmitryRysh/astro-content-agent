@@ -15,6 +15,9 @@ from astro_content_agent.services.content.catstyle_aspect_timing import (
     build_aspect_timing_from_manifest,
     render_aspect_timing_markdown_section,
 )
+from astro_content_agent.services.content.catstyle_compensation_copy import (
+    apply_structured_compensation_to_post_copy,
+)
 
 
 POST_PACKAGE_VERSION = "catstyle-post-package-v1"
@@ -651,6 +654,18 @@ def build_catstyle_post_package(
         hook, caption, carousel, compensation, checklist = _ru_jupiter_saturn_square_tension()
     else:
         hook, caption, carousel, compensation, checklist = _ru_generic(pa_e, pb_e, asp_e)
+
+    hook, caption, carousel, compensation, checklist = apply_structured_compensation_to_post_copy(
+        pa_e,
+        pb_e,
+        asp_e,
+        mode_e,
+        hook=hook,
+        caption=caption,
+        carousel=carousel,
+        compensation=compensation,
+        checklist=checklist,
+    )
 
     aspect_timing = build_aspect_timing_from_manifest(raw)
     try:
