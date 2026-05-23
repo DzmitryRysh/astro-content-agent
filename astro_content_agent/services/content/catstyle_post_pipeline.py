@@ -6,6 +6,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from astro_content_agent.core.config import get_settings
 from astro_content_agent.services.content.catstyle_manual_review import (
     approve_catstyle_manual_review,
     build_catstyle_manual_review,
@@ -57,7 +58,12 @@ def run_catstyle_post_pipeline(
     """Run the local Catstyle post workflow after images exist on disk."""
     mp = Path(manifest_path).expanduser().resolve()
 
-    pkg = build_catstyle_post_package(mp, generated_images_dir=generated_images_dir)
+    use_llm_caption = bool(get_settings().openai_api_key)
+    pkg = build_catstyle_post_package(
+        mp,
+        generated_images_dir=generated_images_dir,
+        use_llm_caption=use_llm_caption,
+    )
     pkg_out = (
         Path(post_package_dir).expanduser().resolve()
         if post_package_dir is not None

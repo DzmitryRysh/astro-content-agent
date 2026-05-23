@@ -486,7 +486,7 @@ def test_generic_pack_when_not_jupiter_mars_square(tmp_path: Path) -> None:
     mp = _write_manifest(tmp_path, manifest)
     pkg = build_catstyle_post_package(mp)
     assert pkg.shot_mode == "standard"
-    assert "Catstyle" in pkg.caption or "Аспект" in pkg.hook
+    assert "Венера" in pkg.caption or "Нептун" in pkg.caption or "венера" in pkg.caption.lower()
     assert pkg.style_reference_image_path is None
 
 
