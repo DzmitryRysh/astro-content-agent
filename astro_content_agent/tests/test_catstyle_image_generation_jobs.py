@@ -857,7 +857,7 @@ def test_unstable_pair_without_approved_reference_does_not_set_used(tmp_path: Pa
     r = build_catstyle_image_generation_jobs(
         date(2099, 9, 3),
         output_dir=tmp_path / "unstable",
-        planet_a_override="Neptune",
+        planet_a_override="Jupiter",
         planet_b_override="Moon",
         aspect_type_override="square",
         mode_override="tension",
@@ -867,4 +867,5 @@ def test_unstable_pair_without_approved_reference_does_not_set_used(tmp_path: Pa
     assert r.jobs[0].style_reference_image_path is None
     assert r.style_reference_meta is not None
     assert r.style_reference_meta.get("approved_reference_used") is False
+    assert r.style_reference_meta.get("reference_tier") == "none"
     assert r.style_reference_meta.get("source") == "none"

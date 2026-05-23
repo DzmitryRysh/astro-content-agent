@@ -9,7 +9,9 @@ from astro_content_agent.services.content.catstyle_creative_publish_stability im
 def test_mercury_jupiter_flow_stable_via_approved_reference() -> None:
     r = evaluate_creative_publish_stability("Mercury", "Jupiter", "sextile", "flow")
     assert r.stable
+    assert r.has_exact_approved_reference
     assert r.has_approved_reference
+    assert r.reference_tier == "exact"
     assert "mercury_jupiter" in r.reason
 
 

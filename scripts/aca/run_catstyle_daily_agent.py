@@ -92,6 +92,15 @@ def main() -> int:
             "reference or stable visual canon (logged prominently)."
         ),
     )
+    ap.add_argument(
+        "--allow-archetype-publish",
+        action="store_true",
+        dest="allow_archetype_publish",
+        help=(
+            "Allow real --publish when only an archetype fallback reference exists (default: archetype pairs "
+            "may use --validate-only but not --publish)."
+        ),
+    )
     ap.add_argument("--overwrite", action="store_true", help="Overwrite existing package/review/handoff/executor outputs")
     ap.add_argument("--brand-profile-id", default=None)
     ap.add_argument("--instagram-account-id", default=None)
@@ -129,6 +138,7 @@ def main() -> int:
             style_reference_image_path=args.style_reference_image,
             disable_approved_reference_auto=args.disable_approved_reference_auto,
             force_publish_unstable=args.force_publish_unstable,
+            allow_archetype_publish=args.allow_archetype_publish,
             reference_candidates=args.reference_candidates,
             repo_root_for_dotenv=REPO_ROOT,
         )
@@ -156,6 +166,10 @@ def main() -> int:
     print(f"  primary_image:     {r.primary_image_path or '(n/a)'}")
     print(f"  package_dir:       {r.package_dir or '(n/a)'}")
     print(f"  publish_handoff:   {r.publish_handoff_dir or '(n/a)'}")
+    if r.summary_md_path:
+        print(f"  daily_summary:     {r.summary_md_path}")
+    if r.summary_json_path:
+        print(f"  daily_summary_json:{r.summary_json_path}")
     if r.publish_exit_code is not None:
         print(f"  publish_exit:      {r.publish_exit_code}")
     if r.publish_status:

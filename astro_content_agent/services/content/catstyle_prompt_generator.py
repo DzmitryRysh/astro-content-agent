@@ -17,6 +17,7 @@ from astro_content_agent.content.catstyle.approved_reference_prompt_lock_v1 impo
 from astro_content_agent.content.catstyle.approved_reference_registry import (
     resolve_approved_reference,
 )
+from astro_content_agent.content.catstyle.visual_archetype_registry_v1 import resolve_archetype_reference
 from astro_content_agent.content.catstyle.models import (
     CatstylePromptPack,
     CatstylePromptRequest,
@@ -1064,6 +1065,15 @@ def generate_catstyle_prompt_pack(req: CatstylePromptRequest) -> CatstylePromptP
                 aspect_type=req.aspect_type,
                 mode=req.mode,
             )
+        else:
+            arch = resolve_archetype_reference(pa, pb, req.aspect_type, req.mode)
+            if arch is not None and arch.prompt_guidance.strip():
+                data_arch = pack.model_dump(mode="json")
+                prompts_arch = [str(p) for p in (data_arch.get("image_prompts") or [])]
+                if prompts_arch:
+                    prompts_arch[0] = f"{prompts_arch[0].rstrip()}\n\n{arch.prompt_guidance.strip()}"
+                    data_arch["image_prompts"] = prompts_arch
+                    pack = CatstylePromptPack.model_validate(data_arch)
     # Budget guard after art-direction and approved-reference lock (trim tail only when over cap).
     data2 = pack.model_dump(mode="json")
     prompts2 = [str(p) for p in (data2.get("image_prompts") or [])]

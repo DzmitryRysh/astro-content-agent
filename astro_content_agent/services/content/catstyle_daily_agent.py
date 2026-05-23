@@ -17,11 +17,16 @@ from astro_content_agent.services.content.catstyle_image_generation_jobs import 
 )
 from astro_content_agent.services.content.catstyle_post_pipeline import run_catstyle_post_pipeline
 from astro_content_agent.services.content.catstyle_creative_publish_stability import (
+    CREATIVE_PUBLISH_BLOCKED_ARCHETYPE_MESSAGE,
     CREATIVE_PUBLISH_BLOCKED_MESSAGE,
     evaluate_creative_publish_stability,
 )
 from astro_content_agent.services.content.catstyle_real_publish import run_catstyle_handoff_publish_workflow
 from astro_content_agent.content.catstyle.approved_reference_registry import catstyle_repo_root
+from astro_content_agent.services.content.catstyle_daily_agent_summary import (
+    DailyAgentRunParams,
+    attach_summary_to_result,
+)
 from astro_content_agent.services.content.catstyle_reference_candidates import (
     collect_candidate_image_paths,
     format_approval_cli_command,
@@ -112,6 +117,8 @@ class CatstyleDailyAgentResult:
     next_approval_command: str | None = None
     log_lines: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
+    summary_md_path: str | None = None
+    summary_json_path: str | None = None
 
 
 def run_catstyle_daily_agent(
@@ -141,6 +148,7 @@ def run_catstyle_daily_agent(
     style_reference_image_path: str | None = None,
     disable_approved_reference_auto: bool = False,
     force_publish_unstable: bool = False,
+    allow_archetype_publish: bool = False,
     reference_candidates: bool = False,
     repo_root_for_dotenv: Path | None = None,
 ) -> CatstyleDailyAgentResult:
@@ -158,19 +166,74 @@ def run_catstyle_daily_agent(
     errs: list[str] = []
     pub_code: int | None = None
     pub_stat: str | None = None
+    pub_result: Any = None
+    jobs_res_holder: list[CatstyleImageGenerationJobsResult] = []
+    exec_res_holder: list[Any] = []
+    pipe_holder: list[Any] = []
+    stability_holder: list[Any] = []
+    run_params = DailyAgentRunParams(
+        provider=provider,
+        render_style_profile=render_style_profile,
+        shot_mode=shot_mode,
+        scan_mode=scan_mode,
+        editorial_profile=editorial_profile,
+        validate_only=validate_only,
+        publish=publish,
+        force_publish_unstable=force_publish_unstable,
+        allow_archetype_publish=allow_archetype_publish,
+        reference_candidates=reference_candidates,
+        disable_approved_reference_auto=disable_approved_reference_auto,
+    )
+
+    def _finish(
+        base: CatstyleDailyAgentResult,
+        *,
+        planet_a: str = "",
+        planet_b: str = "",
+        aspect_type: str = "",
+        mode: str = "",
+        warnings: list[str] | None = None,
+    ) -> CatstyleDailyAgentResult:
+        base.log_lines = log
+        base.errors = errs
+        jobs_res = jobs_res_holder[0] if jobs_res_holder else None
+        exec_res = exec_res_holder[0] if exec_res_holder else None
+        pipe = pipe_holder[0] if pipe_holder else None
+        stab = stability_holder[0] if stability_holder else None
+        ref_meta = (jobs_res.style_reference_meta if jobs_res else None) or None
+        attach_summary_to_result(
+            root,
+            base,
+            run_params=run_params,
+            jobs_res=jobs_res,
+            exec_res=exec_res,
+            pipe=pipe,
+            publish_result=pub_result,
+            planet_a=planet_a,
+            planet_b=planet_b,
+            aspect_type=aspect_type,
+            mode=mode,
+            style_reference_meta=ref_meta,
+            stability=stab,
+            warnings=warnings,
+        )
+        log.append(f"[summary] {base.summary_md_path}")
+        return base
 
     def _fail(code: int, status: str, msg: str, **kwargs: Any) -> CatstyleDailyAgentResult:
         errs.append(msg)
         log.append(f"ERROR: {msg}")
+        pa, pb, asp, mo = _aspect_context(
+            jobs_res_holder[0].selected_candidate if jobs_res_holder and isinstance(jobs_res_holder[0].selected_candidate, dict) else None
+        )
         base = CatstyleDailyAgentResult(
             exit_code=code,
             date=iso,
             status=status,
-            log_lines=log,
             errors=errs,
             **kwargs,
         )
-        return base
+        return _finish(base, planet_a=pa, planet_b=pb, aspect_type=asp, mode=mo)
 
     if reference_candidates:
         if publish or validate_only:
@@ -207,6 +270,7 @@ def run_catstyle_daily_agent(
         aspect_type_override=aspect_type_override,
         mode_override=mode_override,
     )
+    jobs_res_holder.append(jobs_res)
     for ref_line in (jobs_res.style_reference_meta or {}).get("log_lines") or []:
         log.append(f"  {ref_line}")
 
@@ -234,6 +298,7 @@ def run_catstyle_daily_agent(
     exec_res = execute_catstyle_image_jobs(
         mp, provider_name=provider, output_dir=exec_output_dir, overwrite=overwrite
     )
+    exec_res_holder.append(exec_res)
     gen_dir = Path(exec_res.outputs_dir).resolve()
     log.append(f"  output_dir: {gen_dir}")
     log.append(f"  executor status: {exec_res.status}")
@@ -296,21 +361,25 @@ def run_catstyle_daily_agent(
             log.append(f"  candidate: {cp}")
         log.append(f"[reference-candidates] Review: {review_path}")
         log.append(f"[reference-candidates] Next: {next_cmd}")
-        return CatstyleDailyAgentResult(
-            exit_code=0,
-            date=iso,
-            status="reference_candidates_ok",
-            manifest_path=str(mp),
-            image_jobs_dir=str(jobs_dir),
-            generated_images_dir=str(images_dir),
-            selected_aspect=aspect_line,
-            image_executor_status=exec_res.status,
-            reference_candidates_dir=str(cand_root),
-            candidate_image_paths=[str(p) for p in cand_paths],
-            visual_review_path=str(review_path),
-            next_approval_command=next_cmd,
-            log_lines=log,
-            errors=errs,
+        return _finish(
+            CatstyleDailyAgentResult(
+                exit_code=0,
+                date=iso,
+                status="reference_candidates_ok",
+                manifest_path=str(mp),
+                image_jobs_dir=str(jobs_dir),
+                generated_images_dir=str(images_dir),
+                selected_aspect=aspect_line,
+                image_executor_status=exec_res.status,
+                reference_candidates_dir=str(cand_root),
+                candidate_image_paths=[str(p) for p in cand_paths],
+                visual_review_path=str(review_path),
+                next_approval_command=next_cmd,
+            ),
+            planet_a=pa_ctx,
+            planet_b=pb_ctx,
+            aspect_type=asp_ctx,
+            mode=mode_ctx,
         )
 
     pkg_root = root / "catstyle_post_packages" / iso
@@ -326,6 +395,7 @@ def run_catstyle_daily_agent(
         approval_notes=approval_notes,
         overwrite=overwrite,
     )
+    pipe_holder.append(pipe)
     log.append(f"  pipeline status: {pipe.status}")
     log.append(f"  package_dir: {pipe.package_dir}")
     log.append(f"  primary_image: {pipe.recommended_primary_image or '(none)'}")
@@ -351,23 +421,37 @@ def run_catstyle_daily_agent(
     publish_paths: list[str] = []
 
     if publish and not validate_only:
+        ref_meta = jobs_res.style_reference_meta if isinstance(jobs_res.style_reference_meta, dict) else None
         stability = evaluate_creative_publish_stability(
             pa_ctx,
             pb_ctx,
             asp_ctx,
             mode_ctx,
             force_publish_unstable=force_publish_unstable,
+            allow_archetype_publish=allow_archetype_publish,
+            style_reference_meta=ref_meta,
         )
+        stability_holder.append(stability)
         if stability.force_publish_unstable:
             log.append(
                 "WARNING: --force-publish-unstable — real Instagram publish allowed without approved reference or stable canon."
             )
         if not stability.stable:
+            blocked_msg = (
+                CREATIVE_PUBLISH_BLOCKED_ARCHETYPE_MESSAGE
+                if stability.reason == "archetype_reference_validate_only"
+                else CREATIVE_PUBLISH_BLOCKED_MESSAGE
+            )
+            status = (
+                "creative_publish_blocked_archetype_only"
+                if stability.reason == "archetype_reference_validate_only"
+                else "creative_publish_blocked_unstable_pair"
+            )
             log.append(f"[5/5] Creative publish gate: BLOCKED ({stability.reason})")
             return _fail(
                 1,
-                "creative_publish_blocked_unstable_pair",
-                CREATIVE_PUBLISH_BLOCKED_MESSAGE,
+                status,
+                blocked_msg,
                 manifest_path=str(mp),
                 image_jobs_dir=str(jobs_dir),
                 generated_images_dir=str(gen_dir),
@@ -413,6 +497,7 @@ def run_catstyle_daily_agent(
             brand_profile_id_cli=brand_profile_id,
             instagram_account_id_cli=instagram_account_id,
         )
+        pub_result = pr
         pub_stat = pr.publish_status if pr is not None else None
         log.append(f"  publish workflow exit: {pub_code}  status: {pub_stat}")
         jp = handoff_p / "catstyle_publish_result.json"
@@ -448,24 +533,29 @@ def run_catstyle_daily_agent(
     elif publish and pub_code == 0:
         final_status = pub_stat or "ok"
 
-    return CatstyleDailyAgentResult(
-        exit_code=0,
-        date=iso,
-        status=final_status,
-        manifest_path=str(mp),
-        image_jobs_dir=str(jobs_dir),
-        generated_images_dir=str(gen_dir),
-        primary_image_path=pipe.recommended_primary_image,
-        package_dir=pipe.package_dir,
-        publish_handoff_dir=pipe.publish_handoff_dir,
-        selected_aspect=aspect_line,
-        image_executor_status=exec_res.status,
-        pipeline_status=pipe.status,
-        publish_exit_code=pub_code,
-        publish_status=pub_stat,
-        publish_result_paths=publish_paths,
-        log_lines=log,
-        errors=errs,
+    return _finish(
+        CatstyleDailyAgentResult(
+            exit_code=0,
+            date=iso,
+            status=final_status,
+            manifest_path=str(mp),
+            image_jobs_dir=str(jobs_dir),
+            generated_images_dir=str(gen_dir),
+            primary_image_path=pipe.recommended_primary_image,
+            package_dir=pipe.package_dir,
+            publish_handoff_dir=pipe.publish_handoff_dir,
+            selected_aspect=aspect_line,
+            image_executor_status=exec_res.status,
+            pipeline_status=pipe.status,
+            publish_exit_code=pub_code,
+            publish_status=pub_stat,
+            publish_result_paths=publish_paths,
+        ),
+        planet_a=pa_ctx,
+        planet_b=pb_ctx,
+        aspect_type=asp_ctx,
+        mode=mode_ctx,
+        warnings=list(pipe.warnings) if pipe.warnings else None,
     )
 
 

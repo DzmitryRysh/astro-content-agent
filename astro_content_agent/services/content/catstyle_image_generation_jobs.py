@@ -11,7 +11,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 from astro_content_agent.astro.ephemeris import PlanetPosition
-from astro_content_agent.content.catstyle.approved_reference_registry import resolve_approved_reference
+from astro_content_agent.services.content.catstyle_style_reference_resolver import resolve_style_reference
 from astro_content_agent.content.catstyle.models import CatstylePromptRequest
 from astro_content_agent.services.content.catstyle_daily_pack import generate_catstyle_daily_pack
 from astro_content_agent.services.content.catstyle_manual_override_timing import (
@@ -188,14 +188,8 @@ def _manual_aspect_override_manifest_block(pa: str, pb: str, asp: str, mode: str
     return {"enabled": True, "planet_a": pa, "planet_b": pb, "aspect_type": asp, "mode": mode}
 
 
-def _approved_reference_log_lines(meta: dict[str, Any]) -> list[str]:
-    if not meta.get("approved_reference_used"):
-        return []
-    path = meta.get("approved_reference_image_path") or meta.get("path") or ""
-    return [
-        f"Using approved Catstyle reference image: {path}",
-        "Reference source: approved_reference_registry",
-    ]
+def _style_reference_log_lines(meta: dict[str, Any]) -> list[str]:
+    return list(meta.get("log_lines") or [])
 
 
 def _resolve_final_style_reference(
@@ -207,49 +201,15 @@ def _resolve_final_style_reference(
     aspect_type: str,
     mode: str,
 ) -> tuple[str | None, dict[str, Any]]:
-    """Return ``(path_or_none, meta)`` for jobs/manifest (explicit CLI wins over registry)."""
-    if explicit_path:
-        resolved = str(Path(explicit_path).expanduser().resolve())
-        return resolved, {
-            "source": "explicit",
-            "path": resolved,
-            "style_reference_image_path": resolved,
-            "approved_reference_used": False,
-            "approved_reference_registry_key": None,
-            "approved_reference_image_path": None,
-        }
-    if disable_approved_reference_auto:
-        return None, {
-            "source": "none",
-            "auto_resolve_disabled": True,
-            "approved_reference_used": False,
-            "approved_reference_registry_key": None,
-            "approved_reference_image_path": None,
-            "style_reference_image_path": None,
-        }
-    hit = resolve_approved_reference(planet_a, planet_b, aspect_type, mode)
-    if hit is not None:
-        ref_path = str(Path(hit.image_path).expanduser().resolve())
-        meta = {
-            "source": "approved_registry",
-            "path": ref_path,
-            "style_reference_image_path": ref_path,
-            "registry_key": hit.registry_key,
-            "label": hit.label,
-            "priority": hit.priority,
-            "approved_reference_used": True,
-            "approved_reference_registry_key": hit.registry_key,
-            "approved_reference_image_path": ref_path,
-        }
-        meta["log_lines"] = _approved_reference_log_lines(meta)
-        return ref_path, meta
-    return None, {
-        "source": "none",
-        "approved_reference_used": False,
-        "approved_reference_registry_key": None,
-        "approved_reference_image_path": None,
-        "style_reference_image_path": None,
-    }
+    """Return ``(path_or_none, meta)`` — exact approved → archetype → none."""
+    return resolve_style_reference(
+        explicit_path=explicit_path,
+        disable_approved_reference_auto=disable_approved_reference_auto,
+        planet_a=planet_a,
+        planet_b=planet_b,
+        aspect_type=aspect_type,
+        mode=mode,
+    )
 
 
 def _manifest_summary_text(
@@ -278,6 +238,15 @@ def _manifest_summary_text(
                 f"source: {src}",
             ]
         )
+        tier = style_reference.get("reference_tier")
+        if tier:
+            lines.append(f"reference_tier: {tier}")
+        if style_reference.get("exact_reference_used") is not None:
+            lines.append(f"exact_reference_used: {style_reference.get('exact_reference_used')}")
+        if style_reference.get("archetype_reference_used") is not None:
+            lines.append(f"archetype_reference_used: {style_reference.get('archetype_reference_used')}")
+        if style_reference.get("archetype_key"):
+            lines.append(f"archetype_key: {style_reference.get('archetype_key')}")
         if style_reference.get("approved_reference_used") is not None:
             lines.append(f"approved_reference_used: {style_reference.get('approved_reference_used')}")
         if style_reference.get("approved_reference_registry_key"):
@@ -733,8 +702,8 @@ def build_catstyle_image_generation_jobs(
         files_written.append("manifest_summary.txt")
 
     build_message: str | None = None
-    if style_reference_meta and style_reference_meta.get("approved_reference_used"):
-        build_message = "; ".join(_approved_reference_log_lines(style_reference_meta))
+    if style_reference_meta and style_reference_meta.get("reference_tier") in ("exact", "archetype"):
+        build_message = "; ".join(_style_reference_log_lines(style_reference_meta))
 
     return CatstyleImageGenerationJobsResult(
         date=iso,

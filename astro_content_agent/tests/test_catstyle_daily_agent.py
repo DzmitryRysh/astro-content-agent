@@ -34,6 +34,14 @@ def test_stub_e2e_writes_package_and_handoff(tmp_path: Path) -> None:
     gen = Path(r.generated_images_dir or "")
     assert gen.is_dir()
     assert list(gen.glob("*.png"))
+    summary_md = tmp_path / "catstyle_daily_runs" / "2099-06-01" / "daily_agent_summary.md"
+    assert summary_md.is_file()
+    text = summary_md.read_text(encoding="utf-8")
+    assert "Mercury" in text
+    assert "Jupiter" in text
+    assert "sextile" in text.lower()
+    assert "caption" in text.lower() and "mode" in text.lower()
+    assert "compensation_used" in (tmp_path / "catstyle_daily_runs" / "2099-06-01" / "daily_agent_summary.json").read_text(encoding="utf-8")
 
 
 def test_validate_only_invokes_publish_workflow_validate(tmp_path: Path) -> None:
@@ -58,6 +66,11 @@ def test_validate_only_invokes_publish_workflow_validate(tmp_path: Path) -> None
     kw = m_pub.call_args.kwargs
     assert kw.get("validate_only") is True
     assert kw.get("do_publish") is False
+    summary_md = tmp_path / "catstyle_daily_runs" / "2099-06-02" / "daily_agent_summary.md"
+    assert summary_md.is_file()
+    body = summary_md.read_text(encoding="utf-8")
+    assert "Mercury" in body and "Jupiter" in body
+    assert "validate_only" in body.lower()
 
 
 def _fake_jobs_result(tmp_path: Path, d: date, candidate: dict, job_fields: dict) -> object:
@@ -293,6 +306,45 @@ def test_publish_invokes_real_publish_path(tmp_path: Path) -> None:
     kw = m_pub.call_args.kwargs
     assert kw.get("validate_only") is False
     assert kw.get("do_publish") is True
+    summary_md = tmp_path / "catstyle_daily_runs" / "2099-06-03" / "daily_agent_summary.md"
+    assert summary_md.is_file()
+    body = summary_md.read_text(encoding="utf-8")
+    assert "Mercury" in body and "Jupiter" in body
+    assert "publish_handoff_dir" in body or (r.publish_handoff_dir or "") in body
+    assert "stub" in body.lower()
+
+
+def test_daily_summary_excludes_raw_token_secrets(tmp_path: Path) -> None:
+    secret = "IGA" + ("Z" * 40)
+    with patch(
+        "astro_content_agent.services.content.catstyle_daily_agent.run_catstyle_handoff_publish_workflow"
+    ) as m_pub:
+        m_pub.return_value = (
+            1,
+            CatstyleRealPublishResult(
+                publish_status="publish_failed",
+                error_message=f"Meta rejected {secret}",
+                validate_only=False,
+            ),
+        )
+        r = run_catstyle_daily_agent(
+            "2099-06-20",
+            work_root=tmp_path,
+            provider="stub",
+            publish=True,
+            force_publish_unstable=True,
+            planet_a_override="Mars",
+            planet_b_override="Pluto",
+            aspect_type_override="square",
+            mode_override="tension",
+            scan_mode="noon",
+            overwrite=True,
+        )
+    jp = tmp_path / "catstyle_daily_runs" / "2099-06-20" / "daily_agent_summary.json"
+    assert jp.is_file()
+    raw = jp.read_text(encoding="utf-8")
+    assert secret not in raw
+    assert "REDACTED" in raw or "Meta rejected" in raw
 
 
 def test_manual_override_passed_to_job_builder(tmp_path: Path) -> None:
