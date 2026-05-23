@@ -592,6 +592,10 @@ class CatstylePostPackage(BaseModel):
         default=None,
         description="UTC timing derived from manifest scan fields (no fabricated ephemeris).",
     )
+    caption_source: str | None = Field(
+        default=None,
+        description="Caption writer source: llm | fallback.",
+    )
 
 
 def build_catstyle_post_package(
@@ -722,6 +726,7 @@ def build_catstyle_post_package(
         checklist=checklist,
         source_manifest_path=str(mp),
         aspect_timing=aspect_timing,
+        caption_source=cap_result.source,
     )
 
 

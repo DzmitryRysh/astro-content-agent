@@ -36,3 +36,5 @@ catstyle_post_packages/
 
 # Catstyle publish handoffs (final manual-publish bundles)
 catstyle_publish_handoffs/
+
+catstyle_daily_runs/
