@@ -48,6 +48,8 @@ from astro_content_agent.content.catstyle.zodiac_arena_floor_lock_v1 import (
 )
 from astro_content_agent.content.catstyle.catstyle_global_quality_lock_v1 import (
     CATSTYLE_GLOBAL_QUALITY_LOCK_BLOCK,
+    CATSTYLE_GLOBAL_QUALITY_LOCK_CG_BLOCK,
+    CATSTYLE_GLOBAL_QUALITY_NEGATIVE_CG_EXTRAS,
     CATSTYLE_GLOBAL_QUALITY_NEGATIVE_EXTRAS,
 )
 from astro_content_agent.content.catstyle.mars_pluto_square_tension_canon_v1 import (
@@ -77,6 +79,7 @@ from astro_content_agent.content.catstyle.render_style_profiles_v1 import (
     format_render_style_prompt_block,
     format_render_style_prompt_block_for_flow,
     get_render_style_profile,
+    normalize_render_style_profile_key,
 )
 from astro_content_agent.content.catstyle.world_templates_v1 import (
     DEFAULT_WORLD_TEMPLATE_KEY,
@@ -656,6 +659,30 @@ def _moon_saturn_visual_correction_block(pa: str, pb: str, aspect_type: str, mod
     )
 
 
+def _is_cg_keyart_request(req: CatstylePromptRequest) -> bool:
+    raw = (req.render_style_profile_key or "").strip()
+    if not raw:
+        return False
+    try:
+        return normalize_render_style_profile_key(raw) == "premium_cg_keyart_v1"
+    except ValueError:
+        return False
+
+
+def _global_quality_lock_for_request(req: CatstylePromptRequest) -> str:
+    if _is_cg_keyart_request(req):
+        return CATSTYLE_GLOBAL_QUALITY_LOCK_CG_BLOCK
+    return CATSTYLE_GLOBAL_QUALITY_LOCK_BLOCK
+
+
+def _global_quality_negative_extras_for_request(req: CatstylePromptRequest) -> list[str]:
+    if _is_cg_keyart_request(req):
+        return list(CATSTYLE_GLOBAL_QUALITY_NEGATIVE_EXTRAS) + list(
+            CATSTYLE_GLOBAL_QUALITY_NEGATIVE_CG_EXTRAS
+        )
+    return list(CATSTYLE_GLOBAL_QUALITY_NEGATIVE_EXTRAS)
+
+
 def _pair_specific_visual_guards(pa: str, pb: str, aspect_type: str, mode: str) -> str:
     """Moon/Saturn patch + pair-specific premium canons (Mars/Pluto, Sun/Uranus, …)."""
     parts: list[str] = [
@@ -675,7 +702,7 @@ def _prompt_choreography_middleware(
 ) -> str:
     """Aspect choreography + global quality lock + pair flags + Mars scene decouple; pair-specific guards."""
     blocks: list[str] = [
-        CATSTYLE_GLOBAL_QUALITY_LOCK_BLOCK,
+        _global_quality_lock_for_request(req),
         CATPLANET_BODY_IDENTITY_LOCK_BLOCK,
         ZODIAC_ARENA_FLOOR_LOCK_BLOCK,
     ]
@@ -1109,7 +1136,7 @@ def _finalize_pack_with_art_direction(
     skin_b: str | None,
 ) -> CatstylePromptPack:
     def _append_extra_negatives(p: CatstylePromptPack) -> CatstylePromptPack:
-        extras: list[str] = list(CATSTYLE_GLOBAL_QUALITY_NEGATIVE_EXTRAS)
+        extras: list[str] = _global_quality_negative_extras_for_request(req)
         if is_sun_uranus_conjunction_tension(pa, pb, req.aspect_type, req.mode):
             extras.extend(SUN_URANUS_CONJUNCTION_TENSION_NEGATIVE_EXTRAS)
         if is_mars_pluto_square_tension(pa, pb, req.aspect_type, req.mode):

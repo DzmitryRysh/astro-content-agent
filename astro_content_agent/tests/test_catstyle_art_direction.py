@@ -194,6 +194,37 @@ def test_apply_pack_sets_art_direction_metadata() -> None:
     assert "honor locked scene_template_profile beat" in low
 
 
+def test_cg_render_style_uses_cg_global_lock_and_anti_watercolor_negatives() -> None:
+    prof = build_catstyle_art_direction_profile(
+        editorial_profile="charged",
+        mode="tension",
+        planet_a="Mercury",
+        planet_b="Uranus",
+        skin_a=None,
+        skin_b=None,
+    )
+    out = compose_premium_catstyle_prompt(
+        "BASE.",
+        prof,
+        render_style_profile_key="premium_cg_keyart_v1",
+    ).lower()
+    assert "[catstyle global quality lock cg v1]" in out
+    assert "[catstyle global quality lock v2]" not in out
+    assert "premium cg key art" in out
+    assert "material separation" in out
+    assert "cg key-art presentation pressure" in out
+    neg = strengthen_negative_prompt(
+        "text, photorealistic",
+        prof,
+        render_style_profile_key="premium_cg_keyart_v1",
+    ).lower()
+    assert "watercolor" in neg
+    assert "gouache" in neg
+    assert "sketchbook" in neg
+    assert "fuzzy brush" in neg
+    assert "flat comic doodle" in neg
+
+
 def test_compose_premium_respects_template_profiles_optional() -> None:
     prof = build_catstyle_art_direction_profile(
         editorial_profile="charged",

@@ -76,16 +76,31 @@ def test_image_prompt_opening_line_nonempty_per_profile() -> None:
 def test_premium_cg_keyart_profile_cg_language_and_anti_painterly_negatives() -> None:
     cg = get_render_style_profile("premium_cg_keyart_v1")
     open_low = cg.image_prompt_opening_line.lower()
-    assert "stylized cgi" in open_low or "cgi key-art" in open_low
-    assert "key-art" in open_low or "key art" in open_low.replace("-", " ")
+    assert open_low.startswith("premium cg key art")
+    assert "2.5d" in open_low or "3d-hybrid" in open_low
+    assert "game key-art" in open_low or "game key art" in open_low.replace("-", " ")
+    assert "crisp silhouette" in open_low
+    assert "clean" in open_low and "edge" in open_low
+    assert "material separation" in open_low
+    assert "high-contrast" in open_low
     assert "volumetric" in open_low
-    assert "material" in open_low
+    assert "cinematic depth" in open_low
+    assert "not watercolor" in open_low
+    hard = cg.style_hardlock_block.lower()
     assert cg.style_hardlock_block
-    assert "painterly comic" in cg.style_hardlock_block.lower() or "hand-painted" in cg.style_hardlock_block.lower()
+    assert "gouache" in hard
+    assert "watercolor" in hard
+    assert "storybook" in hard
     neg_joined = " ".join(cg.negative_prompt_additions).lower()
     assert "watercolor" in neg_joined
+    assert "gouache" in neg_joined
     assert "storybook" in neg_joined
-    assert "painterly comic" in neg_joined or "hand-painted" in neg_joined
+    assert "sketchbook" in neg_joined
+    assert "fuzzy brush" in neg_joined
+    assert "flat comic doodle" in neg_joined
+    block = format_render_style_prompt_block(cg).lower()
+    assert "premium cg key" in block
+    assert "material separation" in block
 
 
 def test_v2_profile_unchanged_rejects_cgi_in_opening() -> None:

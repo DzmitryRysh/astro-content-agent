@@ -968,16 +968,23 @@ def test_premium_cg_keyart_render_style_in_prompt_and_opener_contract() -> None:
     )
     p0 = pack.image_prompts[0]
     low = p0.lower()
-    assert low.startswith("premium stylized cgi key-art illustration")
+    assert low.startswith("premium cg key art illustration")
     assert "[style hardlock cg v1 - key art mandate]" in low
     assert "[render style v1 - high-priority visual finish]" in low
-    assert "stylized cgi" in low or "key-art" in low
+    assert "[catstyle global quality lock cg v1]" in low
+    assert "2.5d" in low or "3d-hybrid" in low
+    assert "crisp silhouette" in low
+    assert "material separation" in low
+    assert "high-contrast" in low
     assert "volumetric" in low
+    assert "not watercolor" in low
     assert pack.render_style_profile is not None
     assert pack.render_style_profile["key"] == "premium_cg_keyart_v1"
+    assert "gouache" in low
+    assert "sketchbook" in low
     neg = pack.negative_prompt.lower()
     assert "watercolor" in neg
-    assert "storybook" in neg or "children's illustration" in neg
+    assert "storybook" in neg or "children's illustration" in neg or "sketchbook" in neg
 
 
 def test_premium_comic_poster_v2_still_default_and_opener_unchanged() -> None:

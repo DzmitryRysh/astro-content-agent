@@ -9,6 +9,8 @@ from astro_content_agent.content.catstyle.approved_reference_prompt_lock_v1 impo
 )
 from astro_content_agent.content.catstyle.catstyle_global_quality_lock_v1 import (
     CATSTYLE_GLOBAL_QUALITY_LOCK_BLOCK,
+    CATSTYLE_GLOBAL_QUALITY_LOCK_CG_BLOCK,
+    CATSTYLE_GLOBAL_QUALITY_NEGATIVE_CG_EXTRAS,
     CATSTYLE_GLOBAL_QUALITY_NEGATIVE_EXTRAS,
 )
 from astro_content_agent.content.catstyle.character_skins_v0 import get_character_skin
@@ -114,6 +116,15 @@ def composition_line(*, render_style_profile_key: str | None = None, mode: str |
             "stage the beat like a premium comic panel or movie one-sheet while staying cartony flat-color Catstyle "
             "(never photoreal, never glossy prestige portrait). "
             "Keep each planet's [IDENTITY MARKERS v1] prop stamps and reserved emblem zones readable at thumbnail scale beside faces/bodies."
+            + _flag_emblem
+        )
+    if render_style_profile_key == "premium_cg_keyart_v1":
+        return (
+            "Premium CG key-art poster composition: crisp silhouette dominance, clean edge readability, strong FG/MG/BG "
+            "separation with cinematic volumetric depth—foreground catplanets lead, coliseum midground weight, cosmic "
+            "background scale; reject watercolor-soft empty flats and sticker-float staging. "
+            "Arena + engraved zodiac floor stay epic and readable at thumbnail with lower detail density than characters. "
+            "Keep each planet's [IDENTITY MARKERS v1] prop stamps and reserved emblem zones readable beside faces/bodies."
             + _flag_emblem
         )
     if render_style_profile_key == "premium_comic_poster_v2":
@@ -230,9 +241,20 @@ def compose_premium_catstyle_prompt(
             "Honor locked scene_template_profile beat: amplify the stated action, camera angle, and props - "
             "do not substitute a generic tableau."
         )
-    chunks: list[str] = [*locked, CATSTYLE_GLOBAL_QUALITY_LOCK_BLOCK]
+    global_lock = (
+        CATSTYLE_GLOBAL_QUALITY_LOCK_CG_BLOCK
+        if render_style_profile_key == "premium_cg_keyart_v1"
+        else CATSTYLE_GLOBAL_QUALITY_LOCK_BLOCK
+    )
+    chunks: list[str] = [*locked, global_lock]
     mode_l = (profile.mode or "").strip().lower()
-    if render_style_profile_key == "premium_comic_poster_v2" and mode_l != "flow":
+    if render_style_profile_key == "premium_cg_keyart_v1":
+        chunks.append(
+            "CG key-art presentation pressure (preserve [CANON v1 base] + [IDENTITY MARKERS v1]): crisp silhouette-first "
+            "catplanets with clean edges and strong material separation; high-contrast volumetric lighting and game "
+            "poster finish—never watercolor, gouache, or soft storybook illustration drift."
+        )
+    elif render_style_profile_key == "premium_comic_poster_v2" and mode_l != "flow":
         chunks.append(
             "Heroic presentation pressure (preserve [CANON v1 base] + [IDENTITY MARKERS v1]): foreground-dominant bodies "
             "with pose authority and face intensity; stronger silhouette-first comic-cover energy—still unmistakable "
@@ -337,12 +359,18 @@ def strengthen_negative_prompt(
         style_compact = [
             "text / logos / watermarks / captions",
             "photoreal / hyperreal portrait skin pores HDR",
+            *CATSTYLE_GLOBAL_QUALITY_NEGATIVE_CG_EXTRAS,
             "watercolor wash dominance",
+            "gouache painting dominance",
             "soft painterly comic brush texture dominance",
             "visible hand-painted comic brushstroke mush",
             "rough hand-painted texture dominance",
             "children's illustration style",
             "storybook illustration look",
+            "sketchbook painted texture",
+            "fuzzy brush texture dominance",
+            "flat comic doodle look",
+            "hand-painted children's-book illustration",
             "childish nursery / kawaii / chibi mascot look",
             "sticker mascot center-float posing",
             "flat vector / cheap icon / mobile-game icon look",
@@ -353,6 +381,7 @@ def strengthen_negative_prompt(
             "weak bland composition with disconnected characters",
             "underexposed overall scene",
             "muddy crushed shadows",
+            "soft airbrush illustration mush without CG edges",
         ]
         safety_terms = (
             "real weapons",
