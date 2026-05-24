@@ -18,6 +18,10 @@ from astro_content_agent.content.catstyle.sign_meaning_registry_v1 import (
     sign_context_line_ru,
 )
 from astro_content_agent.content.catstyle.transit_pair_seed_v0 import orient_outer_personal
+from astro_content_agent.services.content.catstyle_aspect_source_truth_v1 import (
+    aspect_source_copy_rules,
+    infer_aspect_source_from_manifest,
+)
 from astro_content_agent.services.content.catstyle_aspect_timing import (
     build_aspect_timing_from_manifest,
     format_ru_timing_caption_append,
@@ -63,6 +67,7 @@ class CatstyleCaptionContext:
     combined_weather_label: str | None = None
     combined_pressure_summary: str | None = None
     stack_compensation_focus: str | None = None
+    aspect_source: str = "manual_editorial"
 
 
 def caption_banned_phrases() -> tuple[str, ...]:
@@ -188,6 +193,7 @@ def build_catstyle_caption_context(
     pb = _safe_planet(planet_b or (str(row.get("planet_b")) if row else "") or "")
     asp = aspect_type or (str(row.get("aspect_type")) if row else "") or ""
     mo = mode or (str(row.get("mode_recommendation") or row.get("mode")) if row else "") or ""
+    aspect_source = infer_aspect_source_from_manifest(manifest)
 
     post_d: date | None = None
     date_iso = str(manifest.get("date") or "").strip()
@@ -201,9 +207,15 @@ def build_catstyle_caption_context(
     timing = build_aspect_timing_from_manifest(manifest)
     oriented = orient_outer_personal(pa, pb)
     personal = oriented[1] if oriented else pb
-    timing_note = format_ru_timing_caption_append(timing, post_date=post_d or date.today(), personal_planet=personal)
-    if timing_note and not timing_note.strip():
-        timing_note = None
+    timing_note: str | None = None
+    if aspect_source == "sky_current":
+        timing_note = format_ru_timing_caption_append(
+            timing, post_date=post_d or date.today(), personal_planet=personal
+        )
+        if timing_note and not timing_note.strip():
+            timing_note = None
+    else:
+        timing = None
 
     comp = resolve_catstyle_compensation(pa, pb, asp, mo)
     comp_guidance = format_compensation_package_block(comp) if comp else None
@@ -219,6 +231,8 @@ def build_catstyle_caption_context(
         nested = row.get("sky_weather_stack")
         stack_raw = nested if isinstance(nested, dict) else stack_raw
     stack: dict[str, Any] | None = stack_raw if isinstance(stack_raw, dict) else None
+    if aspect_source != "sky_current":
+        stack = None
     bg_aspect: dict[str, Any] | None = None
     if stack:
         bgs = stack.get("background_aspects")
@@ -250,11 +264,14 @@ def build_catstyle_caption_context(
         combined_weather_label=str(stack.get("combined_weather_label") or "") if stack else None,
         combined_pressure_summary=str(stack.get("combined_pressure_summary") or "") if stack else None,
         stack_compensation_focus=str(stack.get("compensation_focus") or "") if stack else None,
+        aspect_source=aspect_source,
     )
 
 
 def context_to_llm_payload(ctx: CatstyleCaptionContext) -> dict[str, Any]:
     comp_entry = resolve_catstyle_compensation(ctx.planet_a, ctx.planet_b, ctx.aspect_type, ctx.mode)
+    copy_rules = aspect_source_copy_rules(ctx.aspect_source)
+    timing_allowed = copy_rules["timing_block_allowed"]
     return {
         "planet_a": ctx.planet_a,
         "planet_b": ctx.planet_b,
@@ -269,7 +286,11 @@ def context_to_llm_payload(ctx: CatstyleCaptionContext) -> dict[str, Any]:
         "planet_b_sign_context": ctx.planet_b_sign_context,
         "aspect_interaction": ctx.aspect_interaction,
         "orb": ctx.orb,
-        "package_appends_timing_block": True,
+        "aspect_source": copy_rules["aspect_source"],
+        "allows_current_sky_language": copy_rules["allows_current_sky_language"],
+        "package_appends_timing_block": timing_allowed,
+        "sky_weather_stack_allowed": copy_rules["sky_weather_stack_allowed"],
+        "forbidden_current_sky_phrases": copy_rules["forbidden_when_not_sky_current"],
         "sign_interpretation_rules": (
             "Знак зодиака можно вплетать только для Sun, Moon, Mercury, Venus, Mars, Jupiter, Saturn. "
             "Для Uranus, Neptune, Pluto знак в данных может быть, но НЕ используй его в тексте — "

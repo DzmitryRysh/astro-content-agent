@@ -375,6 +375,7 @@ def test_manual_override_build_jobs_and_manifest(tmp_path: Path) -> None:
         "planet_b": "Mars",
         "aspect_type": "square",
         "mode": "tension",
+        "aspect_source": "manual_editorial",
     }
     assert r.style_reference_meta is not None
     assert r.style_reference_meta.get("source") == "approved_registry"
@@ -387,6 +388,8 @@ def test_manual_override_build_jobs_and_manifest(tmp_path: Path) -> None:
     assert manifest["secondary_supportive_candidate"] is None
     assert manifest["sky_scan_mode"] == "manual_override"
     assert manifest["sky_scan_step_hours_utc"] is None
+    assert manifest["aspect_source"] == "manual_editorial"
+    assert manifest["selected_candidate"]["aspect_source"] == "manual_editorial"
     summary = (tmp_path / "ov" / "manifest_summary.txt").read_text(encoding="utf-8")
     assert "Manual aspect override" in summary
 

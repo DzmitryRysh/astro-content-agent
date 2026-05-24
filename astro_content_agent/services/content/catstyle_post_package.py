@@ -10,6 +10,10 @@ from pydantic import BaseModel, Field
 
 from astro_content_agent.content.catstyle.models import CatstyleAspectTimingMetadata
 from astro_content_agent.content.catstyle.transit_pair_seed_v0 import orient_outer_personal
+from astro_content_agent.services.content.catstyle_aspect_source_truth_v1 import (
+    allows_current_sky_language,
+    infer_aspect_source_from_manifest,
+)
 from astro_content_agent.services.content.catstyle_aspect_timing import (
     build_aspect_timing_from_manifest,
     render_aspect_timing_markdown_section,
@@ -596,6 +600,10 @@ class CatstylePostPackage(BaseModel):
         default=None,
         description="Caption writer source: llm | fallback.",
     )
+    aspect_source: str | None = Field(
+        default=None,
+        description="Truth layer: sky_current | manual_editorial | natal_case | educational.",
+    )
 
 
 def build_catstyle_post_package(
@@ -693,14 +701,17 @@ def build_catstyle_post_package(
     compensation = cap_result.compensation
 
     aspect_timing = build_aspect_timing_from_manifest(raw)
+    aspect_source = infer_aspect_source_from_manifest(raw)
     try:
         post_d = date.fromisoformat(date_iso)
     except ValueError:
         post_d = date.today()
     oriented = orient_outer_personal(pa_e or "", pb_e or "") if pa_e and pb_e else None
     personal_for_timing = oriented[1] if oriented else pb_e
-    if aspect_timing is not None:
+    if aspect_timing is not None and allows_current_sky_language(aspect_source):
         caption = append_timing_once(caption, aspect_timing, post_d, personal_for_timing)
+    elif not allows_current_sky_language(aspect_source):
+        aspect_timing = None
 
     return CatstylePostPackage(
         date=date_iso,
@@ -727,6 +738,7 @@ def build_catstyle_post_package(
         source_manifest_path=str(mp),
         aspect_timing=aspect_timing,
         caption_source=cap_result.source,
+        aspect_source=aspect_source,
     )
 
 

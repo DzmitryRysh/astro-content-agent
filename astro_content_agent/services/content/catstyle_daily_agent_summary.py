@@ -11,6 +11,10 @@ from astro_content_agent.content.catstyle.compensation_registry_v1 import (
     CAPTION_COMPENSATION_MARKER,
     resolve_catstyle_compensation,
 )
+from astro_content_agent.services.content.catstyle_aspect_source_truth_v1 import (
+    allows_current_sky_language,
+    infer_aspect_source_from_manifest,
+)
 from astro_content_agent.services.content.catstyle_creative_publish_stability import (
     CreativePublishStabilityResult,
     evaluate_creative_publish_stability,
@@ -185,8 +189,20 @@ def _sky_weather_stack_from_jobs(jobs_res: CatstyleImageGenerationJobsResult | N
         raw = json.loads(Path(jobs_res.manifest_path).read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return None
+    if not allows_current_sky_language(infer_aspect_source_from_manifest(raw)):
+        return None
     stack = raw.get("sky_weather_stack")
     return stack if isinstance(stack, dict) else None
+
+
+def _aspect_source_from_jobs(jobs_res: CatstyleImageGenerationJobsResult | None) -> str | None:
+    if jobs_res is None or not jobs_res.manifest_path:
+        return None
+    try:
+        raw = json.loads(Path(jobs_res.manifest_path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return infer_aspect_source_from_manifest(raw)
 
 
 def _stability_block(
@@ -265,6 +281,7 @@ def build_daily_agent_summary_payload(
         caption_mode = None
 
     sky_stack = _sky_weather_stack_from_jobs(jobs_res)
+    aspect_source = _aspect_source_from_jobs(jobs_res)
     sky_weather_summary: dict[str, Any] | None = None
     if sky_stack:
         primary = sky_stack.get("primary_aspect") if isinstance(sky_stack.get("primary_aspect"), dict) else {}
@@ -317,6 +334,7 @@ def build_daily_agent_summary_payload(
             "aspect_type": asp or None,
             "mode": mo or None,
             "label": result.selected_aspect or None,
+            "aspect_source": aspect_source,
         },
         "sky_weather_stack": sky_weather_summary,
         "render_style_profile": run_params.render_style_profile,
@@ -394,6 +412,7 @@ def render_daily_agent_summary_markdown(data: dict[str, Any]) -> str:
         f"- **aspect_type:** {sel.get('aspect_type') or '—'}",
         f"- **mode:** {sel.get('mode') or '—'}",
         f"- **label:** {sel.get('label') or '—'}",
+        f"- **aspect_source:** {sel.get('aspect_source') or '—'}",
         "",
     ]
     stack = data.get("sky_weather_stack")

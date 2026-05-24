@@ -51,6 +51,18 @@ def _candidate(
     )
 
 
+def _as_sky_current_manifest(manifest: dict) -> dict:
+    out = dict(manifest)
+    out.setdefault("sky_scan_mode", "day-window")
+    out.setdefault("aspect_source", "sky_current")
+    sel = out.get("selected_candidate")
+    if isinstance(sel, dict):
+        sel_copy = dict(sel)
+        sel_copy.setdefault("aspect_source", "sky_current")
+        out["selected_candidate"] = sel_copy
+    return out
+
+
 def test_mercury_uranus_opposition_prioritized_as_short_flash_primary() -> None:
     ranked = [
         _candidate("Mars", "Pluto", "square", total_score=42, w_first=0, w_last=22),
@@ -91,7 +103,7 @@ def test_mars_pluto_square_can_be_pressure_background() -> None:
 
 
 def test_caption_context_includes_primary_and_background() -> None:
-    manifest = {
+    manifest = _as_sky_current_manifest({
         "date": "2026-05-22",
         "selected_candidate": {
             "planet_a": "Mercury",
@@ -134,7 +146,7 @@ def test_caption_context_includes_primary_and_background() -> None:
                 "suggested_output_name": "out.png",
             }
         ],
-    }
+    })
     ctx = build_catstyle_caption_context(manifest)
     payload = context_to_llm_payload(ctx)
     assert ctx.background_aspect is not None
@@ -144,7 +156,7 @@ def test_caption_context_includes_primary_and_background() -> None:
 
 
 def test_stacked_fallback_caption_names_planets_early_no_outer_signs() -> None:
-    manifest = {
+    manifest = _as_sky_current_manifest({
         "date": "2026-05-22",
         "selected_candidate": {
             "planet_a": "Mercury",
@@ -176,7 +188,7 @@ def test_stacked_fallback_caption_names_planets_early_no_outer_signs() -> None:
             "compensation_focus": "перепроверить",
             "selection_reason": "z",
         },
-    }
+    })
     ctx = build_catstyle_caption_context(manifest)
     result = build_fallback_caption(ctx)
     head = result.caption[:400].lower()
@@ -194,7 +206,7 @@ def test_stacked_caption_life_hook_opening_not_textbook() -> None:
     from astro_content_agent.services.content.catstyle_caption_polish import append_timing_once
     from datetime import date
 
-    manifest = {
+    manifest = _as_sky_current_manifest({
         "date": "2026-05-22",
         "selected_candidate": {
             "planet_a": "Mercury",
@@ -226,7 +238,7 @@ def test_stacked_caption_life_hook_opening_not_textbook() -> None:
             "compensation_focus": "умная искра",
             "selection_reason": "z",
         },
-    }
+    })
     ctx = build_catstyle_caption_context(manifest)
     result = build_fallback_caption(ctx)
     head = result.caption[:500].lower()
@@ -245,7 +257,7 @@ def test_stacked_caption_life_hook_opening_not_textbook() -> None:
 
 
 def test_stacked_fallback_mercury_uranus_bioastrologiya_compensation_not_generic() -> None:
-    manifest = {
+    manifest = _as_sky_current_manifest({
         "date": "2026-05-22",
         "selected_candidate": {
             "planet_a": "Mercury",
@@ -277,7 +289,7 @@ def test_stacked_fallback_mercury_uranus_bioastrologiya_compensation_not_generic
             "compensation_focus": "умная искра",
             "selection_reason": "z",
         },
-    }
+    })
     ctx = build_catstyle_caption_context(manifest)
     assert ctx.combined_weather_label == "Суета и раздражительность"
     result = build_fallback_caption(ctx)
@@ -292,7 +304,7 @@ def test_stacked_fallback_mercury_uranus_bioastrologiya_compensation_not_generic
 
 
 def test_stacked_caption_includes_compensation(tmp_path: Path) -> None:
-    manifest = {
+    manifest = _as_sky_current_manifest({
         "date": "2026-05-22",
         "selected_candidate": {
             "planet_a": "Mercury",
@@ -335,7 +347,7 @@ def test_stacked_caption_includes_compensation(tmp_path: Path) -> None:
                 "suggested_output_name": "out.png",
             }
         ],
-    }
+    })
     mp = tmp_path / "jobs.json"
     mp.write_text(json.dumps(manifest, ensure_ascii=False), encoding="utf-8")
     pkg = build_catstyle_post_package(mp, use_llm_caption=False)

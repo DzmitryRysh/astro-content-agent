@@ -6,6 +6,9 @@ from datetime import date
 
 from astro_content_agent.content.catstyle.models import CatstyleAspectTimingMetadata
 from astro_content_agent.content.catstyle.planet_meaning_registry_v1 import planet_display_ru
+from astro_content_agent.services.content.catstyle_aspect_source_truth_v1 import (
+    apply_aspect_source_caption_guard,
+)
 from astro_content_agent.services.content.catstyle_aspect_timing import append_ru_timing_to_caption
 from astro_content_agent.services.content.catstyle_caption_planet_policy import (
     CAPTION_NO_SIGN_INTERPRETATION_PLANETS,
@@ -96,6 +99,7 @@ def polish_caption_for_package(caption: str, ctx: CatstyleCaptionContext | None 
                     rf"{re.escape(label)},\s*тоже\s+в\s+{re.escape(z)}",
                 ):
                     out = re.sub(pat, label, out, flags=re.IGNORECASE)
+        out = apply_aspect_source_caption_guard(out, ctx.aspect_source)
     return out.strip()
 
 

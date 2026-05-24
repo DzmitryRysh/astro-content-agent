@@ -18,6 +18,11 @@ from astro_content_agent.services.content.catstyle_manual_override_timing import
     merge_manual_override_day_window_into_primary,
 )
 from astro_content_agent.services.content.catstyle_editorial_selection import normalize_editorial_profile
+from astro_content_agent.services.content.catstyle_aspect_source_truth_v1 import (
+    DEFAULT_FORCED_ASPECT_SOURCE,
+    annotate_manifest_aspect_source,
+    normalize_aspect_source,
+)
 from astro_content_agent.services.content.catstyle_prompt_generator import (
     generate_catstyle_prompt_pack,
     normalize_planet_name,
@@ -181,11 +186,19 @@ def _synthetic_primary_manual_override(pa: str, pb: str, asp: str, mode: str) ->
         "orb": None,
         "editorial_selection_score": None,
         "manual_aspect_override": True,
+        "aspect_source": DEFAULT_FORCED_ASPECT_SOURCE,
     }
 
 
 def _manual_aspect_override_manifest_block(pa: str, pb: str, asp: str, mode: str) -> dict[str, Any]:
-    return {"enabled": True, "planet_a": pa, "planet_b": pb, "aspect_type": asp, "mode": mode}
+    return {
+        "enabled": True,
+        "planet_a": pa,
+        "planet_b": pb,
+        "aspect_type": asp,
+        "mode": mode,
+        "aspect_source": DEFAULT_FORCED_ASPECT_SOURCE,
+    }
 
 
 def _style_reference_log_lines(meta: dict[str, Any]) -> list[str]:
@@ -388,6 +401,7 @@ def build_catstyle_image_generation_jobs(
     style_reference_meta: dict[str, Any] | None = None
     manifest_sky_scan_mode: str | None = None
     manifest_sky_scan_step: int | None = None
+    manifest_aspect_source: str = DEFAULT_FORCED_ASPECT_SOURCE
 
     if override_quad is not None:
         o_pa, o_pb, o_asp, o_mode = override_quad
@@ -488,9 +502,11 @@ def build_catstyle_image_generation_jobs(
             )
 
         primary = dict(pack.selected_candidates[0])
+        primary["aspect_source"] = "sky_current"
         pp = dict(pack.prompt_packs[0])
         secondary = pack.secondary_supportive_candidate
         sky_weather_stack = pack.sky_weather_stack
+        manifest_aspect_source = "sky_current"
 
         pa_sel = normalize_planet_name(str(primary["planet_a"]))
         pb_sel = normalize_planet_name(str(primary["planet_b"]))
@@ -671,8 +687,9 @@ def build_catstyle_image_generation_jobs(
             "secondary_supportive_candidate": secondary,
             "jobs": [j.model_dump(mode="json") for j in jobs],
         }
-        if sky_weather_stack is not None:
+        if sky_weather_stack is not None and manifest_aspect_source == "sky_current":
             manifest["sky_weather_stack"] = sky_weather_stack
+        annotate_manifest_aspect_source(manifest, normalize_aspect_source(manifest_aspect_source))
         if manual_block is not None:
             manifest["manual_aspect_override"] = manual_block
         if style_reference_meta is not None:

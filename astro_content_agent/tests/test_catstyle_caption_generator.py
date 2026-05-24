@@ -24,12 +24,15 @@ from astro_content_agent.services.content.catstyle_post_package import build_cat
 def _sun_uranus_manifest() -> dict:
     return {
         "date": "2026-05-22",
+        "sky_scan_mode": "day-window",
+        "aspect_source": "sky_current",
         "selected_candidate": {
             "planet_a": "Sun",
             "planet_b": "Uranus",
             "aspect_type": "conjunction",
             "mode_recommendation": "tension",
             "closest_hour_utc": 12,
+            "aspect_source": "sky_current",
         },
     }
 
@@ -150,11 +153,14 @@ def test_fallback_caption_has_compensation_and_no_placeholder_phrases() -> None:
 def test_post_package_uses_fallback_caption_without_llm(tmp_path: Path) -> None:
     manifest = {
         "date": "2026-05-20",
+        "sky_scan_mode": "day-window",
+        "aspect_source": "sky_current",
         "selected_candidate": {
             "planet_a": "Sun",
             "planet_b": "Uranus",
             "aspect_type": "conjunction",
             "mode_recommendation": "tension",
+            "aspect_source": "sky_current",
         },
         "jobs": [
             {

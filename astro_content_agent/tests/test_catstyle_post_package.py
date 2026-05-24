@@ -216,12 +216,12 @@ def test_mercury_jupiter_sextile_flow_caption_instagram_ready(tmp_path: Path) ->
     gen.mkdir()
     (gen / "catstyle_2026-06-10_001_mercury_jupiter_sextile_flow.png").write_bytes(b"\x89PNG\r\n\x1a\n")
     pkg = build_catstyle_post_package(mp, generated_images_dir=gen)
+    assert pkg.aspect_source == "manual_editorial"
     assert "Пакет Catstyle для ручной сборки" not in pkg.caption
     assert "Меркурий" in pkg.caption and "Юпитер" in pkg.caption
     assert "20 минут" in pkg.caption or "гипотез" in pkg.caption.lower()
-    assert "**Про сроки:**" in pkg.caption
-    assert "Окно аспекта" in pkg.caption
-    assert "1–2 дня" in pkg.caption or "около 3 дней" in pkg.caption
+    assert "**Про сроки:**" not in pkg.caption
+    assert pkg.aspect_timing is None
     cap_l = pkg.caption.lower()
     assert "utc" not in cap_l
     assert "орбис" not in cap_l
