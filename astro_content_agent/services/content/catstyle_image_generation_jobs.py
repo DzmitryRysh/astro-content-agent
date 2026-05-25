@@ -21,6 +21,8 @@ from astro_content_agent.services.content.catstyle_editorial_selection import no
 from astro_content_agent.services.content.catstyle_aspect_source_truth_v1 import (
     DEFAULT_FORCED_ASPECT_SOURCE,
     annotate_manifest_aspect_source,
+    annotate_manifest_sky_timing_mode,
+    infer_sky_timing_mode_from_manifest,
     normalize_aspect_source,
 )
 from astro_content_agent.services.content.catstyle_prompt_generator import (
@@ -690,6 +692,11 @@ def build_catstyle_image_generation_jobs(
         if sky_weather_stack is not None and manifest_aspect_source == "sky_current":
             manifest["sky_weather_stack"] = sky_weather_stack
         annotate_manifest_aspect_source(manifest, normalize_aspect_source(manifest_aspect_source))
+        if manifest_aspect_source == "sky_current":
+            sky_mode = infer_sky_timing_mode_from_manifest(
+                manifest, manifest_aspect_source
+            )
+            annotate_manifest_sky_timing_mode(manifest, sky_mode)
         if manual_block is not None:
             manifest["manual_aspect_override"] = manual_block
         if style_reference_meta is not None:

@@ -21,6 +21,8 @@ from astro_content_agent.content.catstyle.transit_pair_seed_v0 import orient_out
 from astro_content_agent.services.content.catstyle_aspect_source_truth_v1 import (
     aspect_source_copy_rules,
     infer_aspect_source_from_manifest,
+    infer_sky_timing_mode_from_manifest,
+    sky_timing_copy_rules,
 )
 from astro_content_agent.services.content.catstyle_aspect_timing import (
     build_aspect_timing_from_manifest,
@@ -68,6 +70,7 @@ class CatstyleCaptionContext:
     combined_pressure_summary: str | None = None
     stack_compensation_focus: str | None = None
     aspect_source: str = "manual_editorial"
+    sky_timing_mode: str | None = None
 
 
 def caption_banned_phrases() -> tuple[str, ...]:
@@ -194,6 +197,7 @@ def build_catstyle_caption_context(
     asp = aspect_type or (str(row.get("aspect_type")) if row else "") or ""
     mo = mode or (str(row.get("mode_recommendation") or row.get("mode")) if row else "") or ""
     aspect_source = infer_aspect_source_from_manifest(manifest)
+    sky_timing_mode = infer_sky_timing_mode_from_manifest(manifest, aspect_source)
 
     post_d: date | None = None
     date_iso = str(manifest.get("date") or "").strip()
@@ -265,12 +269,14 @@ def build_catstyle_caption_context(
         combined_pressure_summary=str(stack.get("combined_pressure_summary") or "") if stack else None,
         stack_compensation_focus=str(stack.get("compensation_focus") or "") if stack else None,
         aspect_source=aspect_source,
+        sky_timing_mode=sky_timing_mode,
     )
 
 
 def context_to_llm_payload(ctx: CatstyleCaptionContext) -> dict[str, Any]:
     comp_entry = resolve_catstyle_compensation(ctx.planet_a, ctx.planet_b, ctx.aspect_type, ctx.mode)
-    copy_rules = aspect_source_copy_rules(ctx.aspect_source)
+    copy_rules = aspect_source_copy_rules(ctx.aspect_source, ctx.sky_timing_mode)
+    sky_timing = sky_timing_copy_rules(ctx.aspect_source, ctx.sky_timing_mode)
     timing_allowed = copy_rules["timing_block_allowed"]
     return {
         "planet_a": ctx.planet_a,
@@ -291,6 +297,11 @@ def context_to_llm_payload(ctx: CatstyleCaptionContext) -> dict[str, Any]:
         "package_appends_timing_block": timing_allowed,
         "sky_weather_stack_allowed": copy_rules["sky_weather_stack_allowed"],
         "forbidden_current_sky_phrases": copy_rules["forbidden_when_not_sky_current"],
+        "sky_timing_mode": sky_timing.get("sky_timing_mode"),
+        "allows_sky_timing_language": sky_timing.get("allows_sky_timing_language"),
+        "allowed_timing_phrase_hints": sky_timing.get("allowed_timing_phrase_hints"),
+        "timing_copy_guidance": sky_timing.get("timing_copy_guidance"),
+        "forbidden_timing_phrase_families": sky_timing.get("forbidden_timing_phrase_families"),
         "sign_interpretation_rules": (
             "Знак зодиака можно вплетать только для Sun, Moon, Mercury, Venus, Mars, Jupiter, Saturn. "
             "Для Uranus, Neptune, Pluto знак в данных может быть, но НЕ используй его в тексте — "
@@ -324,7 +335,8 @@ def context_to_llm_payload(ctx: CatstyleCaptionContext) -> dict[str, Any]:
             "затем «смотри на ПланетаA–ПланетаB». Не начинай сухо с названия аспекта или "
             "«Планета в оппозиции к…». Пример: «Если день идёт через сбои, звонки, документы "
             "и разговоры на повышенных оборотах — смотри на Меркурий–Уран.» "
-            "Соблюдай aspect_source: current-sky язык только при allows_current_sky_language=true. "
+            "Соблюдай aspect_source: язык неба/тайминга только при allows_current_sky_language=true. "
+            "Используй sky_timing_mode и timing_copy_guidance — не смешивай «сегодня на небе» с фоновым аспектом. "
             "Уран/Нептун/Плутон — без знака зодиака. Сохраняй pair-specific compensation, не обобщай."
         ),
         "pressure_phrasing": ctx.pressure_phrasing,

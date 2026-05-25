@@ -8,9 +8,16 @@ from pathlib import Path
 import pytest
 
 from astro_content_agent.services.content.catstyle_aspect_source_truth_v1 import (
+    DEFAULT_SKY_TIMING_MODE,
     apply_aspect_source_caption_guard,
+    allows_timing_phrase_family,
     infer_aspect_source_from_manifest,
+    infer_sky_timing_mode_from_manifest,
     normalize_aspect_source,
+    normalize_sky_timing_mode,
+    resolve_sky_timing_mode,
+    sky_timing_copy_rules,
+    strip_disallowed_sky_timing_phrases,
     strip_forbidden_current_sky_phrases,
 )
 from astro_content_agent.services.content.catstyle_caption_context import (
@@ -137,11 +144,18 @@ def test_guard_strips_current_sky_phrases_for_non_sky_sources(source: str) -> No
     assert "current sky weather" not in out.lower()
 
 
-def test_guard_preserves_current_sky_phrases_for_sky_current() -> None:
+def test_guard_preserves_exact_today_phrases_for_sky_current_exact_today() -> None:
     raw = "Сегодня на небе Sun-Uranus. Current sky weather is electric."
-    out = apply_aspect_source_caption_guard(raw, "sky_current")
+    out = apply_aspect_source_caption_guard(raw, "sky_current", "exact_today")
     assert "сегодня на небе" in out.lower()
     assert "current sky weather" in out.lower()
+
+
+def test_guard_strips_exact_today_phrases_when_mode_active_window() -> None:
+    raw = "Сегодня на небе Sun-Uranus. В эти дни окно открыто."
+    out = apply_aspect_source_caption_guard(raw, "sky_current", "active_window")
+    assert "сегодня на небе" not in out.lower()
+    assert "в эти дни" in out.lower()
 
 
 def test_sky_current_context_allows_timing_and_stack() -> None:
@@ -237,3 +251,88 @@ def test_infer_educational_from_explicit_manifest_field() -> None:
     manifest["aspect_source"] = "educational"
     manifest["selected_candidate"]["aspect_source"] = "educational"
     assert infer_aspect_source_from_manifest(manifest) == "educational"
+
+
+def test_sky_current_defaults_sky_timing_mode_active_window() -> None:
+    manifest = _sky_manifest()
+    assert infer_sky_timing_mode_from_manifest(manifest) == DEFAULT_SKY_TIMING_MODE
+
+
+def test_sky_current_exact_today_from_duration_category() -> None:
+    manifest = _sky_manifest()
+    manifest["selected_candidate"]["duration_category"] = "short_flash"
+    assert infer_sky_timing_mode_from_manifest(manifest) == "exact_today"
+    rules = sky_timing_copy_rules("sky_current", "exact_today")
+    assert "сегодня на небе" in rules["allowed_timing_phrase_hints"]
+    assert allows_timing_phrase_family("сегодня на небе", "sky_current", "exact_today")
+
+
+def test_sky_current_upcoming_explicit_mode() -> None:
+    manifest = _sky_manifest()
+    manifest["sky_timing_mode"] = "upcoming"
+    assert infer_sky_timing_mode_from_manifest(manifest) == "upcoming"
+    rules = sky_timing_copy_rules("sky_current", "upcoming")
+    assert any("пик" in h for h in rules["allowed_timing_phrase_hints"])
+    assert allows_timing_phrase_family("подходит к пику", "sky_current", "upcoming")
+    cleaned = strip_disallowed_sky_timing_phrases(
+        "Сегодня на небе хаос. Подходит к пику завтра.",
+        "sky_current",
+        "upcoming",
+    )
+    assert "сегодня на небе" not in cleaned.lower()
+    assert "подходит к пику" in cleaned.lower()
+
+
+def test_sky_current_background_mode_phrases() -> None:
+    manifest = _sky_manifest()
+    manifest["sky_timing_mode"] = "background"
+    rules = sky_timing_copy_rules("sky_current", "background")
+    assert "фоном держится" in rules["allowed_timing_phrase_hints"]
+    assert allows_timing_phrase_family("фоном держится давление", "sky_current", "background")
+    cleaned = apply_aspect_source_caption_guard(
+        "Сегодня на небе давит. Фоном держится напряжение.",
+        "sky_current",
+        "background",
+    )
+    assert "сегодня на небе" not in cleaned.lower()
+    assert "фоном держится" in cleaned.lower()
+
+
+def test_manual_editorial_ignores_sky_timing_mode_for_phrases() -> None:
+    rules = sky_timing_copy_rules("manual_editorial", "exact_today")
+    assert rules["allows_sky_timing_language"] is False
+    assert not allows_timing_phrase_family("сегодня на небе", "manual_editorial", "exact_today")
+    out = apply_aspect_source_caption_guard(
+        "Сегодня на небе Меркурий–Уран.",
+        "manual_editorial",
+        "exact_today",
+    )
+    assert "сегодня на небе" not in out.lower()
+
+
+def test_manual_mercury_uranus_no_sky_timing_mode_on_context() -> None:
+    ctx = build_catstyle_caption_context(_manual_manifest())
+    assert ctx.aspect_source == "manual_editorial"
+    assert ctx.sky_timing_mode is None
+    payload = context_to_llm_payload(ctx)
+    assert payload["sky_timing_mode"] is None
+    assert payload["allows_sky_timing_language"] is False
+
+
+def test_sky_manifest_context_includes_timing_guidance() -> None:
+    manifest = _sky_manifest()
+    manifest["sky_timing_mode"] = "active_window"
+    ctx = build_catstyle_caption_context(manifest)
+    assert ctx.sky_timing_mode == "active_window"
+    payload = context_to_llm_payload(ctx)
+    assert payload["sky_timing_mode"] == "active_window"
+    assert "в эти дни" in payload["allowed_timing_phrase_hints"]
+    assert payload["timing_copy_guidance"]
+
+
+def test_resolve_sky_timing_mode_returns_none_for_editorial() -> None:
+    assert resolve_sky_timing_mode("manual_editorial", "exact_today") is None
+
+
+def test_normalize_sky_timing_mode_values() -> None:
+    assert normalize_sky_timing_mode("active_window") == "active_window"

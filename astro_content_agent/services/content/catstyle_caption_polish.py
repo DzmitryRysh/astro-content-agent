@@ -102,7 +102,9 @@ def polish_caption_for_package(caption: str, ctx: CatstyleCaptionContext | None 
                     rf"{re.escape(label)},\s*тоже\s+в\s+{re.escape(z)}",
                 ):
                     out = re.sub(pat, label, out, flags=re.IGNORECASE)
-        out = apply_aspect_source_caption_guard(out, ctx.aspect_source)
+        out = apply_aspect_source_caption_guard(
+            out, ctx.aspect_source, ctx.sky_timing_mode
+        )
         out = apply_caption_opening_guard(out, ctx)
     return out.strip()
 
