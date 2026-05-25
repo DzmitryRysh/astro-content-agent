@@ -15,6 +15,9 @@ from astro_content_agent.services.content.catstyle_caption_planet_policy import 
     use_sign_in_public_caption,
 )
 from astro_content_agent.services.content.catstyle_caption_context import CatstyleCaptionContext
+from astro_content_agent.services.content.catstyle_caption_opening_guard_v1 import (
+    apply_caption_opening_guard,
+)
 
 _OUTER_DISPLAY_RU: tuple[str, ...] = tuple(
     planet_display_ru(p) for p in sorted(CAPTION_NO_SIGN_INTERPRETATION_PLANETS)
@@ -100,6 +103,7 @@ def polish_caption_for_package(caption: str, ctx: CatstyleCaptionContext | None 
                 ):
                     out = re.sub(pat, label, out, flags=re.IGNORECASE)
         out = apply_aspect_source_caption_guard(out, ctx.aspect_source)
+        out = apply_caption_opening_guard(out, ctx)
     return out.strip()
 
 

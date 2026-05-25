@@ -200,7 +200,7 @@ def test_mercury_uranus_fallback_uses_life_hook_not_textbook() -> None:
     }
     ctx = build_catstyle_caption_context(manifest)
     payload = context_to_llm_payload(ctx)
-    assert payload.get("caption_opening_style") == "life_situation_hook_then_planet_meanings"
+    assert payload.get("caption_opening_style") == "life_situation_hook_first"
     result = build_fallback_caption(ctx)
     low = result.caption.lower()
     assert "если день" in low[:200]
@@ -224,6 +224,7 @@ def test_llm_prompt_builder_instructions_file_exists() -> None:
     assert "900" in text
     assert "Лови пару" in text
     assert "package_appends_timing_block" in text
+    assert "caption_opening_formula" in text or "жизненная ситуация" in text.lower()
     assert "Уран" in text
     assert "Нептун" in text
     assert "Плутон" in text

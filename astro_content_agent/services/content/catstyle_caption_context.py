@@ -308,10 +308,24 @@ def context_to_llm_payload(ctx: CatstyleCaptionContext) -> dict[str, Any]:
         "caption_weather_label": comp_entry.caption_weather_label if comp_entry else None,
         "caption_life_hook_opening": comp_entry.caption_life_hook_opening if comp_entry else None,
         "caption_risk_line": comp_entry.caption_risk_line if comp_entry else None,
-        "caption_opening_style": (
-            "life_situation_hook_then_planet_meanings"
-            if comp_entry and comp_entry.caption_life_hook_opening
-            else "standard"
+        "caption_opening_style": "life_situation_hook_first",
+        "caption_opening_formula": [
+            "life_situation_hook",
+            "aspect_pair_name",
+            "simple_planet_meanings",
+            "how_it_feels",
+            "risk_pressure",
+            "compensation",
+            "one_concrete_step_today",
+            "timing_note_only_if_package_appends_timing_block",
+        ],
+        "caption_opening_rules": (
+            "Первый абзац — узнаваемая жизненная ситуация (сбои, звонки, документы, разговоры…), "
+            "затем «смотри на ПланетаA–ПланетаB». Не начинай сухо с названия аспекта или "
+            "«Планета в оппозиции к…». Пример: «Если день идёт через сбои, звонки, документы "
+            "и разговоры на повышенных оборотах — смотри на Меркурий–Уран.» "
+            "Соблюдай aspect_source: current-sky язык только при allows_current_sky_language=true. "
+            "Уран/Нептун/Плутон — без знака зодиака. Сохраняй pair-specific compensation, не обобщай."
         ),
         "pressure_phrasing": ctx.pressure_phrasing,
         "caption_structure": [
