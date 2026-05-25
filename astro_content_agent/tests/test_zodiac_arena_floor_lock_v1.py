@@ -17,7 +17,7 @@ def test_zodiac_floor_block_wheel_and_stone_language() -> None:
     assert "stone brick" in low
     assert "canonical zodiac glyphs" in low
     assert "sector divisions" in low
-    assert "medallion" in low or "compass" in low
+    assert "compass hub" in low or "compass" in low
     assert "random magic circle" in low
 
 

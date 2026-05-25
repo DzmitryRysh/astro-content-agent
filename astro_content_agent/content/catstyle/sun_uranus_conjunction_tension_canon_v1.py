@@ -39,10 +39,10 @@ SUN_URANUS_CONJUNCTION_TENSION_VISUAL_CANON: Final[str] = (
     "**Earth disk above** the arena vault; **zodiac circle engraved into stone floor / stone brick paving**. "
     "**Approved-reference benchmark:** when the Sun/Uranus approved reference is active, use it as the **benchmark for all future Sun/Uranus images**—"
     "match its premium density, coliseum scale, and catplanet reads. "
-    "**Sun planet-cat** = dense **solar-core** surface, royal armor, staff, heavy solar authority, corona flare "
-    "(never a simple colored cat with fire effects). "
-    "**Uranus planet-cat** = dense **cyan ice-gas** planet surface, armor/chain/rock debris, electric orbit motifs, dangerous disruptor "
-    "(never soft plush, striped tiger, or ordinary blue cat with lightning). "
+    "**Sun planet-cat** = **living solar-core body** (molten plasma / star-surface texture, orange-gold celestial glow, "
+    "corona integrated in silhouette)—armor/staff are **secondary trim**, NOT a normal orange furry cat with fire VFX. "
+    "**Uranus planet-cat** = **cyan ice-gas atmospheric body** (gas bands, cloud layers, tilted-axis field, magnetic arcs)—"
+    "debris/electric geometry allowed; NOT plush blue fur, striped tiger, or costume-first trickster cat. "
     "**Mandatory staging:** **Sun on the left or center-left** as the radiant solar force; **Uranus on the right or center-right** "
     "as the electric disruptive force—preserve at poster scale. "
     "**Fusion beat:** visible **energy collision/fusion** between them—**dynamic movement**, **shockwave**, "
@@ -71,10 +71,10 @@ SUN_URANUS_APPROVED_REFERENCE_FIDELITY_BLOCK: Final[str] = (
 
 SUN_URANUS_APPROVED_REFERENCE_FIDELITY_COMPACT: Final[str] = (
     "[SUN-URANUS REF FIDELITY] **Benchmark for all future Sun/Uranus images.** "
-    "Sun: dense solar-core surface, royal armor, staff, heavy solar authority (\u2609 red flag left). "
+    "Sun: dense solar-core surface, royal armor, staff, heavy solar authority (\u2609 red flag left—full ring + central dot). "
     "Uranus: dense cyan ice-gas surface, armor/chain/rock debris, electric orbit motifs, dangerous disruptor (\u2645 blue flag right). "
-    "Match approved render density, monumental coliseum depth, zodiac floor, high contrast—campaign sibling 85–95% consistency; "
-    "not simple colored cats or reference-lite redraw."
+    "Match approved render density, layered starfield/nebula sky, monumental coliseum depth, zodiac floor, high contrast—"
+    "campaign sibling 85–95% consistency; **do not** copy reference body/chest/collar glyphs."
 )
 
 

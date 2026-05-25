@@ -16,6 +16,7 @@ from astro_content_agent.services.content.catstyle_aspect_source_truth_v1 import
 )
 from astro_content_agent.services.content.catstyle_aspect_timing import (
     build_aspect_timing_from_manifest,
+    manifest_has_editorial_timing_handoff,
     render_aspect_timing_markdown_section,
 )
 from astro_content_agent.services.content.catstyle_caption_polish import append_timing_once
@@ -708,9 +709,12 @@ def build_catstyle_post_package(
         post_d = date.today()
     oriented = orient_outer_personal(pa_e or "", pb_e or "") if pa_e and pb_e else None
     personal_for_timing = oriented[1] if oriented else pb_e
+    editorial_timing_handoff = manifest_has_editorial_timing_handoff(raw)
     if aspect_timing is not None and allows_current_sky_language(aspect_source):
         caption = append_timing_once(caption, aspect_timing, post_d, personal_for_timing)
-    elif not allows_current_sky_language(aspect_source):
+    elif editorial_timing_handoff and aspect_timing is not None:
+        caption = append_timing_once(caption, aspect_timing, post_d, personal_for_timing)
+    elif not allows_current_sky_language(aspect_source) and not editorial_timing_handoff:
         aspect_timing = None
 
     return CatstylePostPackage(

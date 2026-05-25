@@ -11,6 +11,9 @@ import httpx
 from pydantic import BaseModel, Field
 
 from astro_content_agent.content.catstyle.approved_reference_registry import catstyle_repo_root
+from astro_content_agent.content.catstyle.sun_uranus_visual_refinement_v1 import (
+    BANNER_ONLY_APPROVED_REFERENCE_DECOUPLING_BLOCK,
+)
 from astro_content_agent.core.config import get_settings
 from astro_content_agent.services.ai.client import OpenAIClientFactory
 
@@ -52,6 +55,7 @@ def _banner_glyph_reference_prefix(job: dict[str, Any]) -> str:
     if style:
         parts.append(
             "Image A = attached primary style/scene reference (catplanet DNA, arena, CG finish). "
+            f"{BANNER_ONLY_APPROVED_REFERENCE_DECOUPLING_BLOCK} "
         )
     label_b = "B" if style else "A"
     label_c = "C" if style else "B"

@@ -21,10 +21,17 @@ from astro_content_agent.content.catstyle.mars_pluto_square_tension_canon_v1 imp
     is_mars_pluto_square_tension,
 )
 from astro_content_agent.content.catstyle.models import CatstylePromptPack
+from astro_content_agent.content.catstyle.banner_glyph_reference_v1 import (
+    banner_only_glyph_mode_active,
+)
 from astro_content_agent.content.catstyle.sun_uranus_conjunction_tension_canon_v1 import (
     SUN_URANUS_APPROVED_REFERENCE_FIDELITY_COMPACT,
     SUN_URANUS_CONJUNCTION_TENSION_NEGATIVE_EXTRAS,
     is_sun_uranus_conjunction_tension,
+)
+from astro_content_agent.content.catstyle.sun_uranus_visual_refinement_v1 import (
+    BANNER_ONLY_APPROVED_REFERENCE_DECOUPLING_BLOCK,
+    SUN_URANUS_VISUAL_REFINEMENT_NEGATIVE_EXTRAS,
 )
 
 _ASPECT_TYPE_MARKER = "Aspect type:"
@@ -65,7 +72,6 @@ _BASE_NEGATIVE_GUARD_FOR_APPROVED_REF: Final[tuple[str, ...]] = (
     "disconnected sticker posing",
 )
 
-
 _CATSTYLE_VISUAL_FIDELITY_NEGATIVE_COMPACT: Final[str] = ", ".join(
     (
         *CATPLANET_BODY_NEGATIVE_EXTRAS,
@@ -83,13 +89,22 @@ def visual_fidelity_negative_must_keep() -> tuple[str, ...]:
 def approved_reference_negative_must_keep(
     planet_a: str, planet_b: str, aspect_type: str, mode: str
 ) -> tuple[str, ...]:
-    return (
+    out: list[str] = list(
         visual_fidelity_negative_must_keep()
         + APPROVED_REFERENCE_NEGATIVE_EXTRAS
         + _pair_negative_must_keep(planet_a, planet_b, aspect_type, mode)
         + _GLOBAL_NEGATIVE_GUARD_FOR_APPROVED_REF
         + _BASE_NEGATIVE_GUARD_FOR_APPROVED_REF
     )
+    if (mode or "").strip().lower() == "flow":
+        out.extend(
+            [
+                "underexposed overall scene",
+                "muddy crushed shadows",
+                "malformed astrological glyphs painted in-image",
+            ]
+        )
+    return tuple(out)
 
 
 def build_approved_reference_lock_block(hit: ResolvedApprovedReference) -> str:
@@ -126,6 +141,8 @@ def build_approved_reference_prompt_lock_text(
         build_approved_reference_lock_block(hit),
         REFERENCE_FIDELITY_GRADING_BLOCK,
     ]
+    if banner_only_glyph_mode_active():
+        parts.append(BANNER_ONLY_APPROVED_REFERENCE_DECOUPLING_BLOCK)
     if is_sun_uranus_conjunction_tension(planet_a, planet_b, aspect_type, mode):
         parts.append(SUN_URANUS_APPROVED_REFERENCE_FIDELITY_COMPACT)
     return " ".join(p for p in parts if p).strip()
@@ -200,6 +217,9 @@ def trim_negative_prompt_to_max(
             dropped = _drop_one_non_reserved(from_end=False)
         if not dropped:
             break
+    while len(_joined(parts)) > max_len:
+        if not _drop_one_non_reserved(from_end=False):
+            break
     out = _joined(parts)
     if len(out) > max_len:
         out = out[:max_len].rstrip().rstrip(",")
@@ -222,6 +242,7 @@ def _pair_negative_must_keep(planet_a: str, planet_b: str, aspect_type: str, mod
         out.extend(MARS_PLUTO_SQUARE_TENSION_NEGATIVE_EXTRAS)
     if is_sun_uranus_conjunction_tension(planet_a, planet_b, aspect_type, mode):
         out.extend(SUN_URANUS_CONJUNCTION_TENSION_NEGATIVE_EXTRAS)
+        out.extend(SUN_URANUS_VISUAL_REFINEMENT_NEGATIVE_EXTRAS)
     return tuple(out)
 
 

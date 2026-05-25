@@ -12,9 +12,10 @@ CATSTYLE_GLOBAL_QUALITY_LOCK_BLOCK: Final[str] = (
     "**Arena floor:** **zodiac circle engraved into stone floor / stone brick paving**—bold constellation band in masonry. "
     "**Composition:** high-drama heroic staging, **strong silhouettes**, **action or symbolic tension** with kinetic read—"
     "**not** static standing confrontation or idle mascot posing. "
-    "**Identity:** each planet-cat keeps clear planetary identity; **integrated flag glyphs** woven into banner cloth "
-    "(canonical heraldic gold, cloth-locked—never floating sticker overlays). "
-    "**Anti-drift:** reject watercolor/storybook softness, cozy cute low-drama tableau, flat toy-like mascots."
+    "**Identity:** each fighter is a **cat-planet** (planetary body material first); **integrated flag glyphs** on "
+    "banner cloth are **secondary** (canonical heraldic gold, cloth-locked—never floating sticker overlays). "
+    "**Anti-drift:** reject watercolor/storybook softness, ordinary furry cats in costumes, costume-first mascots, "
+    "flat toy-like pets."
 )
 
 CATSTYLE_GLOBAL_QUALITY_NEGATIVE_EXTRAS: Final[tuple[str, ...]] = (
@@ -26,6 +27,9 @@ CATSTYLE_GLOBAL_QUALITY_NEGATIVE_EXTRAS: Final[tuple[str, ...]] = (
     "cozy cute low-drama scene",
     "flat mascot look",
     "toy-like cats",
+    "ordinary furry cat",
+    "costume-first mascot",
+    "plush fur dominance",
     "weak simple confrontation",
     "static standing confrontation",
     "two cats merely pointing at each other",
@@ -49,8 +53,9 @@ CATSTYLE_GLOBAL_QUALITY_LOCK_CG_BLOCK: Final[str] = (
     "**Arena floor:** **zodiac circle engraved into stone floor / stone brick paving**—bold constellation band in masonry. "
     "**Composition:** high-drama heroic staging, **strong silhouettes**, epic duel or alliance read with kinetic clarity—"
     "**not** static mascot posing. "
-    "**Identity:** each planet-cat keeps clear planetary identity; **integrated flag glyphs** woven into banner cloth "
-    "(canonical heraldic gold, cloth-locked—never floating sticker overlays)."
+    "**Identity:** each fighter is a **cat-planet**—**planetary body material and aura dominate**; faction banner "
+    "glyphs are **secondary** support (canonical heraldic gold, cloth-locked—never floating sticker overlays). "
+    "Reject ordinary furry cats, plush fur mascots, and costume-first designs."
 )
 
 CATSTYLE_GLOBAL_QUALITY_NEGATIVE_CG_EXTRAS: Final[tuple[str, ...]] = (

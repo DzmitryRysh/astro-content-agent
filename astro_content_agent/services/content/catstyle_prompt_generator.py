@@ -1,6 +1,8 @@
 """Generate Catstyle v0 image prompt packs (text only; no image API calls)."""
 from __future__ import annotations
 
+import re
+
 from astro_content_agent.content.catstyle.aspect_library_v0 import ASPECT_CAT_INTERACTIONS, get_aspect_interaction
 from astro_content_agent.content.catstyle.character_skins_v0 import get_character_skin
 from astro_content_agent.content.catstyle.hero_shots_v1 import (
@@ -9,6 +11,7 @@ from astro_content_agent.content.catstyle.hero_shots_v1 import (
 )
 from astro_content_agent.content.catstyle.approved_reference_prompt_lock_v1 import (
     APPROVED_REFERENCE_NEGATIVE_EXTRAS,
+    _extras_missing_from_negative,
     apply_approved_reference_lock_to_prompt_pack,
     approved_reference_negative_must_keep,
     trim_negative_prompt_to_max,
@@ -33,14 +36,18 @@ from astro_content_agent.content.catstyle.planet_canon import (
     get_planet_canon as get_planet_canon_v2,
 )
 from astro_content_agent.content.catstyle.catplanet_body_identity_lock_v1 import (
-    CATPLANET_BODY_IDENTITY_LOCK_BLOCK,
     CATPLANET_BODY_NEGATIVE_EXTRAS,
+    catplanet_core_body_blocks,
+    is_sun_uranus_pair,
     sun_uranus_catplanet_body_lock_blocks,
 )
 from astro_content_agent.content.catstyle.banner_glyph_reference_v1 import (
     BANNER_ONLY_GLYPH_DISCIPLINE_BLOCK,
     BANNER_ONLY_GLYPH_NEGATIVE_EXTRAS,
+    BANNER_ONLY_NO_CHEST_BADGE_BLOCK,
+    banner_only_glyph_mode_active,
     build_banner_glyph_reference_assist,
+    sanitize_assembled_prompt_for_banner_only,
 )
 from astro_content_agent.content.catstyle.flag_glyph_fidelity_lock_v1 import (
     FLAG_GLYPH_FIDELITY_LOCK_BLOCK,
@@ -69,6 +76,10 @@ from astro_content_agent.content.catstyle.sun_uranus_conjunction_tension_canon_v
     SUN_URANUS_CONJUNCTION_TENSION_NEGATIVE_EXTRAS,
     SUN_URANUS_CONJUNCTION_TENSION_VISUAL_CANON,
     is_sun_uranus_conjunction_tension,
+)
+from astro_content_agent.content.catstyle.sun_uranus_visual_refinement_v1 import (
+    SUN_URANUS_VISUAL_REFINEMENT_NEGATIVE_EXTRAS,
+    sun_uranus_visual_refinement_blocks,
 )
 from astro_content_agent.content.catstyle.planet_glyph_registry_v1 import canonical_glyph_char
 from astro_content_agent.content.catstyle.planet_identity_markers_v1 import (
@@ -387,20 +398,7 @@ def _epic_arena_showdown_block(req: CatstylePromptRequest, pa: str, pb: str) -> 
                 "Saturn banner continuity: **♄ painted into Saturn's faction banner cloth** as integrated heraldic emblem—centered, cloth-locked, large enough to read at thumbnail scale. "
                 "Moon banner continuity: **☽ painted into Moon's faction banner cloth** the same way—lunar read also reinforced by pillow/silver costume cues, not by floating detached symbols. "
                 "Earth cue stability: exactly one Earth-like sphere above and behind arena; avoid duplicate Earth-like globes. "
-                "Poster continuity reinforcement: preserve movie-one-sheet readability with decisive focal hierarchy, clear silhouette breakup, and controlled detail density (characters highest, architecture medium, sky lowest). "
-                "Lighting/readability reinforcement: preserve dramatic key-to-rim sculpting on faces, paws, pillow, chain, and Saturn hat/shoulders; keep contrast punch without muddy low-mid compression. "
-                "Premium finish reinforcement: maintain collectible-cover polish with confident contour authority, deliberate silhouette carve-outs, readable overlap, and clean depth progression from foreground duel bodies to midground architecture to far cosmic void. "
-                "Hero-poster print discipline: preserve clear face readability and pose intent at thumbnail scale while retaining premium battle-poster gravitas; avoid flattened sticker-tableau staging and avoid soft illustrative vignette drift. "
-                "Environment-as-co-star reinforcement: keep zodiac floor ring perspective readable, coliseum wall recession legible, and upper-arch crown forms visible so arena scale feels monumental, elevated, and mythic instead of shallow wallpaper. "
-                "Color separation reinforcement: preserve disciplined dark-but-vivid palette with readable silver-blue Moon energy and readable graphite/stone Saturn mass; keep controlled warm accents for contrast readability, never fire-bloom mimicry. "
-                "Action readability reinforcement: prioritize first-glance cause/effect readability where Moon's soft-force motion and Saturn's structural restraint are both readable in one frame, with chain tension and pillow intent legible without over-forcing exact impact choreography. "
-                "Cinematic depth reinforcement: maintain overlapping depth planes, clear foreground/midground/background spacing, and spatial offset between subjects so the scene reads as poster-cinematic rather than flat side profile. "
-                "Monumental arena reinforcement: include clear arena floor sweep, receding stadium tiers, and side architecture supports that frame conflict with ceremonial gravity; avoid clipping architecture into shoulder-level backdrop fragments. "
-                "Faction readability reinforcement: Moon/Saturn side emblems should remain large and legible enough to support narrative opposition while staying symbolic (no rendered words), and must not be reduced to tiny unreadable accents. "
-                "Detail density discipline: keep character focal regions (faces, paws, pillow edge, chain grip points, Saturn hat silhouette) as highest-detail anchors; keep architecture medium detail; keep sky and far-space accents restrained to avoid muddy clutter. "
-                "Contrast hygiene: protect edge separation between characters and arena walls; avoid overcompressed low mids, avoid murky blacks swallowing forms, avoid gray-brown wash that erodes comic-poster identity. "
-                "Premium Catstyle identity lock: preserve poster-grade heroic comic splash language, polished 2D/2.5D rendering cues, crisp line clarity, rich cel-shaded modeling, dramatic rim-impact lighting, and high-contrast readability as non-negotiable style anchors. "
-                "Anti-storybook drift reinforcement: reject nursery bedtime softness, reject fairytale watercolor haze, reject soft pastel storybook treatment, reject flat mascot simplification, reject toy-like cute flattening that weakens conflict readability. "
+                "Preserve movie-one-sheet readability with decisive focal hierarchy, controlled detail density (characters highest, architecture medium, sky lowest), clear silhouette breakup, and first-glance cause/effect readability at poster distance. "
                 "Negatives: weak action, loose decorative chain, unclear restraint, passive Saturn, duplicated Earth-like sky spheres, shallow pasted backdrop arena, tight portrait crop creep, "
                 "environment reduced to backdrop afterthought, washed-out painterly blur, flat mascot simplification."
             )
@@ -426,7 +424,7 @@ def _epic_arena_showdown_block(req: CatstylePromptRequest, pa: str, pb: str) -> 
         "Background scale cue: include a clearly readable distant Earth or Earth-like blue-green planet with visible cloud and/or continent pattern "
         "as the human-world impact cue (audience world affected by this aspect), smaller than characters but visually legible, clearly above and behind the arena. "
         "Anti-confusion rule: do not replace the Earth impact cue with Moon/Jupiter/Mars/Saturn/or either character planet; "
-        "planet identity belongs on characters, banners, props, reserved emblem zones, and arena symbols unless explicitly overridden. "
+        "planet identity belongs on characters, costume/props, faction banner glyphs, and arena symbols unless explicitly overridden. "
         "For Moon aspects specifically, keep Moon identity on the Moon character (crescent ear staging, pillow/blanket language, silver aura, moonlight wave) "
         "and avoid ambiguous moon-like background orb or large Moon sky-body as the main celestial cue when Earth impact cue is requested. "
         f"{glyph_lock}"
@@ -439,26 +437,248 @@ def _epic_arena_showdown_block(req: CatstylePromptRequest, pa: str, pb: str) -> 
 
 _IMAGE_PROMPT_SAFE_MAX_CHARS = 31_600
 
+# Phrases trim_negative_prompt_to_max must never drop (style / safety contracts).
+_NEGATIVE_PROMPT_CONTRACT_MUST_KEEP: tuple[str, ...] = (
+    "microtexture noise",
+    "tiny crack noise",
+    "particles",
+    "incomplete flag glyphs",
+    "cropped banner glyphs",
+    "random magic circle",
+    "fake zodiac symbols",
+    "underexposed overall scene",
+    "muddy crushed shadows",
+    "horror",
+    "gore",
+    "explicit horror",
+    "fetish imagery",
+    "sexual explicitness",
+)
+
+# v2 poster forbidden lines re-injected only when trimmed away earlier in the pipeline.
+_V2_POSTER_FORBIDDEN_LINES: tuple[str, ...] = (
+    "childish nursery / kawaii / chibi mascot look",
+    "sticker mascot center-float posing",
+    "flat vector / cheap icon / mobile-game icon look — cluttered architecture detail spam — weak bland composition with disconnected characters",
+)
+
+
+def _final_trim_must_keep(keep_neg: tuple[str, ...], *, render_style_key: str) -> tuple[str, ...]:
+    """v2 final trim may drop the compact fidelity blob to preserve poster forbidden categories."""
+    if (render_style_key or "").strip() != "premium_comic_poster_v2":
+        return keep_neg
+    fidelity_compact = visual_fidelity_negative_must_keep()[0]
+    norm_fidelity = " ".join(fidelity_compact.lower().split())
+    return tuple(
+        k
+        for k in keep_neg
+        if " ".join(k.lower().split()) != norm_fidelity
+    )
+
+
+def _negative_contract_merge_extras(
+    negative: str, *, mode: str | None = None, render_style_key: str | None = None
+) -> list[str]:
+    """Inject only missing contract phrases (avoids duplicate tail chunks before the 1200 cap)."""
+    extras = list(_NEGATIVE_PROMPT_CONTRACT_MUST_KEEP)
+    if (render_style_key or "").strip() == "premium_comic_poster_v2":
+        extras.extend(_V2_POSTER_FORBIDDEN_LINES)
+    if (mode or "").strip().lower() == "flow":
+        extras.extend(
+            [
+                "underexposed overall scene",
+                "muddy crushed shadows",
+                "malformed astrological glyphs painted in-image",
+            ]
+        )
+    return _extras_missing_from_negative(negative, tuple(extras))
+
+# Front-loaded prompt sections that budget trim must preserve when present.
+_PROTECTED_PROMPT_MARKERS: tuple[str, ...] = (
+    "[RENDER STYLE v1 - high-priority visual finish]",
+    "[STYLE HARDLOCK CG v1 - key art mandate]",
+    "[STYLE HARDLOCK v2 - premium poster mandate]",
+)
+
+# End anchors for protected blocks (do not span to the next marker — only the tagged section).
+_PROTECTED_BLOCK_END_ANCHORS: dict[str, tuple[str, ...]] = {
+    "[RENDER STYLE v1 - high-priority visual finish]": (
+        "[STYLE HARDLOCK v2 - premium poster mandate]",
+        "[STYLE HARDLOCK CG v1 - key art mandate]",
+        "Aspect type:",
+    ),
+    "[STYLE HARDLOCK v2 - premium poster mandate]": (
+        "[RENDER STYLE v1 - high-priority visual finish]",
+        "Aspect type:",
+    ),
+    "[STYLE HARDLOCK CG v1 - key art mandate]": (
+        "[RENDER STYLE v1 - high-priority visual finish]",
+        "Aspect type:",
+    ),
+}
+
+
+def _protected_prompt_block_span(text: str, marker: str) -> tuple[int, int] | None:
+    """Return [start, end) for one protected block; end is the nearest section anchor after *marker*."""
+    low = text.lower()
+    start = low.find(marker.lower())
+    if start < 0:
+        return None
+    end = len(text)
+    for anchor in _PROTECTED_BLOCK_END_ANCHORS.get(marker, ("Aspect type:",)):
+        pos = low.find(anchor.lower(), start + len(marker))
+        if pos > start:
+            end = min(end, pos)
+    return start, end
+
+
+def _split_protected_prompt_blocks(text: str) -> tuple[str, list[str]]:
+    """Remove protected render-style / hardlock spans from *text*; return core text and extracted blocks."""
+    spans: list[tuple[int, int, str]] = []
+    for marker in _PROTECTED_PROMPT_MARKERS:
+        span = _protected_prompt_block_span(text, marker)
+        if span is None:
+            continue
+        start, end = span
+        spans.append((start, end, text[start:end].strip()))
+    if not spans:
+        return text, []
+    spans.sort(key=lambda item: item[0])
+    protected_parts = [part for _, _, part in spans]
+    core_chunks: list[str] = []
+    cursor = 0
+    for start, end, _ in spans:
+        core_chunks.append(text[cursor:start])
+        cursor = end
+    core_chunks.append(text[cursor:])
+    core = " ".join("".join(core_chunks).split())
+    return core, protected_parts
+
+
+def _trim_core_to_char_budget(core: str, budget: int) -> str:
+    if len(core) <= budget:
+        return core
+    cutoff = core.rfind(". ", 0, budget)
+    if cutoff > int(budget * 0.98):
+        return core[:cutoff].strip() + "."
+    return core[:budget].rstrip()
+
+
+def _dedupe_sentences_in_text(text: str) -> str:
+    """Drop duplicate sentences (normalized) while preserving first-occurrence order."""
+    parts = re.split(r"(?<=[.!?])\s+", text.strip())
+    seen: set[str] = set()
+    kept: list[str] = []
+    for part in parts:
+        raw = part.strip()
+        if not raw:
+            continue
+        norm = " ".join(raw.lower().split())
+        if norm in seen:
+            continue
+        seen.add(norm)
+        kept.append(raw)
+    return " ".join(kept).strip()
+
+
+def _aspect_type_lead_and_body(gap: str) -> tuple[str, str]:
+    """Keep the ``Aspect type:`` sentence when trimming a gap (approved-lock contract)."""
+    idx = gap.find("Aspect type:")
+    if idx < 0:
+        return "", gap
+    end = gap.find(". ", idx)
+    if end < 0:
+        return gap[:idx].strip(), gap[idx:].strip()
+    return gap[: end + 1].strip(), gap[end + 1 :].lstrip()
+
+
+def _trim_gap_to_budget(gap: str, budget: int) -> str:
+    if len(gap) <= budget:
+        return gap
+    lead, body = _aspect_type_lead_and_body(gap)
+    lead_len = len(lead) + (1 if lead and body else 0)
+    body_budget = max(budget - lead_len, 0)
+    if not body:
+        return lead[:budget] if lead else ""
+    trimmed_body = body
+    if len(trimmed_body) > body_budget:
+        trimmed_body = _dedupe_sentences_in_text(trimmed_body)
+        if len(trimmed_body) > body_budget:
+            excess = len(trimmed_body) - body_budget
+            # Drop from the front so epic_arena_showdown / pair staging at the gap tail stay intact.
+            front_cut = trimmed_body[excess:].lstrip()
+            trimmed_body = (
+                front_cut
+                if len(front_cut) <= body_budget
+                else _trim_core_to_char_budget(front_cut, body_budget)
+            )
+    if lead and trimmed_body:
+        return f"{lead} {trimmed_body}".strip()
+    return lead or trimmed_body
+
 
 def _compact_prompt_to_budget(prompt: str, safe_max: int = _IMAGE_PROMPT_SAFE_MAX_CHARS) -> str:
     """
     Deterministic prompt budget guard.
 
-    Strategy: normalize whitespace, then if still over budget, drop duplicate sentences/clauses
-    (case/space normalized) from left-to-right while preserving order of first occurrence.
+    Strategy: normalize whitespace, extract bounded render-style / hardlock blocks, trim only the
+    gaps between them (dedupe sentences first), and reassemble in original order.
     """
     raw = (prompt or "").strip()
     if not raw:
         return raw
-    # Whitespace compaction first (cheap, deterministic) but preserve the full rich stack.
     s = " ".join(raw.split())
     if len(s) <= safe_max:
         return s
-    # Surgical trim: keep the strongest front-loaded style/identity/action stack and trim tail only.
-    cutoff = s.rfind(". ", 0, safe_max)
-    if cutoff > int(safe_max * 0.98):
-        return s[:cutoff].strip() + "."
-    return s[:safe_max].rstrip()
+
+    spans: list[tuple[int, int, str]] = []
+    for marker in _PROTECTED_PROMPT_MARKERS:
+        span = _protected_prompt_block_span(s, marker)
+        if span is None:
+            continue
+        start, end = span
+        spans.append((start, end, s[start:end].strip()))
+    spans.sort(key=lambda item: item[0])
+
+    if not spans:
+        return _trim_core_to_char_budget(s, safe_max)
+
+    protected_len = sum(end - start for start, end, _ in spans)
+    join_spaces = len(spans) + 1
+    gap_budget = max(safe_max - protected_len - join_spaces, int(safe_max * 0.25))
+
+    gaps: list[str] = []
+    cursor = 0
+    for start, end, _ in spans:
+        gaps.append(s[cursor:start])
+        cursor = end
+    gaps.append(s[cursor:])
+
+    gap_lens = [len(g) for g in gaps]
+    gap_total = sum(gap_lens)
+    if gap_total > gap_budget and gap_total > 0:
+        # Trim largest gaps first (usually the middle stack between render-style and tail hardlock).
+        order = sorted(range(len(gaps)), key=lambda i: gap_lens[i], reverse=True)
+        remaining = gap_total
+        trimmed = list(gaps)
+        for idx in order:
+            if remaining <= gap_budget:
+                break
+            share = max(gap_budget - (remaining - len(trimmed[idx])), 0)
+            target = min(len(trimmed[idx]), share)
+            trimmed[idx] = _trim_gap_to_budget(trimmed[idx], target)
+            remaining = sum(len(g) for g in trimmed)
+        gaps = trimmed
+
+    out_parts: list[str] = []
+    for i, (start, end, block) in enumerate(spans):
+        out_parts.append(gaps[i])
+        out_parts.append(block)
+    out_parts.append(gaps[len(spans)])
+    out = " ".join(p for p in out_parts if p).strip()
+    if len(out) > safe_max:
+        out = out[:safe_max].rstrip().rstrip(",")
+    return out
 
 
 def _animation_prompt_body(
@@ -596,7 +816,9 @@ def _validate_skins_for_pair(pa: str, pb: str, skin_a: str | None, skin_b: str |
 def _planet_cat_line(planet: str, canon: PlanetCatCanon, skin_key: str | None) -> str:
     sk_raw = _strip_optional_skin(skin_key)
     marker = get_planet_identity_marker_profile(planet)
-    marker_block = format_identity_markers_prompt_block(planet, marker, has_skin=bool(sk_raw))
+    marker_block = format_identity_markers_prompt_block(
+        planet, marker, has_skin=bool(sk_raw), banner_only_glyph=True
+    )
     canon_v2 = get_planet_canon_v2(planet)
     canon_v2_block = build_planet_canon_prompt_fragment(planet)
     must_have = " | ".join(canon_v2.must_have)
@@ -627,7 +849,7 @@ def _planet_cat_line(planet: str, canon: PlanetCatCanon, skin_key: str | None) -
     sk = get_character_skin(planet, sk_raw)
     overlay = (
         f" Archetype skin **{sk.display_name}** (OPTIONAL COSTUME OVERLAY ONLY — preserve the full [CANON v1 base] "
-        f"and [IDENTITY MARKERS v1] sections above: same planet, base silhouette, emblem-zone placement cues, "
+        f"and [IDENTITY MARKERS v1] sections above: same planet, base silhouette, costume/prop identity cues, "
         f"signature props/details, and recognizability rule must remain readable; "
         f"skin enhances costume/scene hooks, never replaces the planet-cat core): "
         f"costume: {sk.costume_elements}. Props: {sk.prop_elements}. Body language: {sk.body_language}. "
@@ -695,9 +917,11 @@ def _pair_specific_visual_guards(pa: str, pb: str, aspect_type: str, mode: str) 
     parts: list[str] = [
         _moon_saturn_visual_correction_block(pa, pb, aspect_type, mode),
     ]
-    if is_sun_uranus_conjunction_tension(pa, pb, aspect_type, mode):
+    if is_sun_uranus_pair(pa, pb):
         parts.append(sun_uranus_catplanet_body_lock_blocks())
+    if is_sun_uranus_conjunction_tension(pa, pb, aspect_type, mode):
         parts.append(SUN_URANUS_FLAG_GLYPH_FIDELITY_BLOCK)
+        parts.append(sun_uranus_visual_refinement_blocks())
         parts.append(SUN_URANUS_CONJUNCTION_TENSION_VISUAL_CANON)
     if is_mars_pluto_square_tension(pa, pb, aspect_type, mode):
         parts.append(MARS_PLUTO_SQUARE_TENSION_VISUAL_CANON)
@@ -710,7 +934,7 @@ def _prompt_choreography_middleware(
     """Aspect choreography + global quality lock + pair flags + Mars scene decouple; pair-specific guards."""
     blocks: list[str] = [
         _global_quality_lock_for_request(req),
-        CATPLANET_BODY_IDENTITY_LOCK_BLOCK,
+        catplanet_core_body_blocks(),
         ZODIAC_ARENA_FLOOR_LOCK_BLOCK,
     ]
     if (req.mode or "").strip().lower() == "flow":
@@ -721,6 +945,7 @@ def _prompt_choreography_middleware(
     )
     blocks.append(FLAG_GLYPH_FIDELITY_LOCK_BLOCK)
     blocks.append(BANNER_ONLY_GLYPH_DISCIPLINE_BLOCK)
+    blocks.append(BANNER_ONLY_NO_CHEST_BADGE_BLOCK)
     blocks.extend(
         [
             _aspect_choreography_block(req.aspect_type, req.mode),
@@ -802,12 +1027,12 @@ def _pack_from_deep(
 
         prompt = (
             f"{_image_prompt_opening_prefix(render_prof, mode=req.mode)} "
+            f"{render_middle}"
             f"Aspect type: {req.aspect_type}. "
             f"{line_a} "
             f"{line_b} "
             f"{choreo_block} "
             f"{template_middle}"
-            f"{render_middle}"
             f"{shot_middle}"
             f"Scene beat: {base_scene} "
             f"Story tension (cartoon metaphor): {aspect_ix.core_tension} "
@@ -880,12 +1105,12 @@ def _pack_from_seed(
 
         prompt = (
             f"{_image_prompt_opening_prefix(render_prof, mode=req.mode)} "
+            f"{render_middle}"
             f"Aspect type: {req.aspect_type}. "
             f"{line_a} "
             f"{line_b} "
             f"{choreo_block} "
             f"{template_middle}"
-            f"{render_middle}"
             f"{shot_middle}"
             f"Scene beat: {base_scene} "
             f"Story tension (cartoon metaphor): {seed.core_tension} "
@@ -969,12 +1194,12 @@ def _pack_from_fallback(
 
         prompt = (
             f"{_image_prompt_opening_prefix(render_prof, mode=req.mode)} "
+            f"{render_middle}"
             f"Aspect type: {req.aspect_type}. "
             f"{line_a} "
             f"{line_b} "
             f"{choreo_block} "
             f"{template_middle}"
-            f"{render_middle}"
             f"{shot_middle}"
             f"Scene beat: {base_scene} "
             f"Story tension (cartoon metaphor): {core} "
@@ -1118,30 +1343,56 @@ def generate_catstyle_prompt_pack(req: CatstylePromptRequest) -> CatstylePromptP
         approved_reference_negative_must_keep(pa, pb, req.aspect_type, req.mode)
         if approved_hit is not None
         else visual_fidelity_negative_must_keep()
-    )
+    ) + _NEGATIVE_PROMPT_CONTRACT_MUST_KEEP
+    if render_prof.key == "premium_comic_poster_v2":
+        keep_neg = keep_neg + (
+            "photoreal / hyperreal / CGI / 3D game render finish",
+            "game splash render look",
+            "childish nursery / kawaii / chibi mascot look",
+            "sticker mascot center-float posing",
+            "flat vector / cheap icon / mobile-game icon look — cluttered architecture detail spam — weak bland composition with disconnected characters",
+            "microtexture noise — tiny crack noise — excess particles clutter",
+        )
     if (req.mode or "").strip().lower() == "flow":
         keep_neg = keep_neg + (
             "underexposed overall scene",
             "muddy crushed shadows",
             "malformed astrological glyphs painted in-image",
         )
+    neg_contract_extras = _negative_contract_merge_extras(
+        pack.negative_prompt or "",
+        mode=req.mode,
+        render_style_key=render_prof.key,
+    )
     pack = pack.model_copy(
         update={
             "negative_prompt": _merge_negative_prompt(
                 [pack.negative_prompt] if pack.negative_prompt else [],
-                list(BANNER_ONLY_GLYPH_NEGATIVE_EXTRAS),
+                neg_contract_extras + list(BANNER_ONLY_GLYPH_NEGATIVE_EXTRAS),
             )
         }
     )
     pack = _apply_banner_glyph_reference_assist(pack, req, pa, pb)
     capped_neg = trim_negative_prompt_to_max(
         pack.negative_prompt,
-        must_keep=keep_neg,
+        must_keep=_final_trim_must_keep(keep_neg, render_style_key=render_prof.key),
         drop_from="back_first",
     )
     if capped_neg != pack.negative_prompt:
         pack = pack.model_copy(update={"negative_prompt": capped_neg})
-    return pack
+    return _apply_banner_only_full_prompt_sanitize(pack)
+
+
+def _apply_banner_only_full_prompt_sanitize(pack: CatstylePromptPack) -> CatstylePromptPack:
+    """Strip canon/medallion glyph attractors from final assembled image prompts."""
+    if not banner_only_glyph_mode_active():
+        return pack
+    data = pack.model_dump(mode="json")
+    prompts = [
+        sanitize_assembled_prompt_for_banner_only(str(p)) for p in (data.get("image_prompts") or [])
+    ]
+    data["image_prompts"] = prompts
+    return CatstylePromptPack.model_validate(data)
 
 
 def _apply_banner_glyph_reference_assist(
@@ -1186,6 +1437,7 @@ def _finalize_pack_with_art_direction(
         extras: list[str] = _global_quality_negative_extras_for_request(req)
         if is_sun_uranus_conjunction_tension(pa, pb, req.aspect_type, req.mode):
             extras.extend(SUN_URANUS_CONJUNCTION_TENSION_NEGATIVE_EXTRAS)
+            extras.extend(SUN_URANUS_VISUAL_REFINEMENT_NEGATIVE_EXTRAS)
         if is_mars_pluto_square_tension(pa, pb, req.aspect_type, req.mode):
             extras.extend(MARS_PLUTO_SQUARE_TENSION_NEGATIVE_EXTRAS)
         if not extras:

@@ -149,6 +149,24 @@ def _resolve_timing_data_source(
     return "manifest_selected_candidate_v1"
 
 
+def manifest_has_editorial_timing_handoff(manifest: dict[str, Any]) -> bool:
+    """
+    True when a manual editorial override matched a day-window scan with explicit UTC bounds.
+
+    Used to attach factual timing metadata (and optional caption timing) without treating the post
+    as ``sky_current``.
+    """
+    row = _selected_or_job_row(manifest)
+    if not row or not bool(row.get("manual_override_sky_timing_match")):
+        return False
+    if str(manifest.get("sky_scan_mode") or "").strip().lower() != "day-window":
+        return False
+    return (
+        row.get("window_start_hour_utc") is not None
+        and row.get("window_end_hour_utc") is not None
+    )
+
+
 def build_aspect_timing_from_manifest(manifest: dict[str, Any]) -> CatstyleAspectTimingMetadata:
     """
     Build timing metadata strictly from manifest fields (selected_candidate / first job).
@@ -326,6 +344,7 @@ def render_aspect_timing_markdown_section(meta: CatstyleAspectTimingMetadata) ->
 __all__ = [
     "append_ru_timing_to_caption",
     "build_aspect_timing_from_manifest",
+    "manifest_has_editorial_timing_handoff",
     "format_ru_timing_caption_append",
     "render_aspect_timing_markdown_section",
 ]

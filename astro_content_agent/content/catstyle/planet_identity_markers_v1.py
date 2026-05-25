@@ -1,6 +1,10 @@
 """Catstyle planet identity markers v1 - symbol and placement cues layered on canon (prompt layer)."""
 from __future__ import annotations
 
+from astro_content_agent.content.catstyle.banner_glyph_reference_v1 import (
+    banner_only_glyph_mode_active,
+    sanitize_marker_field_for_banner_only,
+)
 from astro_content_agent.content.catstyle.models import PlanetIdentityMarkerProfile
 from astro_content_agent.content.catstyle.planet_canon_v1 import normalize_planet_name
 
@@ -282,43 +286,93 @@ PLANET_IDENTITY_MARKER_PROFILES: dict[str, PlanetIdentityMarkerProfile] = {
 }
 
 
+def _banner_only_glyph_tail(marker: PlanetIdentityMarkerProfile) -> str:
+    sun_dot = (
+        " **Full circle with clearly visible central dot** (not a hollow ring)."
+        if marker.planet_name == "Sun"
+        else ""
+    )
+    return (
+        " [PLANET GLYPH HERALDRY v1 — banner cloth only] **Exactly one** large canonical glyph "
+        f"({marker.planet_symbol} — {marker.symbol_name}) on **this planet's faction banner** only—"
+        "painted or woven into flag cloth as heraldic gold/embroidery with fabric folds and key light."
+        f"{sun_dot} "
+        "No glyph pixels on torso, jewelry, armor, accessories, portal structure, or headwear. "
+        "Reject malformed planetary signs, pseudo-glyphs, fake letters, or sticker-like symbols."
+    )
+
+
 def format_identity_markers_prompt_block(
     planet: str,
     marker: PlanetIdentityMarkerProfile,
     *,
     has_skin: bool,
+    banner_only_glyph: bool | None = None,
 ) -> str:
     """Deterministic paragraph appended after [CANON v1 base] in image prompts."""
-    placement = " | ".join(marker.placement_rules)
-    must_show = " | ".join(marker.must_show_markers)
-    optional = " | ".join(marker.optional_label_ideas) if marker.optional_label_ideas else "none required"
-    avoid_m = " | ".join(marker.avoid_marker_mistakes)
+    banner_only = banner_only_glyph if banner_only_glyph is not None else banner_only_glyph_mode_active()
+
+    def _field(raw: str, field: str) -> str:
+        if not banner_only:
+            return raw
+        return sanitize_marker_field_for_banner_only(planet, raw, field=field)
+
+    if banner_only:
+        placement = _field("", "placement")
+        must_show = _field("", "must_show")
+        optional = "none required"
+    else:
+        placement = " | ".join(_field(r, "placement") for r in marker.placement_rules)
+        must_show = " | ".join(_field(m, "must_show") for m in marker.must_show_markers)
+        optional = (
+            " | ".join(marker.optional_label_ideas) if marker.optional_label_ideas else "none required"
+        )
+    if banner_only:
+        avoid_m = " | ".join(_field(a, "avoid") for a in marker.avoid_marker_mistakes)
+    else:
+        avoid_m = " | ".join(marker.avoid_marker_mistakes)
+    primary = _field(marker.primary_marker, "primary")
+    secondary = _field(marker.secondary_marker, "secondary")
+    signature = _field(marker.signature_prop, "signature")
+    visual_read = _field(marker.visual_read_rule, "visual_read")
+    short_line = _field(marker.short_prompt_line, "short")
     skin_clause = ""
     if has_skin:
-        skin_clause = (
-            " Skin/costume overlay is optional: preserve this entire marker block alongside [CANON v1 base] "
-            "- keep armor/shield/jewelry secondary to **large integrated banner glyphs**; avoid competing fake runes on small props."
+        if banner_only:
+            skin_clause = (
+                " Skin/costume overlay is optional: preserve this entire marker block alongside [CANON v1 base] "
+                "- keep costume/prop identity; **glyphs stay on faction banners only**."
+            )
+        else:
+            skin_clause = (
+                " Skin/costume overlay is optional: preserve this entire marker block alongside [CANON v1 base] "
+                "- keep armor/shield/jewelry secondary to **large integrated banner glyphs**; avoid competing fake runes on small props."
+            )
+    if banner_only:
+        glyph_tail = _banner_only_glyph_tail(marker)
+        staging_label = "Staging objectives (costume/prop identity—no body glyphs):"
+    else:
+        glyph_tail = (
+            " [PLANET GLYPH HERALDRY v1 — painted into the scene] When this planet carries a visible **faction flag or parade banner**, "
+            f"paint **one large canonical astrological glyph** ({marker.planet_symbol} — {marker.symbol_name}) **into the flag cloth** as part of the illustration: "
+            "centered on the cloth field, **flat heraldic gold paint or embroidered-thread emblem**, warped with **fabric folds, perspective, and key light** "
+            "(not a floating white sticker, not a detached glow hovering over characters, not pasted across faces/foreheads/muzzles or torsos unless the shot is explicitly medallion-focused). "
+            "Reject malformed planetary signs, pseudo-glyphs, fake letters, random occult runes, or sticker-like symbols that ignore cloth physics."
         )
-    glyph_tail = (
-        " [PLANET GLYPH HERALDRY v1 — painted into the scene] When this planet carries a visible **faction flag or parade banner**, "
-        f"paint **one large canonical astrological glyph** ({marker.planet_symbol} — {marker.symbol_name}) **into the flag cloth** as part of the illustration: "
-        "centered on the cloth field, **flat heraldic gold paint or embroidered-thread emblem**, warped with **fabric folds, perspective, and key light** "
-        "(not a floating white sticker, not a detached glow hovering over characters, not pasted across faces/foreheads/muzzles or torsos unless the shot is explicitly medallion-focused). "
-        "Reject malformed planetary signs, pseudo-glyphs, fake letters, random occult runes, or sticker-like symbols that ignore cloth physics."
-    )
+        staging_label = "Staging objectives (achieve without painted glyph pixels—props + blank stamp zones):"
     return (
         f"[IDENTITY MARKERS v1] for {planet}:{skin_clause} "
         f"- Canonical glyph to render **on this planet's own banner cloth** when flags appear: "
         f"{marker.planet_symbol} ({marker.symbol_name}). "
-        f"- Primary marker: {marker.primary_marker}. "
-        f"- Secondary marker: {marker.secondary_marker}. "
-        f"- Signature prop: {marker.signature_prop}. "
+        f"- Primary marker: {primary}. "
+        f"- Secondary marker: {secondary}. "
+        f"- Signature prop: {signature}. "
         f"- Placement guidance: {placement}. "
-        f"- Staging objectives (achieve without painted glyph pixels—props + blank stamp zones): {must_show}. "
+        f"- {staging_label} {must_show}. "
         f"- Optional accent ideas: {optional}. "
-        f"- Visual read rule: {marker.visual_read_rule}. "
+        f"- Visual read rule: {visual_read}. "
         f"- Avoid marker mistakes: {avoid_m}. "
-        f"- Compact cue: {marker.short_prompt_line}"
+        f"- Compact cue: {short_line}"
         f"{glyph_tail}"
     )
 

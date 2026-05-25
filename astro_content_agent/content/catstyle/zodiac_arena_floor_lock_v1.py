@@ -6,7 +6,7 @@ from typing import Final
 ZODIAC_ARENA_FLOOR_LOCK_BLOCK: Final[str] = (
     "[ZODIAC ARENA FLOOR LOCK v1] The arena floor must contain a **large readable zodiac wheel** "
     "**engraved or inlaid into stone brick paving**—a major Catstyle universe anchor, **not a random magic circle**. "
-    "**Canonical zodiac glyphs** around the wheel, **clear sector divisions**, **visible central medallion/compass center**; "
+    "**Canonical zodiac glyphs** around the wheel, **clear sector divisions**, **visible central compass hub**; "
     "floor feels **physically part of the arena**—readable but not stealing focus from fighters."
 )
 

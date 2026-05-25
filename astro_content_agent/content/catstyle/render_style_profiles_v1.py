@@ -216,21 +216,23 @@ RENDER_STYLE_PROFILES: dict[str, CatstyleRenderStyleProfile] = {
             "flags, and zodiac floor preserved."
         ),
         image_prompt_opening_line=(
-            "Premium CG key art illustration of anthropomorphic planet-cats — polished 2.5D / 3D-hybrid game key-art poster "
-            "finish with crisp silhouette readability, clean hard edges, strong material separation, high-contrast keyed "
+            "Premium CG key art illustration of anthropomorphic cat-planets — polished 2.5D / 3D-hybrid game key-art poster "
+            "finish with crisp silhouette readability, clean hard edges, strong material separation, and **planetary body material** "
+            "reads (star-surface, ice-gas atmosphere, molten core—not ordinary furry cats in costumes), high-contrast keyed "
             "lighting, volumetric light, and cinematic depth (NOT watercolor, NOT gouache, NOT soft painterly storybook "
             "illustration, NOT sketchbook texture, NOT photoreal portrait, NOT flat mascot sticker art); "
             "collectible splash-art CG polish with monumental cosmic coliseum scale, epic dramatic staging, and "
-            "brand-consistent catplanet identity—game key-art surface clarity over hand-painted comic brush dominance."
+            "living catplanet bodies dominant over costume—game key-art surface clarity over hand-painted comic brush dominance."
         ),
         style_hardlock_block=(
             "HARDLOCK premium CG key-art finish: prioritize polished 2.5D / 3D-hybrid poster rendering with crisp edges, "
             "readable silhouettes, separated materials, and volumetric cinematic lighting—reject watercolor washes, gouache "
             "softness, painterly illustration dominance, storybook / children's-book painted look, sketchbook texture, fuzzy "
             "brush stacks, flat comic doodle simplicity, and visible hand-painted ink-wash mush. "
-            "Catstyle universe non-negotiable: catplanet bodies (not ordinary cats), monumental cosmic coliseum, engraved "
-            "zodiac floor wheel, faction flags with canonical planetary glyphs woven in cloth (readable heraldic gold), "
-            "cosmic scale, epic duel or alliance staging—characters remain focal hierarchy. "
+            "Catstyle universe non-negotiable: **living catplanet body material first** (not ordinary furry cats, not "
+            "costume-first mascots), monumental cosmic coliseum, engraved zodiac floor wheel, **secondary** faction flags "
+            "with canonical planetary glyphs woven in cloth (readable heraldic gold), cosmic scale, epic duel staging—"
+            "planetary surface texture wins over fur and cloth. "
             "Texture: medium CG material groups with clean specular planes—no micro-noise speckle, no mushy airbrush fog. "
             "Lighting: high-contrast dramatic separation with volumetric depth—no HDR photoreal skin, no murky noir crush."
         ),
@@ -279,9 +281,13 @@ RENDER_STYLE_PROFILES: dict[str, CatstyleRenderStyleProfile] = {
             "High-contrast keyed lighting with volumetric depth and cinematic separation.",
             "Catstyle universe preserved: epic arena, zodiac floor, readable flag glyphs, cosmic scale.",
             "Premium poster composition with clear heroic focal thrust.",
-            "Brand-consistent catplanet identity—never generic animals.",
+            "Brand-consistent catplanet identity—planetary body material dominates; never ordinary furry pet cats.",
+            "Living solar / ice-gas / planetary surface reads—not costume-first mascots.",
         ],
         avoid_lines=[
+            "Ordinary furry cats with elemental effects or costumes.",
+            "Costume-first mascot design over planet body material.",
+            "Plush soft-fur dominance without planetary surface texture.",
             "Watercolor, gouache, or soft painterly illustration dominance.",
             "Storybook, sketchbook, or hand-painted children's-book softness.",
             "Dominant hand-painted comic brush texture and visible ink-wash mush.",

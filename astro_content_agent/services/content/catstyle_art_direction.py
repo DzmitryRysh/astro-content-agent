@@ -13,6 +13,9 @@ from astro_content_agent.content.catstyle.catstyle_global_quality_lock_v1 import
     CATSTYLE_GLOBAL_QUALITY_NEGATIVE_CG_EXTRAS,
     CATSTYLE_GLOBAL_QUALITY_NEGATIVE_EXTRAS,
 )
+from astro_content_agent.content.catstyle.banner_glyph_reference_v1 import (
+    rewrite_art_direction_for_banner_only,
+)
 from astro_content_agent.content.catstyle.character_skins_v0 import get_character_skin
 from astro_content_agent.content.catstyle.models import CatstylePromptPack
 
@@ -90,6 +93,7 @@ def build_catstyle_art_direction_profile(
 
 
 def composition_line(*, render_style_profile_key: str | None = None, mode: str | None = None) -> str:
+    """Composition cue; banner-only mode swaps legacy prop-stamp / emblem-zone lines."""
     m = (mode or "").strip().lower()
     _flag_emblem = (
         " Pair-poster flags: each planet's **canonical glyph is painted into its own banner cloth** as large heraldic gold—"
@@ -97,7 +101,7 @@ def composition_line(*, render_style_profile_key: str | None = None, mode: str |
     )
     if m == "flow":
         if render_style_profile_key == "premium_comic_poster_v2":
-            return (
+            return rewrite_art_direction_for_banner_only(
                 "Cinematic comic-panel composition with premium poster clarity: allied silhouette dominance, "
                 "foreground-led co-discovery staging with shared focal pull toward horizon/portal/atlas/chart, "
                 "decisive FG/MG/BG separation and impactful depth—reject centered sticker mascots floating on empty flats. "
@@ -108,7 +112,7 @@ def composition_line(*, render_style_profile_key: str | None = None, mode: str |
                 " Keep each planet's [IDENTITY MARKERS v1] prop stamps and reserved emblem zones readable at thumbnail scale beside faces/bodies."
                 + _flag_emblem
             )
-        return (
+        return rewrite_art_direction_for_banner_only(
             "Cinematic comic-panel composition with poster-like clarity: allied staging toward one shared objective, "
             "strong silhouette readability, decisive foreground/background separation, one focal co-discovery beat "
             "readable at thumbnail size. "
@@ -119,7 +123,7 @@ def composition_line(*, render_style_profile_key: str | None = None, mode: str |
             + _flag_emblem
         )
     if render_style_profile_key == "premium_cg_keyart_v1":
-        return (
+        return rewrite_art_direction_for_banner_only(
             "Premium CG key-art poster composition: crisp silhouette dominance, clean edge readability, strong FG/MG/BG "
             "separation with cinematic volumetric depth—foreground catplanets lead, coliseum midground weight, cosmic "
             "background scale; reject watercolor-soft empty flats and sticker-float staging. "
@@ -128,14 +132,14 @@ def composition_line(*, render_style_profile_key: str | None = None, mode: str |
             + _flag_emblem
         )
     if render_style_profile_key == "premium_comic_poster_v2":
-        return (
+        return rewrite_art_direction_for_banner_only(
             "Cinematic comic-panel composition with premium battle-poster clarity: heroic silhouette dominance, "
             "foreground-heavy duel staging with authoritative poses, decisive FG/MG/BG separation and impactful depth—"
             "reject centered sticker mascots floating on empty flats. Keep backgrounds simplified relative to characters: "
             "arena + zodiac floor readable and epic, but lower detail density than focal bodies."
             " Keep each planet's [IDENTITY MARKERS v1] prop stamps and reserved emblem zones readable at thumbnail scale beside faces/bodies."
         )
-    return (
+    return rewrite_art_direction_for_banner_only(
         "Cinematic comic-panel composition with poster-like clarity: strong silhouette readability, "
         "decisive foreground/background separation, one focal action readable at thumbnail size. "
         "Not a flat mascot pose, not a centered sticker-like character floating in empty space—"
@@ -315,13 +319,11 @@ def strengthen_negative_prompt(
             "sticker-like centered character floating in empty space",
             "flat mascot pose",
             "bland mascot pose",
-            "flat vector / cheap icon / mobile-game icon look",
-            "crowded background, micro-detail clutter, filigree noise",
-            "microtexture noise and tiny crack clutter",
-            "excess particles clutter",
+            "flat mascot sticker aesthetic",
+            "flat vector / cheap icon / mobile-game icon look — cluttered architecture detail spam — weak bland composition with disconnected characters",
+            "crowded background — micro-detail clutter — filigree noise",
+            "microtexture noise — tiny crack noise — excess particles clutter",
             "over-rendered fur strands and material gloss",
-            "cluttered architecture detail spam",
-            "weak bland composition with disconnected characters",
             "underexposed overall scene",
             "muddy crushed shadows",
         ]
@@ -375,8 +377,7 @@ def strengthen_negative_prompt(
             "sticker mascot center-float posing",
             "flat vector / cheap icon / mobile-game icon look",
             "crowded background, micro-detail clutter, filigree noise",
-            "microtexture noise and tiny crack clutter",
-            "excess particles clutter",
+            "microtexture noise — tiny crack noise — excess particles clutter",
             "cluttered architecture micro-detail spam",
             "weak bland composition with disconnected characters",
             "underexposed overall scene",

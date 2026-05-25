@@ -809,7 +809,10 @@ def test_epic_arena_showdown_profile_includes_environment_scale_and_readable_sub
     assert "smaller than characters but visually legible" in blob
     assert "clearly above and behind the arena" in blob
     assert "do not replace the earth impact cue with moon/jupiter/mars/saturn" in blob
-    assert "planet identity belongs on characters, banners, props, reserved emblem zones, and arena symbols" in blob
+    assert (
+        "planet identity belongs on characters, costume/props, faction banner glyphs, and arena symbols"
+        in blob
+    )
     assert "for moon aspects specifically" in blob
     assert "avoid ambiguous moon-like background orb" in blob
     assert "large moon sky-body as the main celestial cue" in blob
