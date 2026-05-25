@@ -212,6 +212,20 @@ class CatstylePromptRequest(BaseModel):
             "Typically aligned with disable_approved_reference_auto on image job builds."
         ),
     )
+    banner_glyph_reference_planet_a: str | None = Field(
+        default=None,
+        description="Optional narrow banner-glyph crop for planet A (left/port banner).",
+    )
+    banner_glyph_reference_planet_b: str | None = Field(
+        default=None,
+        description="Optional narrow banner-glyph crop for planet B (right/starboard banner).",
+    )
+    use_banner_glyph_reference_auto: bool = Field(
+        default=True,
+        description=(
+            "When True, discover ``references/banner_glyphs/{planet}_banner_glyph.png`` for missing explicit paths."
+        ),
+    )
 
 
 class CatstylePromptPack(BaseModel):
@@ -238,6 +252,10 @@ class CatstylePromptPack(BaseModel):
     image_prompt_shot_roles: list[str | None] = Field(
         default_factory=list,
         description="Parallel shot_role labels (hero_poster / alternate_action_angle) per image_prompt index.",
+    )
+    banner_glyph_reference_assist: dict | None = Field(
+        default=None,
+        description="Banner glyph reference paths + Image A/B/C role prompt block (v1).",
     )
 
     @model_validator(mode="after")

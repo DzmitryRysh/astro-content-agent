@@ -37,6 +37,11 @@ from astro_content_agent.content.catstyle.catplanet_body_identity_lock_v1 import
     CATPLANET_BODY_NEGATIVE_EXTRAS,
     sun_uranus_catplanet_body_lock_blocks,
 )
+from astro_content_agent.content.catstyle.banner_glyph_reference_v1 import (
+    BANNER_ONLY_GLYPH_DISCIPLINE_BLOCK,
+    BANNER_ONLY_GLYPH_NEGATIVE_EXTRAS,
+    build_banner_glyph_reference_assist,
+)
 from astro_content_agent.content.catstyle.flag_glyph_fidelity_lock_v1 import (
     FLAG_GLYPH_FIDELITY_LOCK_BLOCK,
     FLAG_GLYPH_FIDELITY_NEGATIVE_EXTRAS,
@@ -362,7 +367,7 @@ def _epic_arena_showdown_block(req: CatstylePromptRequest, pa: str, pb: str) -> 
                 "[MOON-SATURN EPIC ARENA ACTION STAGING v5 - balanced lock] Anti-static action blocking: avoid static face-to-face standing poses and flat symmetrical standoffs. "
                 "Keep premium comic-poster force: premium cinematic comic-poster illustration, poster-grade heroic battle splash, polished 2D/2.5D comic rendering, collectible-cover polish, "
                 "dramatic rim-impact lighting, crisp line clarity, rich cel-shaded modeling, and layered foreground/midground/background depth. "
-                "Visual drift negatives: no nursery art, no storybook look, no soft watercolor wash, no washed-out painterly blur, no flat mascot read. "
+                "Visual drift negatives: not soft nursery art, not cute nursery, no storybook look, no soft watercolor wash, no washed-out painterly blur, no flat mascot read. "
                 "Color/readability: keep dark-but-vivid contrast with clean edge separation; forbid muddy darkness and unreadable murk. "
                 "Night-atmosphere brightness lift (no daylight washout): preserve dramatic deep-blue cosmic night mood but raise overall exposure slightly—richer midtones and luminous contrast—"
                 "so subjects stay clearly readable; balance warm subtle arena-floor glow against cool silver-blue lunar rim/key sculpt on Moon, pillow edges, and silver aura cues; "
@@ -404,7 +409,9 @@ def _epic_arena_showdown_block(req: CatstylePromptRequest, pa: str, pb: str) -> 
     sa = f"{pa} ({ga})" if ga else pa
     sb = f"{pb} ({gb})" if gb else pb
     return (
-        "[SHOT/COMPOSITION PROFILE v4 - epic_arena_showdown] Mythic showdown poster framing in a ceremonial cosmic arena: "
+        "[SHOT/COMPOSITION PROFILE v4 - epic_arena_showdown] "
+        "not soft nursery art, not cute nursery, not storybook softness—premium heroic comic-poster finish only. "
+        "Mythic showdown poster framing in a ceremonial cosmic arena: "
         "heroic medium-wide to wide cinematic composition where the environment is a co-star and not background afterthought. "
         "Camera/framing correction: pull the camera back slightly into wider poster framing; characters occupy slightly less of the frame while "
         "faces/poses remain readable; preserve negative space and breathing room around central action. "
@@ -713,6 +720,7 @@ def _prompt_choreography_middleware(
         resolved_pair_flag_glyph_system_block(pa, pb, req.aspect_type, req.mode)
     )
     blocks.append(FLAG_GLYPH_FIDELITY_LOCK_BLOCK)
+    blocks.append(BANNER_ONLY_GLYPH_DISCIPLINE_BLOCK)
     blocks.extend(
         [
             _aspect_choreography_block(req.aspect_type, req.mode),
@@ -1117,6 +1125,15 @@ def generate_catstyle_prompt_pack(req: CatstylePromptRequest) -> CatstylePromptP
             "muddy crushed shadows",
             "malformed astrological glyphs painted in-image",
         )
+    pack = pack.model_copy(
+        update={
+            "negative_prompt": _merge_negative_prompt(
+                [pack.negative_prompt] if pack.negative_prompt else [],
+                list(BANNER_ONLY_GLYPH_NEGATIVE_EXTRAS),
+            )
+        }
+    )
+    pack = _apply_banner_glyph_reference_assist(pack, req, pa, pb)
     capped_neg = trim_negative_prompt_to_max(
         pack.negative_prompt,
         must_keep=keep_neg,
@@ -1125,6 +1142,36 @@ def generate_catstyle_prompt_pack(req: CatstylePromptRequest) -> CatstylePromptP
     if capped_neg != pack.negative_prompt:
         pack = pack.model_copy(update={"negative_prompt": capped_neg})
     return pack
+
+
+def _apply_banner_glyph_reference_assist(
+    pack: CatstylePromptPack,
+    req: CatstylePromptRequest,
+    pa: str,
+    pb: str,
+) -> CatstylePromptPack:
+    """Append banner-only discipline + optional Image A/B/C glyph reference roles."""
+    style_path: str | None = None
+    if not req.disable_approved_reference_prompt_lock:
+        approved = resolve_approved_reference(pa, pb, req.aspect_type, req.mode)
+        if approved is not None:
+            style_path = approved.image_path
+    assist = build_banner_glyph_reference_assist(
+        pa,
+        pb,
+        style_reference_image_path=style_path,
+        explicit_glyph_a=req.banner_glyph_reference_planet_a,
+        explicit_glyph_b=req.banner_glyph_reference_planet_b,
+        use_auto_discovery=req.use_banner_glyph_reference_auto,
+    )
+    roles = (assist or {}).get("reference_roles_prompt_block") or ""
+    data = pack.model_dump(mode="json")
+    prompts = [str(p) for p in (data.get("image_prompts") or [])]
+    if prompts and roles:
+        prompts[0] = f"{prompts[0].rstrip()}\n\n{roles.strip()}"
+        data["image_prompts"] = prompts
+    data["banner_glyph_reference_assist"] = assist
+    return CatstylePromptPack.model_validate(data)
 
 
 def _finalize_pack_with_art_direction(

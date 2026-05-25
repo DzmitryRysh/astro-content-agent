@@ -39,12 +39,46 @@ def _sanitize_error_message(msg: str) -> str:
     return out
 
 
+def _banner_glyph_reference_prefix(job: dict[str, Any]) -> str:
+    """Provider preamble when banner glyph reference paths are on the job."""
+    ga = str(job.get("banner_glyph_reference_planet_a_path") or "").strip()
+    gb = str(job.get("banner_glyph_reference_planet_b_path") or "").strip()
+    if not ga and not gb:
+        return ""
+    style = str(job.get("style_reference_image_path") or "").strip()
+    parts = [
+        "[REFERENCE INPUT] When the image API accepts multiple reference images: "
+    ]
+    if style:
+        parts.append(
+            "Image A = attached primary style/scene reference (catplanet DNA, arena, CG finish). "
+        )
+    label_b = "B" if style else "A"
+    label_c = "C" if style else "B"
+    if ga:
+        parts.append(
+            f"Image {label_b} = left/port banner glyph crop (planet A)—canonical heraldic glyph on cloth only. "
+        )
+    if gb:
+        parts.append(
+            f"Image {label_c} = right/starboard banner glyph crop (planet B)—canonical heraldic glyph on cloth only. "
+        )
+    parts.append(
+        "Use banner glyph references only for correct glyphs on faction flags; no extra glyphs elsewhere. "
+    )
+    return "".join(parts)
+
+
 def _build_combined_prompt(job: dict[str, Any]) -> str:
     main = str(job.get("prompt_text", "") or "").strip()
     neg = str(job.get("negative_prompt", "") or "").strip()
+    prefix = _banner_glyph_reference_prefix(job)
+    body = main
     if neg:
-        return f"{main}\n\nAvoid / negative guidance: {neg}"
-    return main
+        body = f"{body}\n\nAvoid / negative guidance: {neg}"
+    if prefix:
+        return f"{prefix}{body}"
+    return body
 
 
 def _fit_provider_prompt(prompt: str) -> str:

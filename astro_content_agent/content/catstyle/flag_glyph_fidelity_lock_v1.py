@@ -23,7 +23,15 @@ FLAG_GLYPH_FIDELITY_NEGATIVE_EXTRAS: Final[tuple[str, ...]] = (
     "cropped banner glyphs",
 )
 
+# Re-export banner-only discipline for backward-compatible imports.
+from astro_content_agent.content.catstyle.banner_glyph_reference_v1 import (  # noqa: E402
+    BANNER_ONLY_GLYPH_DISCIPLINE_BLOCK,
+    BANNER_ONLY_GLYPH_NEGATIVE_EXTRAS,
+)
+
 __all__ = [
+    "BANNER_ONLY_GLYPH_DISCIPLINE_BLOCK",
+    "BANNER_ONLY_GLYPH_NEGATIVE_EXTRAS",
     "FLAG_GLYPH_FIDELITY_LOCK_BLOCK",
     "FLAG_GLYPH_FIDELITY_NEGATIVE_EXTRAS",
     "SUN_URANUS_FLAG_GLYPH_FIDELITY_BLOCK",

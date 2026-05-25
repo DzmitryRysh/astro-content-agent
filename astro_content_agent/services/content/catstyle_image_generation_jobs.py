@@ -59,6 +59,14 @@ class CatstyleImageGenJob(BaseModel):
         default=None,
         description="Optional local path to approved style reference image for providers that support image-conditioned generation.",
     )
+    banner_glyph_reference_planet_a_path: str | None = Field(
+        default=None,
+        description="Narrow banner-glyph reference for planet A (left/port banner), Image B when style ref present.",
+    )
+    banner_glyph_reference_planet_b_path: str | None = Field(
+        default=None,
+        description="Narrow banner-glyph reference for planet B (right/starboard banner), Image C when style ref present.",
+    )
     prompt_text: str
     negative_prompt: str
     animation_prompt: str
@@ -557,6 +565,14 @@ def build_catstyle_image_generation_jobs(
     carousel = str(pp.get("carousel_idea", ""))
     art_meta = pp.get("art_direction_profile")
     art_direction_profile = art_meta if isinstance(art_meta, dict) else None
+    glyph_assist = pp.get("banner_glyph_reference_assist")
+    glyph_a_path: str | None = None
+    glyph_b_path: str | None = None
+    if isinstance(glyph_assist, dict):
+        raw_a = glyph_assist.get("banner_glyph_reference_planet_a_path")
+        raw_b = glyph_assist.get("banner_glyph_reference_planet_b_path")
+        glyph_a_path = str(raw_a).strip() if raw_a else None
+        glyph_b_path = str(raw_b).strip() if raw_b else None
 
     w_prof = pp.get("world_template_profile")
     world_template_profile = w_prof if isinstance(w_prof, dict) else None
@@ -642,6 +658,8 @@ def build_catstyle_image_generation_jobs(
                     variant_index=variant_index,
                     shot_role=shot_role,
                     style_reference_image_path=final_ref,
+                    banner_glyph_reference_planet_a_path=glyph_a_path,
+                    banner_glyph_reference_planet_b_path=glyph_b_path,
                     prompt_text=prompt_text,
                     negative_prompt=neg,
                     animation_prompt=anim,
