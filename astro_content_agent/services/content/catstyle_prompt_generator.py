@@ -54,6 +54,11 @@ from astro_content_agent.content.catstyle.flag_glyph_fidelity_lock_v1 import (
     FLAG_GLYPH_FIDELITY_NEGATIVE_EXTRAS,
     SUN_URANUS_FLAG_GLYPH_FIDELITY_BLOCK,
 )
+from astro_content_agent.content.catstyle.cosmic_zodiac_arena_premium_environment_v1 import (
+    COSMIC_ZODIAC_ARENA_PREMIUM_ENVIRONMENT_NEGATIVE_EXTRAS,
+    applies_cosmic_zodiac_arena_premium_environment,
+    cosmic_zodiac_arena_premium_environment_blocks,
+)
 from astro_content_agent.content.catstyle.zodiac_arena_floor_lock_v1 import (
     ZODIAC_ARENA_FLOOR_LOCK_BLOCK,
     ZODIAC_ARENA_FLOOR_NEGATIVE_EXTRAS,
@@ -123,6 +128,7 @@ _CATSTYLE_VISUAL_FIDELITY_NEGATIVE_CHUNK = ", ".join(
     (
         *CATPLANET_BODY_NEGATIVE_EXTRAS,
         *ZODIAC_ARENA_FLOOR_NEGATIVE_EXTRAS,
+        *COSMIC_ZODIAC_ARENA_PREMIUM_ENVIRONMENT_NEGATIVE_EXTRAS,
         *FLAG_GLYPH_FIDELITY_NEGATIVE_EXTRAS,
     )
 )
@@ -453,6 +459,7 @@ _NEGATIVE_PROMPT_CONTRACT_MUST_KEEP: tuple[str, ...] = (
     "explicit horror",
     "fetish imagery",
     "sexual explicitness",
+    "floating sticker overlays",
 )
 
 # v2 poster forbidden lines re-injected only when trimmed away earlier in the pipeline.
@@ -477,12 +484,27 @@ def _final_trim_must_keep(keep_neg: tuple[str, ...], *, render_style_key: str) -
 
 
 def _negative_contract_merge_extras(
-    negative: str, *, mode: str | None = None, render_style_key: str | None = None
+    negative: str,
+    *,
+    mode: str | None = None,
+    render_style_key: str | None = None,
+    planet_a: str | None = None,
+    planet_b: str | None = None,
+    aspect_type: str | None = None,
 ) -> list[str]:
     """Inject only missing contract phrases (avoids duplicate tail chunks before the 1200 cap)."""
     extras = list(_NEGATIVE_PROMPT_CONTRACT_MUST_KEEP)
     if (render_style_key or "").strip() == "premium_comic_poster_v2":
         extras.extend(_V2_POSTER_FORBIDDEN_LINES)
+    if planet_a and planet_b and is_sun_uranus_conjunction_tension(
+        planet_a, planet_b, aspect_type or "", mode or ""
+    ):
+        extras.extend(
+            (
+                "losing approved reference visual DNA",
+                "circular chest badge",
+            )
+        )
     if (mode or "").strip().lower() == "flow":
         extras.extend(
             [
@@ -498,6 +520,11 @@ _PROTECTED_PROMPT_MARKERS: tuple[str, ...] = (
     "[RENDER STYLE v1 - high-priority visual finish]",
     "[STYLE HARDLOCK CG v1 - key art mandate]",
     "[STYLE HARDLOCK v2 - premium poster mandate]",
+    "[CATSTYLE GLOBAL QUALITY LOCK CG v1]",
+    "[SUN-URANUS HARD ART-DIRECTION OVERRIDE v3",
+    "[SUN-URANUS CONJUNCTION TENSION VISUAL CANON v1]",
+    "[COSMIC ZODIAC ARENA PREMIUM ENVIRONMENT v1]",
+    "[SUN CATPLANET BODY LOCK v3]",
 )
 
 # End anchors for protected blocks (do not span to the next marker — only the tagged section).
@@ -513,6 +540,35 @@ _PROTECTED_BLOCK_END_ANCHORS: dict[str, tuple[str, ...]] = {
     ),
     "[STYLE HARDLOCK CG v1 - key art mandate]": (
         "[RENDER STYLE v1 - high-priority visual finish]",
+        "Aspect type:",
+    ),
+    "[CATSTYLE GLOBAL QUALITY LOCK CG v1]": (
+        "[CATPLANET BODY IDENTITY LOCK v2]",
+        "[ZODIAC ARENA FLOOR LOCK v1]",
+        "[RENDER STYLE v1 - high-priority visual finish]",
+        "Aspect type:",
+    ),
+    "[SUN CATPLANET BODY LOCK v3]": (
+        "[SUN-URANUS HARD ART-DIRECTION OVERRIDE v3",
+        "[SUN-URANUS CONJUNCTION TENSION VISUAL CANON v1]",
+        "[WORLD TEMPLATE v1 - high-priority setting direction]",
+        "Aspect type:",
+    ),
+    "[SUN-URANUS HARD ART-DIRECTION OVERRIDE v3": (
+        "[SUN-URANUS PREMIUM SPECTACLE COMPOSITION v1]",
+        "[SUN-URANUS CONJUNCTION TENSION VISUAL CANON v1]",
+        "[WORLD TEMPLATE v1 - high-priority setting direction]",
+        "Aspect type:",
+    ),
+    "[SUN-URANUS CONJUNCTION TENSION VISUAL CANON v1]": (
+        "[WORLD TEMPLATE v1 - high-priority setting direction]",
+        "[SHOT/COMPOSITION PROFILE",
+        "Aspect type:",
+    ),
+    "[COSMIC ZODIAC ARENA PREMIUM ENVIRONMENT v1]": (
+        "[FLAG GLYPH FIDELITY LOCK v1]",
+        "[CATSTYLE FLOW MODE",
+        "[SHOT/COMPOSITION PROFILE",
         "Aspect type:",
     ),
 }
@@ -905,11 +961,21 @@ def _global_quality_lock_for_request(req: CatstylePromptRequest) -> str:
 
 
 def _global_quality_negative_extras_for_request(req: CatstylePromptRequest) -> list[str]:
+    extras: list[str] = []
     if _is_cg_keyart_request(req):
-        return list(CATSTYLE_GLOBAL_QUALITY_NEGATIVE_EXTRAS) + list(
-            CATSTYLE_GLOBAL_QUALITY_NEGATIVE_CG_EXTRAS
-        )
-    return list(CATSTYLE_GLOBAL_QUALITY_NEGATIVE_EXTRAS)
+        extras.extend(CATSTYLE_GLOBAL_QUALITY_NEGATIVE_EXTRAS)
+        extras.extend(CATSTYLE_GLOBAL_QUALITY_NEGATIVE_CG_EXTRAS)
+    else:
+        extras.extend(CATSTYLE_GLOBAL_QUALITY_NEGATIVE_EXTRAS)
+    if applies_cosmic_zodiac_arena_premium_environment(
+        world_template_key=req.world_template_key,
+        premium_art_direction=req.premium_art_direction,
+        render_style_profile_key=req.render_style_profile_key,
+        shot_mode=req.shot_mode,
+        mode=req.mode,
+    ):
+        extras.extend(COSMIC_ZODIAC_ARENA_PREMIUM_ENVIRONMENT_NEGATIVE_EXTRAS)
+    return extras
 
 
 def _pair_specific_visual_guards(pa: str, pb: str, aspect_type: str, mode: str) -> str:
@@ -937,6 +1003,14 @@ def _prompt_choreography_middleware(
         catplanet_core_body_blocks(),
         ZODIAC_ARENA_FLOOR_LOCK_BLOCK,
     ]
+    if applies_cosmic_zodiac_arena_premium_environment(
+        world_template_key=req.world_template_key,
+        premium_art_direction=req.premium_art_direction,
+        render_style_profile_key=req.render_style_profile_key,
+        shot_mode=req.shot_mode,
+        mode=req.mode,
+    ):
+        blocks.append(cosmic_zodiac_arena_premium_environment_blocks())
     if (req.mode or "").strip().lower() == "flow":
         blocks.append(_catstyle_flow_mode_visual_lock(req))
         blocks.append(_mercury_jupiter_flow_planetary_being_lock(req, pa, pb))
@@ -1353,6 +1427,13 @@ def generate_catstyle_prompt_pack(req: CatstylePromptRequest) -> CatstylePromptP
             "flat vector / cheap icon / mobile-game icon look — cluttered architecture detail spam — weak bland composition with disconnected characters",
             "microtexture noise — tiny crack noise — excess particles clutter",
         )
+    if render_prof.key == "premium_cg_keyart_v1":
+        keep_neg = keep_neg + ("fuzzy brush texture dominance",)
+    if is_sun_uranus_conjunction_tension(pa, pb, req.aspect_type, req.mode):
+        keep_neg = keep_neg + (
+            "losing approved reference visual DNA",
+            "circular chest badge",
+        )
     if (req.mode or "").strip().lower() == "flow":
         keep_neg = keep_neg + (
             "underexposed overall scene",
@@ -1363,6 +1444,9 @@ def generate_catstyle_prompt_pack(req: CatstylePromptRequest) -> CatstylePromptP
         pack.negative_prompt or "",
         mode=req.mode,
         render_style_key=render_prof.key,
+        planet_a=pa,
+        planet_b=pb,
+        aspect_type=req.aspect_type,
     )
     pack = pack.model_copy(
         update={

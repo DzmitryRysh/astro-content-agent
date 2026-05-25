@@ -46,6 +46,11 @@ def test_prompt_includes_benchmark_for_future_sun_uranus_images() -> None:
     assert "benchmark for all future sun/uranus images" in low
     assert "dense solar-core" in low or "solar-core" in low
     assert "ice-gas" in low
+    assert "bright cyan" in low or "accessory richness" in low
+    assert "harness" in low or "collar" in low
+    assert "dense" in low and "starfield" in low
+    assert "milky way" in low or "nebula" in low
+    assert "plush" in low or "hard-edged" in low or "toy-like" in low
     assert "do not reduce" not in low or "never a simple colored cat" in low
 
 
@@ -78,7 +83,7 @@ def test_prompt_requires_canonical_glyphs() -> None:
     assert "\u2645" in joined
     assert "Sun glyph" in joined or "Sun (\u2609)" in joined
     assert "[FLAG GLYPH FIDELITY LOCK v1]" in joined
-    assert "[SUN-URANUS FLAG GLYPH FIDELITY v1]" in joined
+    assert "[SUN-URANUS FLAG GLYPH FIDELITY v2]" in joined
 
 
 def test_prompt_includes_zodiac_arena_floor_lock() -> None:

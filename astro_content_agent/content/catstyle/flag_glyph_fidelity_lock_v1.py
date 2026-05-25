@@ -10,8 +10,9 @@ FLAG_GLYPH_FIDELITY_LOCK_BLOCK: Final[str] = (
 )
 
 SUN_URANUS_FLAG_GLYPH_FIDELITY_BLOCK: Final[str] = (
-    "[SUN-URANUS FLAG GLYPH FIDELITY v1] **Left Sun banner:** canonical **\u2609 (\u2609)**—**full circular ring "
-    "with a bold clearly visible central dot** (never a hollow ring); must read at **phone / Instagram** scale. "
+    "[SUN-URANUS FLAG GLYPH FIDELITY v2] **Left Sun banner (non-optional):** canonical **\u2609 (\u2609)** = **full circular ring "
+    "WITH a clearly visible FILLED central dot**—solid opaque center mass inside the ring; **reject** hollow ring, "
+    "empty circle, coin/O shapes, missing center dot; must read at **phone / Instagram** scale. "
     "**Right Uranus banner:** canonical **\u2645 (\u2645)**—**complete glyph** with **vertical stem, side arcs, "
     "and lower circle**—banner cloth only, never on body. Reject incomplete Sun dots, body/chest/collar glyph drift, "
     "and random rune substitutes."
@@ -21,8 +22,11 @@ FLAG_GLYPH_FIDELITY_NEGATIVE_EXTRAS: Final[tuple[str, ...]] = (
     "incomplete flag glyphs",
     "fake Uranus glyph",
     "partial Sun glyph",
+    "hollow sun ring without central dot",
+    "sun banner hollow ring missing center",
     "random rune symbols",
     "cropped banner glyphs",
+    "floating sticker overlays",
 )
 
 # Re-export banner-only discipline for backward-compatible imports.

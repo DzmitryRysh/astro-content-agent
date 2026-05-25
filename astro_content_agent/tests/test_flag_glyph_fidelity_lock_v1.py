@@ -26,6 +26,7 @@ def test_flag_glyph_negative_extras() -> None:
     assert "incomplete flag glyphs" in joined
     assert "fake uranus glyph" in joined
     assert "partial sun glyph" in joined
+    assert "hollow sun ring" in joined
     assert "random rune" in joined
     assert "cropped banner glyphs" in joined
 
@@ -36,7 +37,8 @@ def test_sun_uranus_flag_block_glyphs_and_banner_sides() -> None:
     low = SUN_URANUS_FLAG_GLYPH_FIDELITY_BLOCK.lower()
     assert "left sun banner" in low
     assert "right uranus banner" in low
-    assert "central dot" in low
+    assert "filled central dot" in low
+    assert "hollow ring" in low
     assert "vertical stem" in low
     assert "side arcs" in low
     assert "lower circle" in low
@@ -59,7 +61,7 @@ def test_sun_uranus_prompt_includes_flag_glyph_fidelity_locks() -> None:
     )
     joined = "\n".join(pack.image_prompts)
     assert "[FLAG GLYPH FIDELITY LOCK v1]" in joined
-    assert "[SUN-URANUS FLAG GLYPH FIDELITY v1]" in joined
+    assert "[SUN-URANUS FLAG GLYPH FIDELITY v2]" in joined
     assert "\u2609" in joined and "\u2645" in joined
     neg = pack.negative_prompt.lower()
     assert "incomplete flag glyphs" in neg

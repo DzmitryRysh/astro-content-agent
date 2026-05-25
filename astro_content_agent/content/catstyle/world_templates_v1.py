@@ -36,8 +36,8 @@ WORLD_TEMPLATES: dict[str, CatstyleWorldTemplate] = {
             "reads; avoid hyper-real marble noise or toy playmat blandness."
         ),
         background_line=(
-            "Background is cosmic void with layered stars, soft nebula milk, void gradients - premium comic poster sky "
-            "not photographic NASA clutter."
+            "Background is a **rich cosmic vault**: layered starfield, **colorful Milky Way / galaxy band**, nebula dust "
+            "and depth—premium poster sky (not photographic NASA clutter); optional distant Earth disk when framing needs it."
         ),
         lighting_line=(
             "Rim light picks silhouette edges; key light favors focal duel/cooperation; simple volumetric glow cones OK "

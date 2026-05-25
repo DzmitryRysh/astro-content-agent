@@ -74,12 +74,16 @@ def test_sun_uranus_includes_approved_reference_fidelity_language() -> None:
     joined = "\n".join(pack.image_prompts)
     low = joined.lower()
     assert "[SUN-URANUS REF FIDELITY]" in joined
-    assert "benchmark for all future sun/uranus images" in low
-    assert "solar-core" in low or "solar core" in low
-    assert "royal armor" in low
+    assert "visual target" in low or "approved reference" in low
+    assert "solar-core" in low or "solar core" in low or "molten solar-core" in low
     assert "staff" in low
-    assert "ice-gas" in low
-    assert "electric orbit" in low or "electric orbit motifs" in low
+    assert "ice-gas" in low or "bright cyan" in low
+    assert "lightning" in low or "electric rings" in low or "electric orbit" in low
+    assert "colorful milky way" in low or "galaxy band" in low
+    assert "wrist cuff" in low or "wrist cuffs" in low
+    assert "collar" in low and "harness" in low
+    assert "accessory richness" in low or "hardware silhouette" in low
+    assert "do not" in low and "copy reference" in low or "do not" in low and "body glyph" in low
     assert "\u2609" in joined
     assert "\u2645" in joined
     assert "red flag left" in low or "flag left" in low

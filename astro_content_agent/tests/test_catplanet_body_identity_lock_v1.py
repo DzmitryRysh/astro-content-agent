@@ -8,6 +8,7 @@ from astro_content_agent.content.catstyle.catplanet_body_identity_lock_v1 import
     CATPLANET_FLAGS_SECONDARY_BLOCK,
     SUN_CATPLANET_BODY_LOCK_BLOCK,
     URANUS_CATPLANET_BODY_LOCK_BLOCK,
+    URANUS_REBEL_GENIUS_ACCESSORY_LOCK_BLOCK,
     catplanet_core_body_blocks,
 )
 from astro_content_agent.content.catstyle.models import CatstylePromptRequest
@@ -60,24 +61,28 @@ def test_catplanet_negative_extras() -> None:
 
 def test_sun_catplanet_body_lock_solar_plasma_material() -> None:
     low = SUN_CATPLANET_BODY_LOCK_BLOCK.lower()
-    assert "v2" in low
-    assert "living solar" in low
+    assert "v3" in low
+    assert "living solar" in low or "solar-core" in low
     assert "molten plasma" in low or "star-surface" in low
+    assert "staff" in low
     assert "orange-gold" in low
     assert "corona" in low
-    assert "not a normal orange furry cat" in low or "not a normal orange" in low
-    assert "costume" in low and "secondary" in low
+    assert "not a normal orange" in low
 
 
 def test_uranus_catplanet_body_lock_ice_gas_electric() -> None:
     low = URANUS_CATPLANET_BODY_LOCK_BLOCK.lower()
-    assert "v2" in low
+    assert "v5" in low
+    assert "no leather jacket" in low
+    assert "lightning rings" in low or "electric" in low and "rings" in low
+    assert "stones" in low or "debris" in low
+    assert "plush" in low or "toy-like" in low
+    assert "rebel" in low or "disruptor" in low
+    assert "bright cyan" in low
     assert "ice-gas" in low
     assert "gas bands" in low or "cloud layers" in low
-    assert "tilted-axis" in low or "tilted axis" in low
-    assert "magnetic-field" in low or "magnetic field" in low
-    assert "not a normal blue furry cat" in low or "not a normal blue" in low
-    assert "plush fur" in low
+    assert "normal blue fur" in low or "not normal blue" in low
+    assert "mascot" in low and ("softness" in low or "cuddliness" in low or "plush" in low)
 
 
 def test_global_catplanet_body_identity_lock_in_prompt() -> None:
@@ -107,7 +112,8 @@ def test_sun_uranus_premium_cg_keyart_catplanet_material_priority() -> None:
     pack = generate_catstyle_prompt_pack(_sun_uranus_req(render="premium_cg_keyart_v1"))
     joined = "\n".join(pack.image_prompts).lower()
     assert "premium cg key art" in joined
-    assert "[catplanet body identity lock v2]" in joined
+    assert "[uranus catplanet body lock v5]" in joined
+    assert "[catstyle global quality lock cg v1]" in joined
     assert "planetary body material" in joined
     assert "not ordinary furry cats" in joined or "not ordinary furry" in joined
     assert "molten plasma" in joined or "star-surface" in joined
@@ -123,10 +129,25 @@ def test_sun_uranus_prompt_includes_body_and_flag_locks() -> None:
     joined = "\n".join(pack.image_prompts)
     low = joined.lower()
     assert "[catplanet body identity lock v2]" in low
-    assert "[sun catplanet body lock v2]" in low
-    assert "[uranus catplanet body lock v2]" in low
+    assert "[sun catplanet body lock v3]" in low
+    assert "[uranus catplanet body lock v5]" in low
+    assert "[uranus reference spectacle v2]" in low
+    assert "[sun-uranus hard art-direction override v3" in low
+    assert "reject leather jacket" in low or "no leather jacket" in low
+    assert "[uranus rebel genius accessory lock v7" in low
+    assert "[uranus inventor genius v4]" in low
+    assert "lightning rings" in low or ("electric" in low and "rings" in low)
+    assert "tesla" in low
+    assert "[uranus hard-edged attitude v2]" in low
+    assert "bright cyan" in low
+    assert "collectible" in low
+    assert "accessory richness" in low or "hardware silhouette" in low
+    assert "hoop earring" in low
+    assert "attached to the ear" in low or "physically attached" in low
+    assert "accessory glyph ban" in low
+    assert "two" in low and ("cuff" in low or "bracelet" in low)
     assert "[flag glyph fidelity lock v1]" in low
-    assert "[sun-uranus flag glyph fidelity v1]" in low
+    assert "[sun-uranus flag glyph fidelity v2]" in low
     assert "[zodiac arena floor lock v1]" in low
 
 
