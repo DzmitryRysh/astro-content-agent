@@ -99,6 +99,18 @@ def main() -> int:
         help="Do not auto-pick an approved reference from the Catstyle registry when --style-reference-image is omitted.",
     )
     ap.add_argument(
+        "--arena-reference-image",
+        default=None,
+        dest="arena_reference_image",
+        help="Optional local arena/environment reference image (coliseum, sky, floor only).",
+    )
+    ap.add_argument(
+        "--disable-arena-reference-auto",
+        action="store_true",
+        dest="disable_arena_reference_auto",
+        help="Do not auto-pick the default approved arena reference from the arena registry.",
+    )
+    ap.add_argument(
         "--planet-a",
         default=None,
         dest="planet_a_override",
@@ -149,6 +161,8 @@ def main() -> int:
             shot_mode=args.shot_mode,
             style_reference_image_path=args.style_reference_image,
             disable_approved_reference_auto=args.disable_approved_reference_auto,
+            arena_reference_image_path=args.arena_reference_image,
+            disable_arena_reference_auto=args.disable_arena_reference_auto,
             planet_a_override=args.planet_a_override,
             planet_b_override=args.planet_b_override,
             aspect_type_override=args.aspect_type_override,
@@ -179,6 +193,13 @@ def main() -> int:
         print(f"  style reference:   explicit style reference: {meta.get('path')}")
     else:
         print("  style reference:   no reference selected")
+    arena_meta = result.arena_reference_meta or {}
+    if arena_meta.get("arena_reference_used") and arena_meta.get("arena_reference_image_path"):
+        print(f"  arena reference:   {arena_meta.get('arena_reference_image_path')}")
+        if arena_meta.get("arena_reference_registry_key"):
+            print(f"  arena registry key: {arena_meta.get('arena_reference_registry_key')}")
+    else:
+        print("  arena reference:   no arena reference selected")
     if result.manual_aspect_override:
         mo = result.manual_aspect_override
         print(

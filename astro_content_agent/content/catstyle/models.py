@@ -226,6 +226,24 @@ class CatstylePromptRequest(BaseModel):
             "When True, discover ``references/banner_glyphs/{planet}_banner_glyph.png`` for missing explicit paths."
         ),
     )
+    arena_reference_image_path: str | None = Field(
+        default=None,
+        description="Optional explicit local path to approved arena/environment reference image.",
+    )
+    use_arena_reference_auto: bool = Field(
+        default=True,
+        description=(
+            "When True, resolve the default approved arena reference from the arena registry for environment anchoring."
+        ),
+    )
+    disable_arena_reference_auto: bool = Field(
+        default=False,
+        description="When True, do not auto-resolve approved arena reference (explicit path still honored).",
+    )
+    disable_arena_reference_prompt_block: bool = Field(
+        default=False,
+        description="When True, skip [CATSTYLE APPROVED ARENA REFERENCE v1] prompt injection.",
+    )
 
 
 class CatstylePromptPack(BaseModel):
@@ -256,6 +274,10 @@ class CatstylePromptPack(BaseModel):
     banner_glyph_reference_assist: dict | None = Field(
         default=None,
         description="Banner glyph reference paths + Image A/B/C role prompt block (v1).",
+    )
+    arena_reference_assist: dict | None = Field(
+        default=None,
+        description="Approved arena reference path + environment-only prompt block (v1).",
     )
 
     @model_validator(mode="after")

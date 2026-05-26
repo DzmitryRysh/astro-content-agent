@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+from pathlib import Path
 
 from astro_content_agent.content.catstyle.aspect_library_v0 import ASPECT_CAT_INTERACTIONS, get_aspect_interaction
 from astro_content_agent.content.catstyle.character_skins_v0 import get_character_skin
@@ -40,6 +41,10 @@ from astro_content_agent.content.catstyle.catplanet_body_identity_lock_v1 import
     catplanet_core_body_blocks,
     is_sun_uranus_pair,
     sun_uranus_catplanet_body_lock_blocks,
+)
+from astro_content_agent.content.catstyle.approved_arena_reference_registry import ResolvedArenaReference
+from astro_content_agent.content.catstyle.catstyle_approved_arena_reference_v1 import (
+    apply_approved_arena_reference_to_prompt_pack,
 )
 from astro_content_agent.content.catstyle.banner_glyph_reference_v1 import (
     BANNER_ONLY_GLYPH_DISCIPLINE_BLOCK,
@@ -82,6 +87,7 @@ from astro_content_agent.content.catstyle.sun_uranus_conjunction_tension_canon_v
     SUN_URANUS_CONJUNCTION_TENSION_VISUAL_CANON,
     is_sun_uranus_conjunction_tension,
 )
+from astro_content_agent.services.content.catstyle_arena_reference_resolver import resolve_arena_reference
 from astro_content_agent.content.catstyle.sun_uranus_visual_refinement_v1 import (
     SUN_URANUS_VISUAL_REFINEMENT_NEGATIVE_EXTRAS,
     sun_uranus_visual_refinement_blocks,
@@ -523,6 +529,7 @@ _PROTECTED_PROMPT_MARKERS: tuple[str, ...] = (
     "[CATSTYLE GLOBAL QUALITY LOCK CG v1]",
     "[SUN-URANUS HARD ART-DIRECTION OVERRIDE v3",
     "[SUN-URANUS CONJUNCTION TENSION VISUAL CANON v1]",
+    "[CATSTYLE APPROVED ARENA REFERENCE v1]",
     "[COSMIC ZODIAC ARENA PREMIUM ENVIRONMENT v1]",
     "[SUN CATPLANET BODY LOCK v3]",
 )
@@ -561,6 +568,11 @@ _PROTECTED_BLOCK_END_ANCHORS: dict[str, tuple[str, ...]] = {
         "Aspect type:",
     ),
     "[SUN-URANUS CONJUNCTION TENSION VISUAL CANON v1]": (
+        "[WORLD TEMPLATE v1 - high-priority setting direction]",
+        "[SHOT/COMPOSITION PROFILE",
+        "Aspect type:",
+    ),
+    "[CATSTYLE APPROVED ARENA REFERENCE v1]": (
         "[WORLD TEMPLATE v1 - high-priority setting direction]",
         "[SHOT/COMPOSITION PROFILE",
         "Aspect type:",
@@ -1456,6 +1468,21 @@ def generate_catstyle_prompt_pack(req: CatstylePromptRequest) -> CatstylePromptP
             )
         }
     )
+    if not req.disable_arena_reference_prompt_block:
+        arena_path, arena_meta = resolve_arena_reference(
+            explicit_path=req.arena_reference_image_path,
+            disable_arena_reference_auto=req.disable_arena_reference_auto,
+            use_arena_reference_auto=req.use_arena_reference_auto,
+        )
+        if arena_path:
+            arena_hit = ResolvedArenaReference(
+                registry_key=str(arena_meta.get("arena_reference_registry_key") or "explicit"),
+                image_path=Path(arena_path),
+                label=str(arena_meta.get("label") or ""),
+                notes=str(arena_meta.get("notes") or ""),
+                priority=int(arena_meta.get("priority") or 0),
+            )
+            pack = apply_approved_arena_reference_to_prompt_pack(pack, arena_hit)
     pack = _apply_banner_glyph_reference_assist(pack, req, pa, pb)
     capped_neg = trim_negative_prompt_to_max(
         pack.negative_prompt,

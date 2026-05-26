@@ -143,6 +143,7 @@ def test_build_jobs_two_prompts_all_pending(tmp_path: Path) -> None:
             date(2026, 5, 2),
             editorial_profile="charged",
             output_dir=tmp_path / "jobs",
+            disable_arena_reference_auto=True,
         )
     assert isinstance(r, CatstyleImageGenerationJobsResult)
     assert len(r.jobs) == 2
@@ -183,6 +184,7 @@ def test_build_jobs_jobs_count_one_daily_pack(tmp_path: Path) -> None:
             editorial_profile="charged",
             output_dir=tmp_path / "jobs1",
             jobs_count=1,
+            disable_arena_reference_auto=True,
         )
     assert len(r.jobs) == 1
     assert r.jobs[0].prompt_index == 1
@@ -236,7 +238,9 @@ def test_output_writes_manifest_and_prompt_files(tmp_path: Path) -> None:
         "astro_content_agent.services.content.catstyle_image_generation_jobs.generate_catstyle_daily_pack",
         return_value=_fake_pack_one_primary(),
     ):
-        r = build_catstyle_image_generation_jobs(date(2026, 5, 2), output_dir=out)
+        r = build_catstyle_image_generation_jobs(
+            date(2026, 5, 2), output_dir=out, disable_arena_reference_auto=True
+        )
     assert (out / "image_generation_jobs.json").is_file()
     assert (out / "job_01_prompt.txt").read_text(encoding="utf-8").strip() == "prompt line one"
     assert (out / "job_02_prompt.txt").read_text(encoding="utf-8").strip() == "prompt line two"

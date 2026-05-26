@@ -272,7 +272,7 @@ def test_openai_style_reference_unsupported_client_returns_clear_error(
     job = {**_openai_job(1), "style_reference_image_path": str(ref)}
     r = p.generate(job, tmp_path, overwrite=False)
     assert r.status == "failed"
-    assert r.message and "style reference image generation is not supported by this OpenAI SDK/client path" in r.message
+    assert r.message and "reference image generation is not supported by this OpenAI SDK/client path" in r.message
     assert secret_token not in (r.message or "")
     assert "REDACTED" in (r.message or "")
     mock_client.images.generate.assert_not_called()

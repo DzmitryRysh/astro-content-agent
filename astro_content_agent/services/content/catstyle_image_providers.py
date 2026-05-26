@@ -11,6 +11,9 @@ import httpx
 from pydantic import BaseModel, Field
 
 from astro_content_agent.content.catstyle.approved_reference_registry import catstyle_repo_root
+from astro_content_agent.content.catstyle.catstyle_approved_arena_reference_v1 import (
+    format_arena_reference_image_roles_prefix,
+)
 from astro_content_agent.content.catstyle.sun_uranus_visual_refinement_v1 import (
     BANNER_ONLY_APPROVED_REFERENCE_DECOUPLING_BLOCK,
 )
@@ -42,41 +45,55 @@ def _sanitize_error_message(msg: str) -> str:
     return out
 
 
-def _banner_glyph_reference_prefix(job: dict[str, Any]) -> str:
-    """Provider preamble when banner glyph reference paths are on the job."""
-    ga = str(job.get("banner_glyph_reference_planet_a_path") or "").strip()
-    gb = str(job.get("banner_glyph_reference_planet_b_path") or "").strip()
-    if not ga and not gb:
+def _resolve_reference_image_path(path_str: str) -> Path | None:
+    raw = str(path_str or "").strip()
+    if not raw:
+        return None
+    ref_path = Path(raw).expanduser()
+    if not ref_path.is_absolute():
+        candidate = (catstyle_repo_root() / ref_path).resolve()
+        ref_path = candidate if candidate.is_file() else (Path.cwd() / ref_path).resolve()
+    else:
+        ref_path = ref_path.resolve()
+    return ref_path if ref_path.is_file() else None
+
+
+def _ordered_reference_paths_from_job(job: dict[str, Any]) -> list[tuple[str, Path]]:
+    """Return ordered (role, path) pairs: style, arena, banner_a, banner_b."""
+    out: list[tuple[str, Path]] = []
+    for key, role in (
+        ("style_reference_image_path", "style"),
+        ("arena_reference_image_path", "arena"),
+        ("banner_glyph_reference_planet_a_path", "banner_a"),
+        ("banner_glyph_reference_planet_b_path", "banner_b"),
+    ):
+        resolved = _resolve_reference_image_path(str(job.get(key) or ""))
+        if resolved is not None:
+            out.append((role, resolved))
+    return out
+
+
+def _reference_input_prefix(job: dict[str, Any]) -> str:
+    """Provider preamble for style, arena, and banner glyph reference images."""
+    refs = _ordered_reference_paths_from_job(job)
+    if not refs:
         return ""
-    style = str(job.get("style_reference_image_path") or "").strip()
-    parts = [
-        "[REFERENCE INPUT] When the image API accepts multiple reference images: "
-    ]
-    if style:
-        parts.append(
-            "Image A = attached primary style/scene reference (catplanet DNA, arena, CG finish). "
-            f"{BANNER_ONLY_APPROVED_REFERENCE_DECOUPLING_BLOCK} "
-        )
-    label_b = "B" if style else "A"
-    label_c = "C" if style else "B"
-    if ga:
-        parts.append(
-            f"Image {label_b} = left/port banner glyph crop (planet A)—canonical heraldic glyph on cloth only. "
-        )
-    if gb:
-        parts.append(
-            f"Image {label_c} = right/starboard banner glyph crop (planet B)—canonical heraldic glyph on cloth only. "
-        )
-    parts.append(
-        "Use banner glyph references only for correct glyphs on faction flags; no extra glyphs elsewhere. "
+    roles = {role for role, _ in refs}
+    prefix = format_arena_reference_image_roles_prefix(
+        style_reference_present="style" in roles,
+        arena_reference_present="arena" in roles,
+        banner_glyph_a="banner_a" in roles,
+        banner_glyph_b="banner_b" in roles,
     )
-    return "".join(parts)
+    if "style" in roles:
+        prefix = f"{prefix} {BANNER_ONLY_APPROVED_REFERENCE_DECOUPLING_BLOCK}"
+    return prefix.strip() + " " if prefix else ""
 
 
 def _build_combined_prompt(job: dict[str, Any]) -> str:
     main = str(job.get("prompt_text", "") or "").strip()
     neg = str(job.get("negative_prompt", "") or "").strip()
-    prefix = _banner_glyph_reference_prefix(job)
+    prefix = _reference_input_prefix(job)
     body = main
     if neg:
         body = f"{body}\n\nAvoid / negative guidance: {neg}"
@@ -168,6 +185,11 @@ class StubCatstyleImageProvider:
             if job.get("style_reference_image_path") is not None
             else None
         )
+        arena_reference_image_path = (
+            str(job.get("arena_reference_image_path", "")).strip() or None
+            if job.get("arena_reference_image_path") is not None
+            else None
+        )
         prompt_text = str(job.get("prompt_text", ""))
         preview = _preview(prompt_text)
 
@@ -188,6 +210,7 @@ class StubCatstyleImageProvider:
                     "suggested_output_name": suggested,
                     "prompt_index": prompt_index,
                     "style_reference_image_path": style_reference_image_path,
+                    "arena_reference_image_path": arena_reference_image_path,
                 },
             )
 
@@ -199,6 +222,7 @@ class StubCatstyleImageProvider:
             "prompt_preview": preview,
             "note": STUB_NOTE,
             "style_reference_image_path": style_reference_image_path,
+            "arena_reference_image_path": arena_reference_image_path,
         }
         stub_path.write_text(json.dumps(body, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         return CatstyleImageProviderResult(
@@ -214,6 +238,7 @@ class StubCatstyleImageProvider:
                 "suggested_output_name": suggested,
                 "prompt_index": prompt_index,
                 "style_reference_image_path": style_reference_image_path,
+                "arena_reference_image_path": arena_reference_image_path,
             },
         )
 
@@ -255,6 +280,11 @@ class OpenAICatstyleImageProvider:
             if job.get("style_reference_image_path") is not None
             else None
         )
+        arena_reference_image_path = (
+            str(job.get("arena_reference_image_path", "")).strip() or None
+            if job.get("arena_reference_image_path") is not None
+            else None
+        )
         preview = _preview(str(job.get("prompt_text", "")))
 
         meta_base = {
@@ -263,10 +293,13 @@ class OpenAICatstyleImageProvider:
             "prompt_index": prompt_index,
             "suggested_output_name": suggested,
             "style_reference_image_path": style_reference_image_path,
+            "arena_reference_image_path": arena_reference_image_path,
             "reference_used": False,
-            "reference_path": style_reference_image_path,
-            "reference_skip_reason": "no_reference_provided" if not style_reference_image_path else None,
+            "reference_path": style_reference_image_path or arena_reference_image_path,
+            "reference_skip_reason": None,
             "generation_mode": "text_generate",
+            "reference_image_roles": [],
+            "reference_image_paths": [],
         }
 
         api_key = settings.openai_api_key
@@ -290,45 +323,69 @@ class OpenAICatstyleImageProvider:
                 metadata={**meta_base, "prompt_preview": preview},
             )
 
-        ref_path: Path | None = None
-        if style_reference_image_path:
-            ref_path = Path(style_reference_image_path).expanduser()
-            if not ref_path.is_absolute():
-                candidate = (catstyle_repo_root() / ref_path).resolve()
-                ref_path = candidate if candidate.is_file() else (Path.cwd() / ref_path).resolve()
-            else:
-                ref_path = ref_path.resolve()
-            style_reference_image_path = str(ref_path)
-            meta_base["style_reference_image_path"] = style_reference_image_path
-            meta_base["reference_path"] = style_reference_image_path
-            if not ref_path.is_file():
-                return CatstyleImageProviderResult(
-                    provider=self.provider_name,
-                    job_id=job_id,
-                    status="failed",
-                    message=f"style_reference_image_path not found: {ref_path}",
-                    metadata={
-                        **meta_base,
-                        "prompt_preview": preview,
-                        "reference_skip_reason": "reference_file_missing",
-                        "generation_mode": "text_generate",
-                        "reference_used": False,
-                        "final_prompt_length": None,
-                    },
-                )
-            meta_base["reference_skip_reason"] = None
+        ref_entries = _ordered_reference_paths_from_job(job)
+        missing_keys: list[str] = []
+        for key in (
+            "style_reference_image_path",
+            "arena_reference_image_path",
+            "banner_glyph_reference_planet_a_path",
+            "banner_glyph_reference_planet_b_path",
+        ):
+            if job.get(key):
+                if _resolve_reference_image_path(str(job.get(key))) is None:
+                    missing_keys.append(key)
+        if missing_keys:
+            first_key = missing_keys[0]
+            return CatstyleImageProviderResult(
+                provider=self.provider_name,
+                job_id=job_id,
+                status="failed",
+                message=f"{first_key} not found: {job.get(first_key)}",
+                metadata={
+                    **meta_base,
+                    "prompt_preview": preview,
+                    "reference_skip_reason": "reference_file_missing",
+                    "generation_mode": "text_generate",
+                    "reference_used": False,
+                    "final_prompt_length": None,
+                    "missing_reference_keys": missing_keys,
+                },
+            )
+
+        ref_paths = [p for _, p in ref_entries]
+        if ref_paths:
             meta_base["reference_used"] = True
             meta_base["generation_mode"] = "image_edit"
+            meta_base["reference_skip_reason"] = None
+            meta_base["reference_image_roles"] = [role for role, _ in ref_entries]
+            meta_base["reference_image_paths"] = [str(p) for p in ref_paths]
+            meta_base["reference_path"] = str(ref_paths[0])
+            style_resolved = next((p for role, p in ref_entries if role == "style"), None)
+            if style_resolved is not None:
+                meta_base["style_reference_image_path"] = str(style_resolved)
+            if arena_reference_image_path:
+                arena_resolved = next((p for role, p in ref_entries if role == "arena"), None)
+                if arena_resolved is not None:
+                    meta_base["arena_reference_image_path"] = str(arena_resolved)
             ref_src = str(job.get("reference_source") or "").strip()
-            meta_base["reference_source"] = ref_src or "style_reference_image"
+            meta_base["reference_source"] = ref_src or "catstyle_reference_images"
+        else:
+            meta_base["reference_skip_reason"] = "no_reference_provided"
 
         prompt = _build_combined_prompt(job)
-        if ref_path is not None:
-            prompt = (
-                "Use the provided reference image as the strict primary visual DNA anchor "
-                "(campaign sibling; preserve render density, catplanet bodies, arena scale). "
-                f"{prompt}"
-            )
+        if ref_paths:
+            if any(role == "style" for role, _ in ref_entries):
+                prompt = (
+                    "Use the provided primary style reference image as the strict visual DNA anchor "
+                    "(campaign sibling; preserve render density, catplanet bodies, material polish). "
+                    f"{prompt}"
+                )
+            if any(role == "arena" for role, _ in ref_entries):
+                prompt = (
+                    "Use the provided arena/environment reference for coliseum brightness, sky richness, "
+                    "Earth disk, and zodiac floor only—not for characters or glyphs. "
+                    f"{prompt}"
+                )
         prompt = _fit_provider_prompt(prompt)
         final_prompt_length = len(prompt)
         if not prompt.strip():
@@ -344,7 +401,7 @@ class OpenAICatstyleImageProvider:
         resp: Any
         api_model = model
         try:
-            if ref_path is not None:
+            if ref_paths:
                 edit_fn = getattr(client.images, "edit", None)
                 if edit_fn is None or not callable(edit_fn):
                     return CatstyleImageProviderResult(
@@ -352,7 +409,7 @@ class OpenAICatstyleImageProvider:
                         job_id=job_id,
                         status="failed",
                         message=(
-                            "style reference image generation is not supported by this OpenAI SDK/client path: "
+                            "reference image generation is not supported by this OpenAI SDK/client path: "
                             "client.images.edit is not available."
                         ),
                         metadata={
@@ -363,14 +420,19 @@ class OpenAICatstyleImageProvider:
                             "final_prompt_length": final_prompt_length,
                         },
                     )
-                with ref_path.open("rb") as image_file:
+                opened = [p.open("rb") for p in ref_paths]
+                try:
+                    image_arg: Any = opened[0] if len(opened) == 1 else opened
                     resp = client.images.edit(
                         model=api_model,
-                        image=image_file,
+                        image=image_arg,
                         prompt=prompt,
                         size=size,  # type: ignore[arg-type]
                         n=1,
                     )
+                finally:
+                    for fh in opened:
+                        fh.close()
             else:
                 # GPT image models (e.g. gpt-image-1): no response_format — base64 is default;
                 # use output_format instead (response_format is invalid for these models).
@@ -382,14 +444,14 @@ class OpenAICatstyleImageProvider:
                     output_format="png",
                 )
         except TypeError as exc:
-            if ref_path is not None:
+            if ref_paths:
                 safe = _sanitize_error_message(str(exc))
                 return CatstyleImageProviderResult(
                     provider=self.provider_name,
                     job_id=job_id,
                     status="failed",
                     message=(
-                        "style reference image generation is not supported by this OpenAI SDK/client path: "
+                        "reference image generation is not supported by this OpenAI SDK/client path: "
                         f"{safe}"
                     ),
                     metadata={
@@ -414,7 +476,7 @@ class OpenAICatstyleImageProvider:
             )
         except Exception as exc:  # noqa: BLE001 — surface safe summary only
             safe = _sanitize_error_message(str(exc))
-            if ref_path is not None:
+            if ref_paths:
                 msg = f"OpenAI images.edit API error: {safe}"
             else:
                 msg = f"OpenAI image API error: {safe}"

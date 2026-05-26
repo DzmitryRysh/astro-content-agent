@@ -781,6 +781,7 @@ def test_epic_arena_showdown_profile_includes_environment_scale_and_readable_sub
             world_template_key="cosmic_zodiac_arena",
             premium_art_direction=False,
             disable_approved_reference_prompt_lock=True,
+            disable_arena_reference_auto=True,
         )
     )
     blob = " ".join(pack.image_prompts).lower()

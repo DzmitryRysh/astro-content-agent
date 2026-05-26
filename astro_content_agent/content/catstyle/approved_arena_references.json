@@ -1,0 +1,13 @@
+{
+  "version": "catstyle-approved-arena-reference-v1",
+  "entries": [
+    {
+      "registry_key": "cosmic_zodiac_arena_premium_v1",
+      "image_path": "references/catstyle_moon_saturn_square_tension_approved.png",
+      "label": "Default premium cosmic zodiac arena environment",
+      "notes": "Bootstrap arena/environment anchor: bright premium coliseum, rich starfield, Earth above arena, readable zodiac floor. Replace via approve_catstyle_arena_reference when a dedicated arena plate is ready.",
+      "priority": 100,
+      "active": true
+    }
+  ]
+}

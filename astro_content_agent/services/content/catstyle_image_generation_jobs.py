@@ -11,8 +11,13 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 from astro_content_agent.astro.ephemeris import PlanetPosition
+from astro_content_agent.content.catstyle.approved_arena_reference_registry import ResolvedArenaReference
+from astro_content_agent.content.catstyle.catstyle_approved_arena_reference_v1 import (
+    apply_approved_arena_reference_to_prompt_pack,
+)
+from astro_content_agent.content.catstyle.models import CatstylePromptPack, CatstylePromptRequest
+from astro_content_agent.services.content.catstyle_arena_reference_resolver import resolve_arena_reference
 from astro_content_agent.services.content.catstyle_style_reference_resolver import resolve_style_reference
-from astro_content_agent.content.catstyle.models import CatstylePromptRequest
 from astro_content_agent.services.content.catstyle_daily_pack import generate_catstyle_daily_pack
 from astro_content_agent.services.content.catstyle_manual_override_timing import (
     merge_manual_override_day_window_into_primary,
@@ -66,6 +71,10 @@ class CatstyleImageGenJob(BaseModel):
     banner_glyph_reference_planet_b_path: str | None = Field(
         default=None,
         description="Narrow banner-glyph reference for planet B (right/starboard banner), Image C when style ref present.",
+    )
+    arena_reference_image_path: str | None = Field(
+        default=None,
+        description="Optional local path to approved arena/environment reference (coliseum, sky, floor only).",
     )
     prompt_text: str
     negative_prompt: str
@@ -122,6 +131,10 @@ class CatstyleImageGenerationJobsResult(BaseModel):
     style_reference_meta: dict[str, Any] | None = Field(
         default=None,
         description="How the style reference path was chosen: explicit CLI, approved registry v1, or none.",
+    )
+    arena_reference_meta: dict[str, Any] | None = Field(
+        default=None,
+        description="How the arena/environment reference path was chosen: explicit CLI, arena registry v1, or none.",
     )
 
 
@@ -209,6 +222,43 @@ def _manual_aspect_override_manifest_block(pa: str, pb: str, asp: str, mode: str
         "mode": mode,
         "aspect_source": DEFAULT_FORCED_ASPECT_SOURCE,
     }
+
+
+def _merge_arena_reference_into_prompt_pack_dict(
+    pp: dict[str, Any],
+    *,
+    arena_path: str,
+    arena_meta: dict[str, Any],
+) -> dict[str, Any]:
+    """Ensure pack prompts include arena block when a reference path resolved."""
+    if pp.get("arena_reference_assist"):
+        return pp
+    first = str((pp.get("image_prompts") or [""])[0])
+    if "[CATSTYLE APPROVED ARENA REFERENCE v1]" in first:
+        return pp
+    hit = ResolvedArenaReference(
+        registry_key=str(arena_meta.get("arena_reference_registry_key") or "explicit"),
+        image_path=Path(arena_path),
+        label=str(arena_meta.get("label") or ""),
+        notes=str(arena_meta.get("notes") or ""),
+        priority=int(arena_meta.get("priority") or 0),
+    )
+    pack = apply_approved_arena_reference_to_prompt_pack(CatstylePromptPack.model_validate(pp), hit)
+    return dict(pack.model_dump(mode="json"))
+
+
+def _arena_reference_log_lines(meta: dict[str, Any]) -> list[str]:
+    lines: list[str] = []
+    if meta.get("arena_reference_used"):
+        lines.append("arena_reference_used: true")
+    if meta.get("arena_reference_registry_key"):
+        lines.append(f"arena_reference_registry_key: {meta.get('arena_reference_registry_key')}")
+    if meta.get("arena_reference_image_path"):
+        lines.append(f"arena_reference_image_path: {meta.get('arena_reference_image_path')}")
+    for log_line in meta.get("log_lines") or []:
+        if log_line:
+            lines.append(str(log_line))
+    return lines
 
 
 def _style_reference_log_lines(meta: dict[str, Any]) -> list[str]:
@@ -347,6 +397,9 @@ def build_catstyle_image_generation_jobs(
     render_style_profile_key: str | None = None,
     shot_mode: str | None = None,
     style_reference_image_path: str | None = None,
+    arena_reference_image_path: str | None = None,
+    use_arena_reference_auto: bool = True,
+    disable_arena_reference_auto: bool = False,
     planet_a_override: str | None = None,
     planet_b_override: str | None = None,
     aspect_type_override: str | None = None,
@@ -394,6 +447,9 @@ def build_catstyle_image_generation_jobs(
     style_ref_cli = str(style_reference_image_path).strip() if style_reference_image_path else None
     if style_ref_cli == "":
         style_ref_cli = None
+    arena_ref_cli = str(arena_reference_image_path).strip() if arena_reference_image_path else None
+    if arena_ref_cli == "":
+        arena_ref_cli = None
 
     override_quad = parse_manual_aspect_override_fields(
         planet_a_override,
@@ -409,6 +465,8 @@ def build_catstyle_image_generation_jobs(
     primary: dict[str, Any]
     pp: dict[str, Any]
     style_reference_meta: dict[str, Any] | None = None
+    arena_reference_meta: dict[str, Any] | None = None
+    final_arena_ref: str | None = None
     manifest_sky_scan_mode: str | None = None
     manifest_sky_scan_step: int | None = None
     manifest_aspect_source: str = DEFAULT_FORCED_ASPECT_SOURCE
@@ -429,6 +487,11 @@ def build_catstyle_image_generation_jobs(
             aspect_type=o_asp,
             mode=o_mode,
         )
+        final_arena_ref, arena_reference_meta = resolve_arena_reference(
+            explicit_path=arena_ref_cli,
+            disable_arena_reference_auto=disable_arena_reference_auto,
+            use_arena_reference_auto=use_arena_reference_auto,
+        )
         vc_manual = 2 if jobs_count is None else jobs_count
         req_kw: dict[str, Any] = dict(
             planet_a=pa_n,
@@ -447,6 +510,9 @@ def build_catstyle_image_generation_jobs(
         if render_k is not None:
             req_kw["render_style_profile_key"] = render_k
         req_kw["disable_approved_reference_prompt_lock"] = disable_approved_reference_auto
+        req_kw["arena_reference_image_path"] = arena_ref_cli
+        req_kw["use_arena_reference_auto"] = use_arena_reference_auto
+        req_kw["disable_arena_reference_auto"] = disable_arena_reference_auto
         if final_ref:
             pa_chk = pa_n.lower()
             pb_chk = pb_n.lower()
@@ -458,6 +524,10 @@ def build_catstyle_image_generation_jobs(
         except ValueError as e:
             raise ValueError(f"Cannot build prompts for manual aspect override: {e}") from e
         pp = dict(pack_obj.model_dump(mode="json"))
+        if final_arena_ref and arena_reference_meta:
+            pp = _merge_arena_reference_into_prompt_pack_dict(
+                pp, arena_path=final_arena_ref, arena_meta=arena_reference_meta
+            )
         sm_manual = str(scan_mode).strip().lower()
         if sm_manual == "day-window":
             manifest_sky_scan_mode = "day-window"
@@ -530,6 +600,11 @@ def build_catstyle_image_generation_jobs(
             aspect_type=asp_sel,
             mode=mode_sel,
         )
+        final_arena_ref, arena_reference_meta = resolve_arena_reference(
+            explicit_path=arena_ref_cli,
+            disable_arena_reference_auto=disable_arena_reference_auto,
+            use_arena_reference_auto=use_arena_reference_auto,
+        )
 
         if final_ref:
             pa_chk = pa_sel.lower()
@@ -555,9 +630,17 @@ def build_catstyle_image_generation_jobs(
                 if render_k is not None:
                     req_kw_refresh["render_style_profile_key"] = render_k
                 req_kw_refresh["disable_approved_reference_prompt_lock"] = disable_approved_reference_auto
+                req_kw_refresh["arena_reference_image_path"] = arena_ref_cli
+                req_kw_refresh["use_arena_reference_auto"] = use_arena_reference_auto
+                req_kw_refresh["disable_arena_reference_auto"] = disable_arena_reference_auto
                 pp = generate_catstyle_prompt_pack(CatstylePromptRequest(**req_kw_refresh)).model_dump(
                     mode="json"
                 )
+
+    if final_arena_ref and arena_reference_meta:
+        pp = _merge_arena_reference_into_prompt_pack_dict(
+            pp, arena_path=final_arena_ref, arena_meta=arena_reference_meta
+        )
 
     image_prompts: list[str] = [str(p) for p in (pp.get("image_prompts") or [])]
     neg = str(pp.get("negative_prompt", ""))
@@ -658,6 +741,7 @@ def build_catstyle_image_generation_jobs(
                     variant_index=variant_index,
                     shot_role=shot_role,
                     style_reference_image_path=final_ref,
+                    arena_reference_image_path=final_arena_ref,
                     banner_glyph_reference_planet_a_path=glyph_a_path,
                     banner_glyph_reference_planet_b_path=glyph_b_path,
                     prompt_text=prompt_text,
@@ -719,6 +803,8 @@ def build_catstyle_image_generation_jobs(
             manifest["manual_aspect_override"] = manual_block
         if style_reference_meta is not None:
             manifest["style_reference"] = style_reference_meta
+        if arena_reference_meta is not None:
+            manifest["arena_reference"] = arena_reference_meta
         mp = out / "image_generation_jobs.json"
         _write_utf8_json(mp, manifest)
         manifest_path = str(mp)
@@ -748,8 +834,13 @@ def build_catstyle_image_generation_jobs(
         files_written.append("manifest_summary.txt")
 
     build_message: str | None = None
+    build_lines: list[str] = []
     if style_reference_meta and style_reference_meta.get("reference_tier") in ("exact", "archetype"):
-        build_message = "; ".join(_style_reference_log_lines(style_reference_meta))
+        build_lines.extend(_style_reference_log_lines(style_reference_meta))
+    if arena_reference_meta and arena_reference_meta.get("arena_reference_used"):
+        build_lines.extend(_arena_reference_log_lines(arena_reference_meta))
+    if build_lines:
+        build_message = "; ".join(build_lines)
 
     return CatstyleImageGenerationJobsResult(
         date=iso,
@@ -763,6 +854,7 @@ def build_catstyle_image_generation_jobs(
         files_written=files_written,
         message=build_message,
         style_reference_meta=style_reference_meta,
+        arena_reference_meta=arena_reference_meta,
     )
 
 
