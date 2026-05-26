@@ -78,27 +78,40 @@ def format_arena_reference_image_roles_prefix(
     banner_glyph_b: bool,
 ) -> str:
     """
-    Provider preamble for multi-image edit: A=style, B=arena environment, C/D=banner glyphs.
+    Provider preamble for multi-image edit.
+
+    When arena + style are both present: **Image A = arena** (environment wins),
+    **Image B = style** (characters/aspect only—must not darken the world shell).
     """
     if not arena_reference_present and not banner_glyph_a and not banner_glyph_b and not style_reference_present:
         return ""
     lines = [
-        "[CATSTYLE REFERENCE IMAGE ROLES v1] When the image API accepts multiple reference images:",
+        "[CATSTYLE REFERENCE IMAGE ROLES v2] When the image API accepts multiple reference images:",
     ]
     letter = ord("A")
-    if style_reference_present:
+    if arena_reference_present:
         lines.append(
-            "**Image A** = primary **style / character campaign** reference (catplanet finish, lighting density, "
-            "material polish)—**NOT** for copying misplaced body glyphs from the plate."
+            "**Image A** = **approved arena/environment reference**—**highest priority** for **coliseum brightness**, "
+            "**illuminated arches**, **tier depth**, **rich Milky Way / galaxy band**, **Earth disk above arena**, "
+            "**readable zodiac floor**, and premium cinematic vault lighting. "
+            "**Do NOT** copy characters, poses, planet colors, or glyphs from Image A."
         )
         letter += 1
-    if arena_reference_present:
+    if style_reference_present:
         ch = chr(letter)
-        lines.append(
-            f"**Image {ch}** = **approved arena/environment reference ONLY**—copy **coliseum brightness**, "
-            "**illuminated arches**, **tier depth**, **rich Milky Way sky**, **Earth above arena**, "
-            "**zodiac floor**—**do NOT** copy characters, poses, planet colors, or glyphs from this plate."
-        )
+        if arena_reference_present and ch == "B":
+            lines.append(
+                f"**Image {ch}** = **approved character/aspect/style reference**—controls **catplanet bodies**, "
+                "**aspect energy**, **pair choreography**, material polish, and campaign finish. "
+                "**Image B must NOT override Image A for environment:** ignore darker semicircle coliseum, weak sky, "
+                "flat tiers, or muted Milky Way from Image B—**never** let the style plate pull the arena back to a "
+                "darker old world shell. **NOT** for copying misplaced body glyphs from the plate."
+            )
+        else:
+            lines.append(
+                f"**Image {ch}** = **approved character/aspect/style reference** (catplanet finish, lighting density, "
+                "material polish)—**NOT** for copying misplaced body glyphs from the plate."
+            )
         letter += 1
     if banner_glyph_a:
         ch = chr(letter)
@@ -111,10 +124,43 @@ def format_arena_reference_image_roles_prefix(
         lines.append(
             f"**Image {ch}** = narrow **right/starboard banner glyph** crop—heraldic cloth glyph only."
         )
-    lines.append(
-        "Arena reference must **not** override character identity, glyph discipline, or aspect choreography."
-    )
+    if arena_reference_present and style_reference_present:
+        lines.append(
+            "**Environment priority lock:** Image A (arena) always wins coliseum/sky/floor/architecture over Image B; "
+            "Image B must not override environment brightness or sky richness."
+        )
+    elif arena_reference_present:
+        lines.append(
+            "Arena reference must **not** override character identity, glyph discipline, or aspect choreography."
+        )
     return " ".join(lines)
+
+
+def format_dual_reference_provider_priority_preamble(
+    *,
+    arena_present: bool,
+    style_present: bool,
+) -> str:
+    """Short provider-boundary lines prepended before the main prompt when references attach."""
+    parts: list[str] = []
+    if arena_present and style_present:
+        parts.append(
+            "**Reference priority:** attached **Image A** is the arena/environment plate—use it as the **authoritative** "
+            "brighter coliseum, rich Milky Way sky, Earth disk, and zodiac floor. Attached **Image B** is the "
+            "Sun/Uranus (or pair) style plate—use it **only** for characters, aspect energy, and CG finish; "
+            "**do not** inherit Image B's darker arena, weak starfield, or flat coliseum shell."
+        )
+    elif arena_present:
+        parts.append(
+            "Use the provided arena/environment reference as the authoritative world shell: coliseum brightness, "
+            "sky richness, Earth disk, and zodiac floor—not for characters or glyphs."
+        )
+    elif style_present:
+        parts.append(
+            "Use the provided style reference for catplanet bodies, aspect energy, and material polish—"
+            "not for environment darkness or weak sky when text locks demand a brighter premium arena."
+        )
+    return " ".join(parts)
 
 
 __all__ = [
@@ -122,5 +168,6 @@ __all__ = [
     "apply_approved_arena_reference_to_prompt_pack",
     "build_approved_arena_reference_prompt_block",
     "format_arena_reference_image_roles_prefix",
+    "format_dual_reference_provider_priority_preamble",
     "inject_approved_arena_reference_block",
 ]

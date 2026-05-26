@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 from astro_content_agent.content.catstyle.approved_reference_registry import catstyle_repo_root
 from astro_content_agent.content.catstyle.catstyle_approved_arena_reference_v1 import (
     format_arena_reference_image_roles_prefix,
+    format_dual_reference_provider_priority_preamble,
 )
 from astro_content_agent.content.catstyle.sun_uranus_visual_refinement_v1 import (
     BANNER_ONLY_APPROVED_REFERENCE_DECOUPLING_BLOCK,
@@ -59,11 +60,11 @@ def _resolve_reference_image_path(path_str: str) -> Path | None:
 
 
 def _ordered_reference_paths_from_job(job: dict[str, Any]) -> list[tuple[str, Path]]:
-    """Return ordered (role, path) pairs: style, arena, banner_a, banner_b."""
+    """Return ordered (role, path) pairs: arena first, then style, then banner glyphs."""
     out: list[tuple[str, Path]] = []
     for key, role in (
-        ("style_reference_image_path", "style"),
         ("arena_reference_image_path", "arena"),
+        ("style_reference_image_path", "style"),
         ("banner_glyph_reference_planet_a_path", "banner_a"),
         ("banner_glyph_reference_planet_b_path", "banner_b"),
     ):
@@ -374,18 +375,13 @@ class OpenAICatstyleImageProvider:
 
         prompt = _build_combined_prompt(job)
         if ref_paths:
-            if any(role == "style" for role, _ in ref_entries):
-                prompt = (
-                    "Use the provided primary style reference image as the strict visual DNA anchor "
-                    "(campaign sibling; preserve render density, catplanet bodies, material polish). "
-                    f"{prompt}"
-                )
-            if any(role == "arena" for role, _ in ref_entries):
-                prompt = (
-                    "Use the provided arena/environment reference for coliseum brightness, sky richness, "
-                    "Earth disk, and zodiac floor only—not for characters or glyphs. "
-                    f"{prompt}"
-                )
+            roles_present = {role for role, _ in ref_entries}
+            priority = format_dual_reference_provider_priority_preamble(
+                arena_present="arena" in roles_present,
+                style_present="style" in roles_present,
+            )
+            if priority:
+                prompt = f"{priority} {prompt}"
         prompt = _fit_provider_prompt(prompt)
         final_prompt_length = len(prompt)
         if not prompt.strip():

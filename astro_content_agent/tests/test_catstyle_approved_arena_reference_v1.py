@@ -17,7 +17,9 @@ from astro_content_agent.content.catstyle.catstyle_approved_arena_reference_v1 i
     apply_approved_arena_reference_to_prompt_pack,
     build_approved_arena_reference_prompt_block,
     format_arena_reference_image_roles_prefix,
+    format_dual_reference_provider_priority_preamble,
 )
+from astro_content_agent.services.content import catstyle_image_providers as cap
 from astro_content_agent.content.catstyle.models import CatstylePromptRequest
 from astro_content_agent.services.content.catstyle_image_generation_jobs import build_catstyle_image_generation_jobs
 from astro_content_agent.services.content.catstyle_image_providers import OpenAICatstyleImageProvider
@@ -155,16 +157,66 @@ def test_openai_provider_passes_style_and_arena_references(
     assert r.metadata.get("arena_reference_image_path") == str(arena_ref.resolve())
     assert r.metadata.get("style_reference_image_path") == str(style_ref.resolve())
     roles = r.metadata.get("reference_image_roles") or []
-    assert roles == ["style", "arena"]
+    assert roles == ["arena", "style"]
     call_kw = mock_client.images.edit.call_args.kwargs
     img_arg = call_kw.get("image")
     assert img_arg is not None
     if isinstance(img_arg, list):
         assert len(img_arg) == 2
+        assert img_arg[0].name == str(arena_ref.resolve())
+        assert img_arg[1].name == str(style_ref.resolve())
     prompt = call_kw.get("prompt", "")
-    assert "arena/environment reference" in prompt.lower() or "arena" in prompt.lower()
-    assert "[CATSTYLE REFERENCE IMAGE ROLES v1]" in prompt
-    assert "environment reference ONLY" in prompt or "arena/environment" in prompt.lower()
+    assert "[CATSTYLE REFERENCE IMAGE ROLES v2]" in prompt
+    assert "**Image A**" in prompt and "arena/environment" in prompt.lower()
+    assert "**Image B**" in prompt and "character/aspect/style" in prompt.lower()
+    assert "highest priority" in prompt.lower() or "Image A (arena) always wins" in prompt
+    assert "must NOT override Image A for environment" in prompt or "must not override" in prompt.lower()
+    assert "darker" in prompt.lower() and "sky" in prompt.lower()
+    assert "Reference priority:" in prompt
+    assert "Image A" in prompt and "authoritative" in prompt.lower()
+
+
+def test_ordered_reference_paths_arena_before_style(tmp_path: Path) -> None:
+    arena = tmp_path / "arena.png"
+    style = tmp_path / "style.png"
+    arena.write_bytes(b"a")
+    style.write_bytes(b"s")
+    job = {
+        "arena_reference_image_path": str(arena),
+        "style_reference_image_path": str(style),
+    }
+    ordered = cap._ordered_reference_paths_from_job(job)
+    assert [role for role, _ in ordered] == ["arena", "style"]
+    assert ordered[0][1] == arena.resolve()
+    assert ordered[1][1] == style.resolve()
+
+
+def test_format_arena_roles_prefix_image_a_arena_image_b_style() -> None:
+    prefix = format_arena_reference_image_roles_prefix(
+        style_reference_present=True,
+        arena_reference_present=True,
+        banner_glyph_a=False,
+        banner_glyph_b=False,
+    )
+    assert "[CATSTYLE REFERENCE IMAGE ROLES v2]" in prefix
+    assert "**Image A**" in prefix and "arena/environment" in prefix.lower()
+    assert "**Image B**" in prefix and "character/aspect/style" in prefix.lower()
+    assert "highest priority" in prefix.lower()
+    assert "Image B must NOT override Image A for environment" in prefix
+    assert "darker semicircle coliseum" in prefix.lower() or "darker" in prefix.lower()
+    assert "Environment priority lock" in prefix
+    assert "must not override environment brightness" in prefix.lower()
+
+
+def test_dual_reference_preamble_arena_wins_environment() -> None:
+    preamble = format_dual_reference_provider_priority_preamble(
+        arena_present=True, style_present=True
+    )
+    assert "Image A" in preamble and "arena" in preamble.lower()
+    assert "Image B" in preamble and "style plate" in preamble.lower() or "Image B" in preamble
+    assert "authoritative" in preamble.lower()
+    assert "do not" in preamble.lower() and "darker arena" in preamble.lower()
+    assert "weak starfield" in preamble.lower() or "weak sky" in preamble.lower()
 
 
 def test_format_arena_roles_prefix_environment_not_character() -> None:
@@ -174,9 +226,9 @@ def test_format_arena_roles_prefix_environment_not_character() -> None:
         banner_glyph_a=False,
         banner_glyph_b=False,
     )
-    assert "environment reference ONLY" in prefix or "arena/environment" in prefix.lower()
-    assert "do NOT" in prefix or "not override" in prefix.lower()
-    assert "character identity" in prefix.lower() or "character" in prefix.lower()
+    assert "arena/environment" in prefix.lower()
+    assert "must NOT override Image A" in prefix or "not override" in prefix.lower()
+    assert "character/aspect" in prefix.lower() or "character" in prefix.lower()
 
 
 def test_apply_arena_to_pack_sets_assist() -> None:

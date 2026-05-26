@@ -8,6 +8,14 @@
       "notes": "Bootstrap arena/environment anchor: bright premium coliseum, rich starfield, Earth above arena, readable zodiac floor. Replace via approve_catstyle_arena_reference when a dedicated arena plate is ready.",
       "priority": 100,
       "active": true
+    },
+    {
+      "registry_key": "premium_cosmic_zodiac_arena_v1",
+      "image_path": "references/catstyle_arena_premium_cosmic_zodiac_arena_v1_approved.png",
+      "label": "Premium cosmic zodiac arena v1",
+      "notes": "",
+      "priority": 200,
+      "active": true
     }
   ]
 }
