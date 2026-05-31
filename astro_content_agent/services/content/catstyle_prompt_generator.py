@@ -79,6 +79,11 @@ from astro_content_agent.content.catstyle.mars_pluto_square_tension_canon_v1 imp
     MARS_PLUTO_SQUARE_TENSION_VISUAL_CANON,
     is_mars_pluto_square_tension,
 )
+from astro_content_agent.content.catstyle.moon_saturn_square_tension_visual_canon_v1 import (
+    MOON_SATURN_SQUARE_TENSION_NEGATIVE_EXTRAS,
+    MOON_SATURN_SQUARE_TENSION_VISUAL_CANON,
+    is_moon_saturn_square_tension,
+)
 from astro_content_agent.content.catstyle.pair_flag_glyph_resolution_v1 import (
     resolved_pair_flag_glyph_system_block,
 )
@@ -250,23 +255,40 @@ def _aspect_choreography_animation_clause(aspect_type: str) -> str:
     return mapping.get(k, "")
 
 
-def _planet_pair_action_language(pa: str, pb: str) -> str:
+def _planet_pair_action_language(
+    pa: str, pb: str, aspect_type: str = "", mode: str = ""
+) -> str:
     """Planet-specific allowed action lexicon (Moon/Saturn explicit for choreography v1)."""
     pair = {pa.strip().lower(), pb.strip().lower()}
     chunks: list[str] = []
     if "moon" in pair:
-        chunks.append(
-            "[PLANETARY ACTION LEXICON v1 - Moon] Prefer: pillow strike, moonlight wave, protective defensive motion, "
-            "tidal push, emotional flinch/retreat/burst—soft but active movement."
-        )
+        if is_moon_saturn_square_tension(pa, pb, aspect_type, mode):
+            chunks.append(
+                "[PLANETARY ACTION LEXICON v1 - Moon] Prefer: **glowing crescent sickle** strikes and guards, "
+                "moonlight arc, protective defensive motion, emotional flinch/retreat/burst—soft but active force; "
+                "optional small sleep relic/cushion as **secondary** prop only—not pillow-as-primary-weapon."
+            )
+        else:
+            chunks.append(
+                "[PLANETARY ACTION LEXICON v1 - Moon] Prefer: pillow strike, moonlight wave, protective defensive motion, "
+                "tidal push, emotional flinch/retreat/burst—soft but active movement."
+            )
     if "saturn" in pair:
-        chunks.append(
-            "[PLANETARY ACTION LEXICON v1 - Saturn] Prefer: stone block, freeze/frost field, gravity press, chain bind, "
-            "gate slam, ruler strike as measuring/architect line (not a blade swing), wall summon, stop gesture, time lock, "
-            "heavy downward force. Saturn may fight hard through barriers/time/weight—never as fiery reckless Mars: "
-            "no flames, no fire aura, no ninja/fighter styling, no martial-arts choreography, no reckless attack pose, "
-            "no Mars-like aggression, no nunchucks/martial weapons."
-        )
+        if is_moon_saturn_square_tension(pa, pb, aspect_type, mode):
+            chunks.append(
+                "[PLANETARY ACTION LEXICON v1 - Saturn] Prefer: **chain bind** as main control read, gravity press, "
+                "stone block, freeze field, gate slam, stop gesture, time lock, cane/timekeeper measure, pocket-watch "
+                "pause—cold downward structural force. **Never** orange/fire/solar/Mars-coded Saturn: no flames, "
+                "no fire aura, no magma glow, no rage-warrior pose, no ninja/fighter styling, no martial-arts duel choreography."
+            )
+        else:
+            chunks.append(
+                "[PLANETARY ACTION LEXICON v1 - Saturn] Prefer: stone block, freeze/frost field, gravity press, chain bind, "
+                "gate slam, ruler strike as measuring/architect line (not a blade swing), wall summon, stop gesture, time lock, "
+                "heavy downward force. Saturn may fight hard through barriers/time/weight—never as fiery reckless Mars: "
+                "no flames, no fire aura, no ninja/fighter styling, no martial-arts choreography, no reckless attack pose, "
+                "no Mars-like aggression, no nunchucks/martial weapons."
+            )
     return " ".join(chunks).strip()
 
 
@@ -511,6 +533,10 @@ def _negative_contract_merge_extras(
                 "circular chest badge",
             )
         )
+    if planet_a and planet_b and is_moon_saturn_square_tension(
+        planet_a, planet_b, aspect_type or "", mode or ""
+    ):
+        extras.extend(MOON_SATURN_SQUARE_TENSION_NEGATIVE_EXTRAS)
     if (mode or "").strip().lower() == "flow":
         extras.extend(
             [
@@ -529,6 +555,9 @@ _PROTECTED_PROMPT_MARKERS: tuple[str, ...] = (
     "[CATSTYLE GLOBAL QUALITY LOCK CG v1]",
     "[SUN-URANUS HARD ART-DIRECTION OVERRIDE v3",
     "[SUN-URANUS CONJUNCTION TENSION VISUAL CANON v1]",
+    "[MOON-SATURN SQUARE TENSION VISUAL CANON v1]",
+    "[MOON-SATURN SATURN IDENTITY HARD LOCK v1]",
+    "[MOON-SATURN ARENA PAIR LOCK v1]",
     "[CATSTYLE APPROVED ARENA REFERENCE v1]",
     "[COSMIC ZODIAC ARENA PREMIUM ENVIRONMENT v1]",
     "[SUN CATPLANET BODY LOCK v3]",
@@ -570,6 +599,22 @@ _PROTECTED_BLOCK_END_ANCHORS: dict[str, tuple[str, ...]] = {
     "[SUN-URANUS CONJUNCTION TENSION VISUAL CANON v1]": (
         "[WORLD TEMPLATE v1 - high-priority setting direction]",
         "[SHOT/COMPOSITION PROFILE",
+        "Aspect type:",
+    ),
+    "[MOON-SATURN SQUARE TENSION VISUAL CANON v1]": (
+        "[MOON-SATURN EPIC ARENA ACTION STAGING",
+        "[WORLD TEMPLATE v1 - high-priority setting direction]",
+        "[SHOT/COMPOSITION PROFILE",
+        "Aspect type:",
+    ),
+    "[MOON-SATURN SATURN IDENTITY HARD LOCK v1]": (
+        "[MOON-SATURN ARENA PAIR LOCK v1]",
+        "[MOON-SATURN SQUARE TENSION VISUAL CANON v1]",
+        "Aspect type:",
+    ),
+    "[MOON-SATURN ARENA PAIR LOCK v1]": (
+        "[MOON-SATURN SATURN IDENTITY HARD LOCK v1]",
+        "[COSMIC ZODIAC ARENA PREMIUM ENVIRONMENT v1]",
         "Aspect type:",
     ),
     "[CATSTYLE APPROVED ARENA REFERENCE v1]": (
@@ -927,35 +972,6 @@ def _planet_cat_line(planet: str, canon: PlanetCatCanon, skin_key: str | None) -
     return base_with_markers + overlay
 
 
-def _moon_saturn_visual_correction_block(pa: str, pb: str, aspect_type: str, mode: str) -> str:
-    """Moon square Saturn: arena-readable clash where Moon stays soft-force and Saturn stays structural—not Mars combat."""
-    pair = {pa.lower(), pb.lower()}
-    if pair != {"moon", "saturn"}:
-        return ""
-    if (aspect_type or "").strip().lower() != "square":
-        return ""
-    if (mode or "").strip().lower() != "tension":
-        return ""
-    return (
-        "[MOON-SATURN VISUAL CORRECTION PATCH v1 - mandatory identity guard] "
-        "Dynamic zodiac-arena conflict is OK here: this is softness versus structure, not a generic action-hero brawl or soft cat versus fire ninja. "
-        "Moon attacks/defends with pillow strikes, moonlight waves, tidal pushes, protective defensive motion, emotional "
-        "flinch/retreat/burst—soft but active force; Moon stays rounded, vulnerable, comfort-seeking, silver-lit, clutching pillow/blanket/soft cloth; "
-        "may glance toward a small glowing cozy doorway/window as memory of past comfort. "
-        "Saturn counters with stone blocks, freeze/frost fields, gravity presses, chain binds, gate slams, wall summons, stop gesture, "
-        "time-lock, ruler-as-measure strike, heavy downward structural force—cold stone-and-iron judge/architect/guardian energy; upright, severe, emotionally reserved. "
-        "Scene metaphor: a heavy stone gate of time and responsibility blocks the way back to comfort while Moon presses with soft waves. "
-        "Checkpoint imagery: stone gate/wall/tower, chain, clock boundary line; Saturn props like ruler, key, hourglass, blank watch, architectural plan. "
-        "Composition target: premium cinematic comic poster, strong silhouettes, dramatic arena-readable pressure via symbolism (not MMA). "
-        "Palette target: cold stone-and-silver dominant palette with controlled warm memory glow only in background comfort cue. "
-        "Saturn critical negatives: do NOT depict Saturn with flames, fire aura, martial weapons, ninja/fighter styling, "
-        "reckless attack pose, reckless speed, or Mars-like aggression; do NOT let Saturn inherit Mars visual traits. "
-        "Whole-scene hard negatives: no martial-arts duel choreography, no body-on-body brawl, no nunchucks; "
-        "not cute nursery, not flat mascot, not 3D CGI figurine, not game render look. "
-        "Read: Moon softer/more emotionally defensive, Saturn still/imposing/limiting through mass and time; vulnerability vs discipline."
-    )
-
-
 def _is_cg_keyart_request(req: CatstylePromptRequest) -> bool:
     raw = (req.render_style_profile_key or "").strip()
     if not raw:
@@ -991,10 +1007,10 @@ def _global_quality_negative_extras_for_request(req: CatstylePromptRequest) -> l
 
 
 def _pair_specific_visual_guards(pa: str, pb: str, aspect_type: str, mode: str) -> str:
-    """Moon/Saturn patch + pair-specific premium canons (Mars/Pluto, Sun/Uranus, …)."""
-    parts: list[str] = [
-        _moon_saturn_visual_correction_block(pa, pb, aspect_type, mode),
-    ]
+    """Pair-specific premium canons (Moon/Saturn, Mars/Pluto, Sun/Uranus, …)."""
+    parts: list[str] = []
+    if is_moon_saturn_square_tension(pa, pb, aspect_type, mode):
+        parts.append(MOON_SATURN_SQUARE_TENSION_VISUAL_CANON)
     if is_sun_uranus_pair(pa, pb):
         parts.append(sun_uranus_catplanet_body_lock_blocks())
     if is_sun_uranus_conjunction_tension(pa, pb, aspect_type, mode):
@@ -1035,7 +1051,7 @@ def _prompt_choreography_middleware(
     blocks.extend(
         [
             _aspect_choreography_block(req.aspect_type, req.mode),
-            _planet_pair_action_language(pa, pb),
+            _planet_pair_action_language(pa, pb, req.aspect_type, req.mode),
             _arena_composition_boost_block(req),
             _epic_arena_showdown_block(req, pa, pb),
             _mars_heavy_scene_style_decouple_block(req, pa, pb),
@@ -1446,6 +1462,8 @@ def generate_catstyle_prompt_pack(req: CatstylePromptRequest) -> CatstylePromptP
             "losing approved reference visual DNA",
             "circular chest badge",
         )
+    if is_moon_saturn_square_tension(pa, pb, req.aspect_type, req.mode):
+        keep_neg = keep_neg + MOON_SATURN_SQUARE_TENSION_NEGATIVE_EXTRAS
     if (req.mode or "").strip().lower() == "flow":
         keep_neg = keep_neg + (
             "underexposed overall scene",
@@ -1551,6 +1569,8 @@ def _finalize_pack_with_art_direction(
             extras.extend(SUN_URANUS_VISUAL_REFINEMENT_NEGATIVE_EXTRAS)
         if is_mars_pluto_square_tension(pa, pb, req.aspect_type, req.mode):
             extras.extend(MARS_PLUTO_SQUARE_TENSION_NEGATIVE_EXTRAS)
+        if is_moon_saturn_square_tension(pa, pb, req.aspect_type, req.mode):
+            extras.extend(MOON_SATURN_SQUARE_TENSION_NEGATIVE_EXTRAS)
         if not extras:
             return p
         merged_neg = _merge_negative_prompt(

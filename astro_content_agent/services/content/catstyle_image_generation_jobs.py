@@ -15,6 +15,9 @@ from astro_content_agent.content.catstyle.approved_arena_reference_registry impo
 from astro_content_agent.content.catstyle.catstyle_approved_arena_reference_v1 import (
     apply_approved_arena_reference_to_prompt_pack,
 )
+from astro_content_agent.content.catstyle.catstyle_approved_planet_reference_v1 import (
+    resolve_planet_references_for_pair,
+)
 from astro_content_agent.content.catstyle.models import CatstylePromptPack, CatstylePromptRequest
 from astro_content_agent.services.content.catstyle_arena_reference_resolver import resolve_arena_reference
 from astro_content_agent.services.content.catstyle_style_reference_resolver import resolve_style_reference
@@ -76,6 +79,14 @@ class CatstyleImageGenJob(BaseModel):
         default=None,
         description="Optional local path to approved arena/environment reference (coliseum, sky, floor only).",
     )
+    planet_a_reference_image_path: str | None = Field(
+        default=None,
+        description="Optional local path to approved planet A character reference.",
+    )
+    planet_b_reference_image_path: str | None = Field(
+        default=None,
+        description="Optional local path to approved planet B character reference.",
+    )
     prompt_text: str
     negative_prompt: str
     animation_prompt: str
@@ -135,6 +146,10 @@ class CatstyleImageGenerationJobsResult(BaseModel):
     arena_reference_meta: dict[str, Any] | None = Field(
         default=None,
         description="How the arena/environment reference path was chosen: explicit CLI, arena registry v1, or none.",
+    )
+    planet_references_meta: dict[str, Any] | None = Field(
+        default=None,
+        description="Resolved per-planet character references for planet_a and planet_b.",
     )
 
 
@@ -285,6 +300,21 @@ def _resolve_final_style_reference(
     )
 
 
+def _planet_reference_log_lines(meta: dict[str, Any]) -> list[str]:
+    lines: list[str] = []
+    for slot in ("planet_a", "planet_b"):
+        row = meta.get(slot) if isinstance(meta.get(slot), dict) else None
+        if not row:
+            continue
+        if row.get("used"):
+            lines.append(
+                f"{slot}: {row.get('planet')} registry_key={row.get('registry_key')} path={row.get('image_path')}"
+            )
+        else:
+            lines.append(f"{slot}: missing ({row.get('missing_reason') or row.get('source')})")
+    return lines
+
+
 def _manifest_summary_text(
     *,
     date: str,
@@ -295,6 +325,7 @@ def _manifest_summary_text(
     output_dir: Path,
     manual_aspect_override: dict[str, Any] | None = None,
     style_reference: dict[str, Any] | None = None,
+    planet_references: dict[str, Any] | None = None,
 ) -> str:
     lines: list[str] = [
         f"Catstyle image generation jobs v0 — {date}",
@@ -338,6 +369,10 @@ def _manifest_summary_text(
             lines.append("auto_resolve_disabled: true")
         for log_line in style_reference.get("log_lines") or []:
             lines.append(log_line)
+        lines.append("")
+    if planet_references:
+        lines.extend(["## Planet references (v1)"])
+        lines.extend(_planet_reference_log_lines(planet_references))
         lines.append("")
     if manual_aspect_override:
         lines.extend(
@@ -695,6 +730,15 @@ def build_catstyle_image_generation_jobs(
     pb = str(primary["planet_b"])
     aspect = str(primary["aspect_type"])
     mode = str(primary["mode_recommendation"])
+    planet_references_meta = resolve_planet_references_for_pair(pa, pb)
+    planet_a_ref_path: str | None = None
+    planet_b_ref_path: str | None = None
+    pa_row = planet_references_meta.get("planet_a") or {}
+    pb_row = planet_references_meta.get("planet_b") or {}
+    if isinstance(pa_row, dict) and pa_row.get("used") and pa_row.get("image_path"):
+        planet_a_ref_path = str(pa_row["image_path"])
+    if isinstance(pb_row, dict) and pb_row.get("used") and pb_row.get("image_path"):
+        planet_b_ref_path = str(pb_row["image_path"])
     source = str(primary.get("source", ""))
     total_score = int(primary["total_score"])
     sel_score = primary.get("editorial_selection_score")
@@ -742,6 +786,8 @@ def build_catstyle_image_generation_jobs(
                     shot_role=shot_role,
                     style_reference_image_path=final_ref,
                     arena_reference_image_path=final_arena_ref,
+                    planet_a_reference_image_path=planet_a_ref_path,
+                    planet_b_reference_image_path=planet_b_ref_path,
                     banner_glyph_reference_planet_a_path=glyph_a_path,
                     banner_glyph_reference_planet_b_path=glyph_b_path,
                     prompt_text=prompt_text,
@@ -805,6 +851,7 @@ def build_catstyle_image_generation_jobs(
             manifest["style_reference"] = style_reference_meta
         if arena_reference_meta is not None:
             manifest["arena_reference"] = arena_reference_meta
+        manifest["planet_references"] = planet_references_meta
         mp = out / "image_generation_jobs.json"
         _write_utf8_json(mp, manifest)
         manifest_path = str(mp)
@@ -829,6 +876,7 @@ def build_catstyle_image_generation_jobs(
             output_dir=out,
             manual_aspect_override=manual_block,
             style_reference=style_reference_meta,
+            planet_references=planet_references_meta,
         )
         _write_utf8_text(out / "manifest_summary.txt", summary)
         files_written.append("manifest_summary.txt")
@@ -839,6 +887,8 @@ def build_catstyle_image_generation_jobs(
         build_lines.extend(_style_reference_log_lines(style_reference_meta))
     if arena_reference_meta and arena_reference_meta.get("arena_reference_used"):
         build_lines.extend(_arena_reference_log_lines(arena_reference_meta))
+    if planet_references_meta:
+        build_lines.extend(_planet_reference_log_lines(planet_references_meta))
     if build_lines:
         build_message = "; ".join(build_lines)
 
@@ -855,6 +905,7 @@ def build_catstyle_image_generation_jobs(
         message=build_message,
         style_reference_meta=style_reference_meta,
         arena_reference_meta=arena_reference_meta,
+        planet_references_meta=planet_references_meta,
     )
 
 

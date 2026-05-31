@@ -11,9 +11,9 @@ import httpx
 from pydantic import BaseModel, Field
 
 from astro_content_agent.content.catstyle.approved_reference_registry import catstyle_repo_root
-from astro_content_agent.content.catstyle.catstyle_approved_arena_reference_v1 import (
-    format_arena_reference_image_roles_prefix,
-    format_dual_reference_provider_priority_preamble,
+from astro_content_agent.content.catstyle.catstyle_approved_planet_reference_v1 import (
+    format_catstyle_modular_reference_roles_prefix,
+    format_modular_reference_provider_priority_preamble,
 )
 from astro_content_agent.content.catstyle.sun_uranus_visual_refinement_v1 import (
     BANNER_ONLY_APPROVED_REFERENCE_DECOUPLING_BLOCK,
@@ -60,11 +60,13 @@ def _resolve_reference_image_path(path_str: str) -> Path | None:
 
 
 def _ordered_reference_paths_from_job(job: dict[str, Any]) -> list[tuple[str, Path]]:
-    """Return ordered (role, path) pairs: arena first, then style, then banner glyphs."""
+    """Return ordered (role, path) pairs: arena, planet_a, planet_b, pair style, banner glyphs."""
     out: list[tuple[str, Path]] = []
     for key, role in (
         ("arena_reference_image_path", "arena"),
-        ("style_reference_image_path", "style"),
+        ("planet_a_reference_image_path", "planet_a"),
+        ("planet_b_reference_image_path", "planet_b"),
+        ("style_reference_image_path", "pair_style"),
         ("banner_glyph_reference_planet_a_path", "banner_a"),
         ("banner_glyph_reference_planet_b_path", "banner_b"),
     ):
@@ -75,18 +77,22 @@ def _ordered_reference_paths_from_job(job: dict[str, Any]) -> list[tuple[str, Pa
 
 
 def _reference_input_prefix(job: dict[str, Any]) -> str:
-    """Provider preamble for style, arena, and banner glyph reference images."""
+    """Provider preamble for modular arena + planet + optional pair + banner glyph references."""
     refs = _ordered_reference_paths_from_job(job)
     if not refs:
         return ""
     roles = {role for role, _ in refs}
-    prefix = format_arena_reference_image_roles_prefix(
-        style_reference_present="style" in roles,
+    prefix = format_catstyle_modular_reference_roles_prefix(
         arena_reference_present="arena" in roles,
+        planet_a_reference_present="planet_a" in roles,
+        planet_b_reference_present="planet_b" in roles,
+        pair_style_reference_present="pair_style" in roles,
+        planet_a_name=str(job.get("planet_a") or "planet A"),
+        planet_b_name=str(job.get("planet_b") or "planet B"),
         banner_glyph_a="banner_a" in roles,
         banner_glyph_b="banner_b" in roles,
     )
-    if "style" in roles:
+    if "pair_style" in roles:
         prefix = f"{prefix} {BANNER_ONLY_APPROVED_REFERENCE_DECOUPLING_BLOCK}"
     return prefix.strip() + " " if prefix else ""
 
@@ -286,6 +292,16 @@ class OpenAICatstyleImageProvider:
             if job.get("arena_reference_image_path") is not None
             else None
         )
+        planet_a_reference_image_path = (
+            str(job.get("planet_a_reference_image_path", "")).strip() or None
+            if job.get("planet_a_reference_image_path") is not None
+            else None
+        )
+        planet_b_reference_image_path = (
+            str(job.get("planet_b_reference_image_path", "")).strip() or None
+            if job.get("planet_b_reference_image_path") is not None
+            else None
+        )
         preview = _preview(str(job.get("prompt_text", "")))
 
         meta_base = {
@@ -295,6 +311,8 @@ class OpenAICatstyleImageProvider:
             "suggested_output_name": suggested,
             "style_reference_image_path": style_reference_image_path,
             "arena_reference_image_path": arena_reference_image_path,
+            "planet_a_reference_image_path": planet_a_reference_image_path,
+            "planet_b_reference_image_path": planet_b_reference_image_path,
             "reference_used": False,
             "reference_path": style_reference_image_path or arena_reference_image_path,
             "reference_skip_reason": None,
@@ -329,6 +347,8 @@ class OpenAICatstyleImageProvider:
         for key in (
             "style_reference_image_path",
             "arena_reference_image_path",
+            "planet_a_reference_image_path",
+            "planet_b_reference_image_path",
             "banner_glyph_reference_planet_a_path",
             "banner_glyph_reference_planet_b_path",
         ):
@@ -361,13 +381,18 @@ class OpenAICatstyleImageProvider:
             meta_base["reference_image_roles"] = [role for role, _ in ref_entries]
             meta_base["reference_image_paths"] = [str(p) for p in ref_paths]
             meta_base["reference_path"] = str(ref_paths[0])
-            style_resolved = next((p for role, p in ref_entries if role == "style"), None)
+            style_resolved = next((p for role, p in ref_entries if role == "pair_style"), None)
             if style_resolved is not None:
                 meta_base["style_reference_image_path"] = str(style_resolved)
-            if arena_reference_image_path:
-                arena_resolved = next((p for role, p in ref_entries if role == "arena"), None)
-                if arena_resolved is not None:
-                    meta_base["arena_reference_image_path"] = str(arena_resolved)
+            arena_resolved = next((p for role, p in ref_entries if role == "arena"), None)
+            if arena_resolved is not None:
+                meta_base["arena_reference_image_path"] = str(arena_resolved)
+            pa_resolved = next((p for role, p in ref_entries if role == "planet_a"), None)
+            if pa_resolved is not None:
+                meta_base["planet_a_reference_image_path"] = str(pa_resolved)
+            pb_resolved = next((p for role, p in ref_entries if role == "planet_b"), None)
+            if pb_resolved is not None:
+                meta_base["planet_b_reference_image_path"] = str(pb_resolved)
             ref_src = str(job.get("reference_source") or "").strip()
             meta_base["reference_source"] = ref_src or "catstyle_reference_images"
         else:
@@ -376,9 +401,13 @@ class OpenAICatstyleImageProvider:
         prompt = _build_combined_prompt(job)
         if ref_paths:
             roles_present = {role for role, _ in ref_entries}
-            priority = format_dual_reference_provider_priority_preamble(
+            priority = format_modular_reference_provider_priority_preamble(
                 arena_present="arena" in roles_present,
-                style_present="style" in roles_present,
+                planet_a_present="planet_a" in roles_present,
+                planet_b_present="planet_b" in roles_present,
+                pair_style_present="pair_style" in roles_present,
+                planet_a_name=str(job.get("planet_a") or "planet A"),
+                planet_b_name=str(job.get("planet_b") or "planet B"),
             )
             if priority:
                 prompt = f"{priority} {prompt}"

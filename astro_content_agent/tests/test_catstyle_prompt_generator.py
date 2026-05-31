@@ -1060,7 +1060,7 @@ def test_moon_saturn_prompt_preserves_distinct_identity_and_saturn_anti_fire() -
     assert "saturn must-not traits lock" in blob
 
 
-def test_moon_saturn_square_tension_includes_visual_correction_patch() -> None:
+def test_moon_saturn_square_tension_includes_visual_canon_v1() -> None:
     from astro_content_agent.content.catstyle.models import CatstylePromptRequest
 
     pack = generate_catstyle_prompt_pack(
@@ -1070,30 +1070,28 @@ def test_moon_saturn_square_tension_includes_visual_correction_patch() -> None:
             aspect_type="square",
             mode="tension",
             premium_art_direction=False,
+            disable_arena_reference_auto=True,
         )
     )
     blob = " ".join(pack.image_prompts).lower()
-    assert "[moon-saturn visual correction patch v1" in blob
+    assert "[moon-saturn square tension visual canon v1]" in blob
     assert "[aspect choreography v1 - square]" in blob
-    assert "strike/counterstrike" in blob or "tense collision" in blob
-    assert "pillow strike" in blob and "moonlight wave" in blob
-    assert ("stone block" in blob or "gravity press" in blob) and (
-        "freeze/frost field" in blob or "time-lock" in blob
-    )
-    assert "generic action-hero brawl" in blob or "fire ninja" in blob
-    assert "do not let saturn inherit mars visual traits" in blob
-    assert "vulnerability vs discipline" in blob
-    assert "stone gate of time and responsibility" in blob
-    assert "cozy doorway/window" in blob
-    assert "martial-arts duel choreography" in blob or "no martial-arts duel choreography" in blob
-    assert "not 3d cgi figurine" in blob
-    assert "[arena composition boost v1]" in blob
-    assert "medium-wide dramatic arena framing" in blob
-    assert "zodiac symbols around the ring" in blob
-    assert "curved coliseum wall" in blob
-    assert "arches/stadium tiers/layered architecture depth" in blob
-    assert "avoid overly tight crop on the two characters" in blob
-    assert "avoid background collapsing into vague darkness" in blob
+    assert "crescent sickle" in blob
+    assert "secondary" in blob and ("cushion" in blob or "sleep relic" in blob)
+    assert "lecturer" in blob or "strategist" in blob
+    assert "psychological enforcer" in blob or "psychological" in blob
+    assert "generic brawl" in blob or "generic brawl" in (pack.negative_prompt or "").lower()
+    assert "[moon-saturn visual correction patch v1" not in blob
+    assert "pillow strike" not in blob
+    assert "vulnerability versus repression" in blob or "emotional pressure versus rigid control" in blob
+    assert "niche statue" in blob or "background niche statues" in blob
+    assert "warm golden" in blob or "golden lights" in blob or "golden arcade" in blob
+    assert "[moon-saturn saturn identity hard lock v1]" in blob
+    assert "orange" in blob and ("fire" in blob or "fiery" in blob)
+    assert "lead" in blob and ("iron" in blob or "stone" in blob)
+    assert "brute-warrior moon" in (pack.negative_prompt or "").lower() or "brute warrior" in (
+        pack.negative_prompt or ""
+    ).lower()
 
 
 def test_aspect_choreography_square_vs_trine_tone() -> None:
