@@ -260,6 +260,97 @@ def test_output_writes_manifest_and_prompt_files(tmp_path: Path) -> None:
     assert "manifest_summary.txt" in r.files_written
 
 
+def test_build_jobs_without_planet_reference_auto_preserves_mock_prompts(tmp_path: Path) -> None:
+    with patch(
+        "astro_content_agent.services.content.catstyle_image_generation_jobs.generate_catstyle_daily_pack",
+        return_value=_fake_pack_one_primary(),
+    ):
+        r = build_catstyle_image_generation_jobs(
+            date(2026, 5, 2),
+            output_dir=tmp_path / "jobs",
+            disable_arena_reference_auto=True,
+            use_planet_reference_auto=False,
+        )
+    assert r.jobs[0].prompt_text == "prompt line one"
+    assert r.jobs[0].planet_a_reference_image_path is None
+    assert r.jobs[0].planet_b_reference_image_path is None
+    assert r.jobs[0].reference_images == [] or all(
+        row["role"] not in ("planet_a", "planet_b") for row in r.jobs[0].reference_images
+    )
+
+
+def test_build_jobs_with_planet_reference_auto_attaches_refs_and_lock(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from astro_content_agent.content.catstyle.catstyle_approved_planet_reference_v1 import (
+        APPROVED_PLANET_REFERENCE_LOCK_MARKER,
+        ApprovedPlanetReferenceEntry,
+        write_planet_registry_entries,
+    )
+
+    reg = tmp_path / "approved_planet_references.json"
+    jupiter_png = tmp_path / "jupiter.png"
+    mars_png = tmp_path / "mars.png"
+    arena_png = tmp_path / "arena.png"
+    pair_png = tmp_path / "pair.png"
+    for p in (jupiter_png, mars_png, arena_png, pair_png):
+        p.write_bytes(b"x")
+    write_planet_registry_entries(
+        reg,
+        [
+            ApprovedPlanetReferenceEntry(
+                registry_key="jupiter_v1",
+                planet="Jupiter",
+                image_path=str(jupiter_png),
+                priority=100,
+                active=True,
+            ),
+            ApprovedPlanetReferenceEntry(
+                registry_key="mars_v1",
+                planet="Mars",
+                image_path=str(mars_png),
+                priority=100,
+                active=True,
+            ),
+        ],
+    )
+    monkeypatch.setattr(
+        "astro_content_agent.content.catstyle.catstyle_approved_planet_reference_v1.approved_planet_references_json_path",
+        lambda: reg,
+    )
+    monkeypatch.setattr(
+        "astro_content_agent.services.content.catstyle_image_generation_jobs.resolve_arena_reference",
+        lambda **kwargs: (str(arena_png.resolve()), {"arena_reference_used": True}),
+    )
+    monkeypatch.setattr(
+        "astro_content_agent.services.content.catstyle_image_generation_jobs._resolve_final_style_reference",
+        lambda **kwargs: (str(pair_png.resolve()), {"source": "explicit", "reference_tier": "exact"}),
+    )
+    with patch(
+        "astro_content_agent.services.content.catstyle_image_generation_jobs.generate_catstyle_daily_pack",
+        return_value=_fake_pack_one_primary(),
+    ):
+        r = build_catstyle_image_generation_jobs(
+            date(2026, 5, 2),
+            output_dir=tmp_path / "jobs",
+            disable_arena_reference_auto=False,
+            disable_approved_reference_auto=True,
+            use_planet_reference_auto=True,
+            jobs_count=1,
+        )
+    job = r.jobs[0]
+    assert APPROVED_PLANET_REFERENCE_LOCK_MARKER in job.prompt_text
+    assert job.planet_a_reference_image_path == str(jupiter_png.resolve())
+    assert job.planet_b_reference_image_path == str(mars_png.resolve())
+    assert [row["role"] for row in job.reference_images] == [
+        "arena",
+        "planet_a",
+        "planet_b",
+        "pair_style",
+    ]
+    assert len({row["path"] for row in job.reference_images}) == len(job.reference_images)
+
+
 def test_output_jobs_count_one_writes_single_prompt_file(tmp_path: Path) -> None:
     out = tmp_path / "out_one"
     with patch(

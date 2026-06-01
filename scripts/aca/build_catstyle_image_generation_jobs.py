@@ -111,6 +111,12 @@ def main() -> int:
         help="Do not auto-pick the default approved arena reference from the arena registry.",
     )
     ap.add_argument(
+        "--use-planet-reference-auto",
+        action="store_true",
+        dest="use_planet_reference_auto",
+        help="Attach approved per-planet character references to jobs and inject planet reference lock.",
+    )
+    ap.add_argument(
         "--planet-a",
         default=None,
         dest="planet_a_override",
@@ -160,10 +166,11 @@ def main() -> int:
             render_style_profile_key=args.render_style_profile,
             shot_mode=args.shot_mode,
             style_reference_image_path=args.style_reference_image,
-            disable_approved_reference_auto=args.disable_approved_reference_auto,
-            arena_reference_image_path=args.arena_reference_image,
-            disable_arena_reference_auto=args.disable_arena_reference_auto,
-            planet_a_override=args.planet_a_override,
+        disable_approved_reference_auto=args.disable_approved_reference_auto,
+        arena_reference_image_path=args.arena_reference_image,
+        disable_arena_reference_auto=args.disable_arena_reference_auto,
+        use_planet_reference_auto=args.use_planet_reference_auto,
+        planet_a_override=args.planet_a_override,
             planet_b_override=args.planet_b_override,
             aspect_type_override=args.aspect_type_override,
             mode_override=args.mode_override,

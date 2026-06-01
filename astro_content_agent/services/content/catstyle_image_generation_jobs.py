@@ -16,6 +16,10 @@ from astro_content_agent.content.catstyle.catstyle_approved_arena_reference_v1 i
     apply_approved_arena_reference_to_prompt_pack,
 )
 from astro_content_agent.content.catstyle.catstyle_approved_planet_reference_v1 import (
+    active_planet_reference_paths_from_meta,
+    apply_approved_planet_reference_lock_to_prompt_pack,
+    build_job_reference_images,
+    planet_references_active_for_job,
     resolve_planet_references_for_pair,
 )
 from astro_content_agent.content.catstyle.models import CatstylePromptPack, CatstylePromptRequest
@@ -86,6 +90,13 @@ class CatstyleImageGenJob(BaseModel):
     planet_b_reference_image_path: str | None = Field(
         default=None,
         description="Optional local path to approved planet B character reference.",
+    )
+    reference_images: list[dict[str, str]] = Field(
+        default_factory=list,
+        description=(
+            "Ordered image-conditioning references for providers: arena, planet_a, planet_b, "
+            "optional pair_style (deduped paths)."
+        ),
     )
     prompt_text: str
     negative_prompt: str
@@ -259,6 +270,29 @@ def _merge_arena_reference_into_prompt_pack_dict(
         priority=int(arena_meta.get("priority") or 0),
     )
     pack = apply_approved_arena_reference_to_prompt_pack(CatstylePromptPack.model_validate(pp), hit)
+    return dict(pack.model_dump(mode="json"))
+
+
+def _merge_planet_reference_lock_into_prompt_pack_dict(
+    pp: dict[str, Any],
+    planet_a: str,
+    planet_b: str,
+    planet_references_meta: dict[str, Any],
+) -> dict[str, Any]:
+    """Ensure pack prompts include planet reference lock when registry refs resolved."""
+    if not planet_references_active_for_job(planet_references_meta):
+        return pp
+    if pp.get("planet_reference_assist"):
+        return pp
+    first = str((pp.get("image_prompts") or [""])[0])
+    if "[APPROVED PLANET REFERENCE LOCK v1]" in first:
+        return pp
+    pack = apply_approved_planet_reference_lock_to_prompt_pack(
+        CatstylePromptPack.model_validate(pp),
+        planet_a,
+        planet_b,
+        planet_references_meta,
+    )
     return dict(pack.model_dump(mode="json"))
 
 
@@ -440,6 +474,7 @@ def build_catstyle_image_generation_jobs(
     aspect_type_override: str | None = None,
     mode_override: str | None = None,
     disable_approved_reference_auto: bool = False,
+    use_planet_reference_auto: bool = False,
     jobs_count: int | None = None,
     *,
     compute_positions_fn: Callable[..., dict[str, PlanetPosition]] | None = None,
@@ -733,12 +768,30 @@ def build_catstyle_image_generation_jobs(
     planet_references_meta = resolve_planet_references_for_pair(pa, pb)
     planet_a_ref_path: str | None = None
     planet_b_ref_path: str | None = None
-    pa_row = planet_references_meta.get("planet_a") or {}
-    pb_row = planet_references_meta.get("planet_b") or {}
-    if isinstance(pa_row, dict) and pa_row.get("used") and pa_row.get("image_path"):
-        planet_a_ref_path = str(pa_row["image_path"])
-    if isinstance(pb_row, dict) and pb_row.get("used") and pb_row.get("image_path"):
-        planet_b_ref_path = str(pb_row["image_path"])
+    planet_refs_attached = use_planet_reference_auto and planet_references_active_for_job(
+        planet_references_meta
+    )
+    if planet_refs_attached:
+        planet_a_ref_path, planet_b_ref_path = active_planet_reference_paths_from_meta(
+            planet_references_meta
+        )
+        pp = _merge_planet_reference_lock_into_prompt_pack_dict(pp, pa, pb, planet_references_meta)
+        image_prompts = [str(p) for p in (pp.get("image_prompts") or [])]
+        if jobs_count is not None:
+            if len(image_prompts) < jobs_count:
+                raise ValueError(
+                    f"jobs_count={jobs_count} requires at least {jobs_count} image prompt(s); "
+                    f"pack has {len(image_prompts)}."
+                )
+            image_prompts = image_prompts[:jobs_count]
+            if shot_roles_list:
+                shot_roles_list = shot_roles_list[:jobs_count]
+    job_reference_images = build_job_reference_images(
+        arena_reference_image_path=final_arena_ref,
+        planet_a_reference_image_path=planet_a_ref_path,
+        planet_b_reference_image_path=planet_b_ref_path,
+        style_reference_image_path=final_ref,
+    )
     source = str(primary.get("source", ""))
     total_score = int(primary["total_score"])
     sel_score = primary.get("editorial_selection_score")
@@ -788,6 +841,7 @@ def build_catstyle_image_generation_jobs(
                     arena_reference_image_path=final_arena_ref,
                     planet_a_reference_image_path=planet_a_ref_path,
                     planet_b_reference_image_path=planet_b_ref_path,
+                    reference_images=job_reference_images,
                     banner_glyph_reference_planet_a_path=glyph_a_path,
                     banner_glyph_reference_planet_b_path=glyph_b_path,
                     prompt_text=prompt_text,

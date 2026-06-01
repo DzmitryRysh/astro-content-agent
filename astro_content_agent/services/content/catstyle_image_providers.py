@@ -61,6 +61,38 @@ def _resolve_reference_image_path(path_str: str) -> Path | None:
 
 def _ordered_reference_paths_from_job(job: dict[str, Any]) -> list[tuple[str, Path]]:
     """Return ordered (role, path) pairs: arena, planet_a, planet_b, pair style, banner glyphs."""
+    ref_images = job.get("reference_images")
+    if isinstance(ref_images, list) and ref_images:
+        out: list[tuple[str, Path]] = []
+        seen: set[str] = set()
+        for item in ref_images:
+            if not isinstance(item, dict):
+                continue
+            role = str(item.get("role") or "").strip()
+            path_str = str(item.get("path") or "").strip()
+            if not role or not path_str:
+                continue
+            resolved = _resolve_reference_image_path(path_str)
+            if resolved is None:
+                continue
+            key = str(resolved)
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append((role, resolved))
+        for key, role in (
+            ("banner_glyph_reference_planet_a_path", "banner_a"),
+            ("banner_glyph_reference_planet_b_path", "banner_b"),
+        ):
+            resolved = _resolve_reference_image_path(str(job.get(key) or ""))
+            if resolved is None:
+                continue
+            bkey = str(resolved)
+            if bkey in seen:
+                continue
+            seen.add(bkey)
+            out.append((role, resolved))
+        return out
     out: list[tuple[str, Path]] = []
     for key, role in (
         ("arena_reference_image_path", "arena"),

@@ -1,4 +1,95 @@
 {
   "version": "catstyle-approved-planet-reference-v1",
-  "entries": []
+  "entries": [
+    {
+      "registry_key": "jupiter_planetcat_v1",
+      "planet": "Jupiter",
+      "image_path": "references/catstyle_planet_jupiter_jupiter_planetcat_v1_approved.png",
+      "label": "Jupiter planetcat v1",
+      "notes": "Base single-character Jupiter reference for Catstyle multi-planet scenes",
+      "priority": 100,
+      "active": true
+    },
+    {
+      "registry_key": "mars_planetcat_v1",
+      "planet": "Mars",
+      "image_path": "references/catstyle_planet_mars_mars_planetcat_v1_approved.png",
+      "label": "Mars planetcat v1",
+      "notes": "Base single-character Mars reference for Catstyle multi-planet scenes",
+      "priority": 100,
+      "active": true
+    },
+    {
+      "registry_key": "mercury_planetcat_v1",
+      "planet": "Mercury",
+      "image_path": "references/catstyle_planet_mercury_mercury_planetcat_v1_approved.png",
+      "label": "Mercury planetcat v1",
+      "notes": "Base single-character Mercury reference for Catstyle multi-planet scenes",
+      "priority": 100,
+      "active": true
+    },
+    {
+      "registry_key": "moon_planetcat_v1",
+      "planet": "Moon",
+      "image_path": "references/catstyle_planet_moon_moon_planetcat_v1_approved.png",
+      "label": "Moon planetcat v1",
+      "notes": "Base single-character Moon reference for Catstyle multi-planet scenes",
+      "priority": 100,
+      "active": true
+    },
+    {
+      "registry_key": "neptune_planetcat_v1",
+      "planet": "Neptune",
+      "image_path": "references/catstyle_planet_neptune_neptune_planetcat_v1_approved.png",
+      "label": "Neptune planetcat v1",
+      "notes": "Base single-character Neptune reference for Catstyle multi-planet scenes",
+      "priority": 100,
+      "active": true
+    },
+    {
+      "registry_key": "pluto_planetcat_v1",
+      "planet": "Pluto",
+      "image_path": "references/catstyle_planet_pluto_pluto_planetcat_v1_approved.png",
+      "label": "Pluto planetcat v1",
+      "notes": "Base single-character Pluto reference for Catstyle multi-planet scenes",
+      "priority": 100,
+      "active": true
+    },
+    {
+      "registry_key": "saturn_planetcat_v1",
+      "planet": "Saturn",
+      "image_path": "references/catstyle_planet_saturn_saturn_planetcat_v1_approved.png",
+      "label": "Saturn planetcat v1",
+      "notes": "Base single-character Saturn reference for Catstyle multi-planet scenes",
+      "priority": 100,
+      "active": true
+    },
+    {
+      "registry_key": "sun_planetcat_v1",
+      "planet": "Sun",
+      "image_path": "references/catstyle_planet_sun_sun_planetcat_v1_approved.png",
+      "label": "Sun planetcat v1",
+      "notes": "Base single-character Sun reference for Catstyle multi-planet scenes",
+      "priority": 100,
+      "active": true
+    },
+    {
+      "registry_key": "uranus_planetcat_v1",
+      "planet": "Uranus",
+      "image_path": "references/catstyle_planet_uranus_uranus_planetcat_v1_approved.png",
+      "label": "Uranus planetcat v1",
+      "notes": "Base single-character Uranus reference for Catstyle multi-planet scenes",
+      "priority": 100,
+      "active": true
+    },
+    {
+      "registry_key": "venus_planetcat_v1",
+      "planet": "Venus",
+      "image_path": "references/catstyle_planet_venus_venus_planetcat_v1_approved.png",
+      "label": "Venus planetcat v1",
+      "notes": "Base single-character Venus reference for Catstyle multi-planet scenes",
+      "priority": 100,
+      "active": true
+    }
+  ]
 }

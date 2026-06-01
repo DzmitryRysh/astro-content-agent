@@ -9,6 +9,127 @@ from pydantic import BaseModel, Field
 
 from astro_content_agent.content.catstyle.approved_reference_registry import catstyle_repo_root
 from astro_content_agent.content.catstyle.planet_canon_v1 import normalize_planet_name
+from astro_content_agent.content.catstyle.models import CatstylePromptPack
+
+
+APPROVED_PLANET_REFERENCE_LOCK_MARKER: str = "[APPROVED PLANET REFERENCE LOCK v1]"
+
+APPROVED_PLANET_REFERENCE_LOCK_BODY: str = (
+    "Treat approved per-planet references as primary character identity anchors. "
+    "Preserve each referenced planet-cat's face style, body proportions, planetary body material, "
+    "silhouette, palette, costume logic, aura, and main accessories. "
+    "Do not revert to old text-only canon when image references are present. "
+    "Text canon may clarify symbolism, but image reference controls visual identity. "
+    "Preserve planet-cat anatomy and planetary surface material over ordinary fur-cat styling."
+)
+
+
+def build_approved_planet_reference_lock_block(
+    planet_a: str,
+    planet_b: str,
+    planet_references_meta: dict[str, Any],
+) -> str:
+    """Build planet reference lock block with planet-specific guardrails."""
+    pa_norm = normalize_planet_name(planet_a)
+    pb_norm = normalize_planet_name(planet_b)
+    pa_row = planet_references_meta.get("planet_a") if isinstance(planet_references_meta.get("planet_a"), dict) else {}
+    pb_row = planet_references_meta.get("planet_b") if isinstance(planet_references_meta.get("planet_b"), dict) else {}
+    extras: list[str] = []
+    if pa_row.get("used") and pa_norm.lower() == "venus":
+        extras.append(
+            "Venus must not revert to generic cute rose cat if a Venus planet reference is attached."
+        )
+    if pb_row.get("used") and pb_norm.lower() == "venus":
+        extras.append(
+            "Venus must not revert to generic cute rose cat if a Venus planet reference is attached."
+        )
+    if pa_row.get("used") and pa_norm.lower() == "saturn":
+        extras.append(
+            "Saturn must not soften into generic dark cat if a Saturn planet reference is attached."
+        )
+    if pb_row.get("used") and pb_norm.lower() == "saturn":
+        extras.append(
+            "Saturn must not soften into generic dark cat if a Saturn planet reference is attached."
+        )
+    body = APPROVED_PLANET_REFERENCE_LOCK_BODY
+    if extras:
+        body = f"{body} {' '.join(dict.fromkeys(extras))}"
+    return f"{APPROVED_PLANET_REFERENCE_LOCK_MARKER} {body}"
+
+
+def inject_approved_planet_reference_lock_block(prompt: str, block: str) -> str:
+    """Append planet lock after arena/style opener region when possible."""
+    block = block.strip()
+    if not block or APPROVED_PLANET_REFERENCE_LOCK_MARKER.lower() in prompt.lower():
+        return prompt
+    for anchor in (
+        APPROVED_PLANET_REFERENCE_LOCK_MARKER,
+        "[CATSTYLE APPROVED ARENA REFERENCE v1]",
+        "Aspect type:",
+        "[WORLD TEMPLATE v1",
+    ):
+        idx = prompt.find(anchor)
+        if idx > 0:
+            return f"{prompt[:idx].rstrip()} {block} {prompt[idx:].lstrip()}"
+    return f"{prompt.rstrip()} {block}"
+
+
+def apply_approved_planet_reference_lock_to_prompt_pack(
+    pack: CatstylePromptPack,
+    planet_a: str,
+    planet_b: str,
+    planet_references_meta: dict[str, Any],
+) -> CatstylePromptPack:
+    """Inject planet reference lock into the first image prompt."""
+    if not planet_references_active_for_job(planet_references_meta):
+        return pack
+    block = build_approved_planet_reference_lock_block(planet_a, planet_b, planet_references_meta)
+    data = pack.model_dump(mode="json")
+    prompts = [str(p) for p in (data.get("image_prompts") or [])]
+    if prompts:
+        prompts[0] = inject_approved_planet_reference_lock_block(prompts[0], block)
+        data["image_prompts"] = prompts
+    data["planet_reference_assist"] = {
+        "planet_a": planet_references_meta.get("planet_a"),
+        "planet_b": planet_references_meta.get("planet_b"),
+        "any_used": planet_references_meta.get("any_used"),
+        "prompt_block": block,
+    }
+    return CatstylePromptPack.model_validate(data)
+
+
+def build_job_reference_images(
+    *,
+    arena_reference_image_path: str | None = None,
+    planet_a_reference_image_path: str | None = None,
+    planet_b_reference_image_path: str | None = None,
+    style_reference_image_path: str | None = None,
+) -> list[dict[str, str]]:
+    """
+    Ordered deduped reference list for job manifests and providers.
+
+    Order: arena → planet_a → planet_b → optional pair_style.
+    """
+    out: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for role, raw in (
+        ("arena", arena_reference_image_path),
+        ("planet_a", planet_a_reference_image_path),
+        ("planet_b", planet_b_reference_image_path),
+        ("pair_style", style_reference_image_path),
+    ):
+        path_str = str(raw or "").strip()
+        if not path_str:
+            continue
+        resolved = _absolute_image_path(path_str)
+        if not resolved.is_file():
+            continue
+        key = str(resolved)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append({"role": role, "path": key})
+    return out
 
 
 def approved_planet_references_json_path() -> Path:
@@ -167,6 +288,27 @@ def resolve_planet_references_for_pair(planet_a: str, planet_b: str) -> dict[str
     }
 
 
+def active_planet_reference_paths_from_meta(
+    planet_references_meta: dict[str, Any],
+) -> tuple[str | None, str | None]:
+    """Return attached planet A/B paths only when resolve metadata reports used=True with image_path."""
+    pa_row = planet_references_meta.get("planet_a") if isinstance(planet_references_meta.get("planet_a"), dict) else {}
+    pb_row = planet_references_meta.get("planet_b") if isinstance(planet_references_meta.get("planet_b"), dict) else {}
+    pa_path: str | None = None
+    pb_path: str | None = None
+    if pa_row.get("used") and pa_row.get("image_path"):
+        pa_path = str(pa_row["image_path"])
+    if pb_row.get("used") and pb_row.get("image_path"):
+        pb_path = str(pb_row["image_path"])
+    return pa_path, pb_path
+
+
+def planet_references_active_for_job(planet_references_meta: dict[str, Any]) -> bool:
+    """True when at least one resolved planet reference is used with a valid image_path."""
+    pa_path, pb_path = active_planet_reference_paths_from_meta(planet_references_meta)
+    return bool(pa_path or pb_path)
+
+
 def list_active_planet_references_grouped() -> dict[str, list[ApprovedPlanetReferenceEntry]]:
     grouped: dict[str, list[ApprovedPlanetReferenceEntry]] = {}
     for e in load_approved_planet_reference_registry():
@@ -298,16 +440,22 @@ def format_modular_reference_provider_priority_preamble(
 
 
 __all__ = [
+    "APPROVED_PLANET_REFERENCE_LOCK_MARKER",
     "ApprovedPlanetReferenceEntry",
     "PlanetReferenceResolveResult",
     "ResolvedPlanetReference",
+    "active_planet_reference_paths_from_meta",
+    "apply_approved_planet_reference_lock_to_prompt_pack",
     "approved_planet_references_json_path",
+    "build_approved_planet_reference_lock_block",
+    "build_job_reference_images",
     "format_catstyle_modular_reference_roles_prefix",
     "format_modular_reference_provider_priority_preamble",
     "list_active_planet_references_grouped",
     "list_resolved_winners_by_planet",
     "load_approved_planet_reference_registry",
     "planet_reference_target_relpath",
+    "planet_references_active_for_job",
     "read_planet_registry_entries",
     "resolve_approved_planet_reference",
     "resolve_planet_reference",

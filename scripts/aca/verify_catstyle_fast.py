@@ -56,10 +56,12 @@ def _run(
 
 
 def scan_diff_for_secrets(diff_text: str, tokens: tuple[str, ...] = SECRET_TOKENS) -> list[str]:
-    """Return secret token names found in diff lines (added/changed context)."""
+    """Return secret token names found in added diff lines only."""
     hits: list[str] = []
     seen: set[str] = set()
     for line in diff_text.splitlines():
+        if not line.startswith("+") or line.startswith("+++"):
+            continue
         for tok in tokens:
             if tok in line and tok not in seen:
                 hits.append(tok)

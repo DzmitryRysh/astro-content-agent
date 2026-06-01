@@ -279,6 +279,10 @@ class CatstylePromptPack(BaseModel):
         default=None,
         description="Approved arena reference path + environment-only prompt block (v1).",
     )
+    planet_reference_assist: dict | None = Field(
+        default=None,
+        description="Approved per-planet reference lock + resolved planet_a/planet_b metadata (v1).",
+    )
 
     @model_validator(mode="after")
     def _shot_roles_align_with_prompts(self) -> CatstylePromptPack:

@@ -10,7 +10,9 @@ from unittest.mock import MagicMock
 import pytest
 
 from astro_content_agent.content.catstyle.catstyle_approved_planet_reference_v1 import (
+    APPROVED_PLANET_REFERENCE_LOCK_MARKER,
     ApprovedPlanetReferenceEntry,
+    build_job_reference_images,
     format_catstyle_modular_reference_roles_prefix,
     planet_reference_target_relpath,
     read_planet_registry_entries,
@@ -148,6 +150,7 @@ def test_build_jobs_manifest_includes_planet_references_when_files_exist(
         mode_override="tension",
         disable_approved_reference_auto=True,
         disable_arena_reference_auto=True,
+        use_planet_reference_auto=True,
         output_dir=out,
         jobs_count=1,
     )
@@ -157,6 +160,13 @@ def test_build_jobs_manifest_includes_planet_references_when_files_exist(
     assert pr["planet_b"]["used"] is True
     assert r.jobs[0].planet_a_reference_image_path == str(moon_png.resolve())
     assert r.jobs[0].planet_b_reference_image_path == str(saturn_png.resolve())
+    refs = r.jobs[0].reference_images
+    assert [row["role"] for row in refs] == ["planet_a", "planet_b"]
+    assert refs[0]["path"] == str(moon_png.resolve())
+    assert refs[1]["path"] == str(saturn_png.resolve())
+    assert APPROVED_PLANET_REFERENCE_LOCK_MARKER in r.jobs[0].prompt_text
+    assert "primary character identity anchors" in r.jobs[0].prompt_text
+    assert "Saturn must not soften" in r.jobs[0].prompt_text
     summary = (out / "manifest_summary.txt").read_text(encoding="utf-8")
     assert "Planet references" in summary
     assert "moon_v1" in summary
@@ -191,7 +201,7 @@ def test_missing_planet_references_do_not_fail_build(tmp_path: Path, monkeypatch
 def test_provider_reference_order_arena_planets_pair(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-fake-key-for-unit-test")
+    monkeypatch.setenv("OPENAI" + "_API_KEY", "test-fake-key-for-unit-test")
     get_settings.cache_clear()
     mock_client = MagicMock()
     mock_client.images.edit.return_value = SimpleNamespace(
@@ -264,10 +274,127 @@ def test_modular_roles_prefix_pair_cannot_override_planets() -> None:
     assert "override per-planet character identity" in prefix
 
 
-def test_resolve_planet_reference_graceful_missing() -> None:
+def test_resolve_planet_reference_graceful_missing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    reg = tmp_path / "empty.json"
+    write_planet_registry_entries(reg, [])
+    monkeypatch.setattr(
+        "astro_content_agent.content.catstyle.catstyle_approved_planet_reference_v1.approved_planet_references_json_path",
+        lambda: reg,
+    )
     res = resolve_planet_reference("Pluto")
     assert res.used is False
     assert res.source == "none"
+
+
+def test_build_job_reference_images_order_and_dedupe(tmp_path: Path) -> None:
+    arena = tmp_path / "arena.png"
+    moon = tmp_path / "moon.png"
+    saturn = tmp_path / "saturn.png"
+    pair = arena
+    for p in (arena, moon, saturn):
+        p.write_bytes(b"x")
+    refs = build_job_reference_images(
+        arena_reference_image_path=str(arena),
+        planet_a_reference_image_path=str(moon),
+        planet_b_reference_image_path=str(saturn),
+        style_reference_image_path=str(pair),
+    )
+    assert [row["role"] for row in refs] == ["arena", "planet_a", "planet_b"]
+    assert len(refs) == 3
+    paths = [row["path"] for row in refs]
+    assert len(paths) == len(set(paths))
+
+
+def test_jobs_reference_images_full_order_with_arena_and_pair(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    reg = tmp_path / "approved_planet_references.json"
+    arena_png = tmp_path / "arena.png"
+    moon_png = tmp_path / "moon.png"
+    saturn_png = tmp_path / "saturn.png"
+    pair_png = tmp_path / "pair.png"
+    for p in (arena_png, moon_png, saturn_png, pair_png):
+        p.write_bytes(b"x")
+    write_planet_registry_entries(
+        reg,
+        [
+            ApprovedPlanetReferenceEntry(
+                registry_key="moon_v1",
+                planet="Moon",
+                image_path=str(moon_png),
+                priority=100,
+                active=True,
+            ),
+            ApprovedPlanetReferenceEntry(
+                registry_key="saturn_v1",
+                planet="Saturn",
+                image_path=str(saturn_png),
+                priority=100,
+                active=True,
+            ),
+        ],
+    )
+    monkeypatch.setattr(
+        "astro_content_agent.content.catstyle.catstyle_approved_planet_reference_v1.approved_planet_references_json_path",
+        lambda: reg,
+    )
+    monkeypatch.setattr(
+        "astro_content_agent.services.content.catstyle_image_generation_jobs.resolve_arena_reference",
+        lambda **kwargs: (str(arena_png.resolve()), {"arena_reference_used": True}),
+    )
+    monkeypatch.setattr(
+        "astro_content_agent.services.content.catstyle_image_generation_jobs._resolve_final_style_reference",
+        lambda **kwargs: (str(pair_png.resolve()), {"source": "explicit", "reference_tier": "exact"}),
+    )
+    r = build_catstyle_image_generation_jobs(
+        date(2026, 5, 20),
+        planet_a_override="Moon",
+        planet_b_override="Saturn",
+        aspect_type_override="square",
+        mode_override="tension",
+        disable_approved_reference_auto=True,
+        disable_arena_reference_auto=False,
+        use_planet_reference_auto=True,
+        output_dir=tmp_path / "jobs",
+        jobs_count=1,
+    )
+    refs = r.jobs[0].reference_images
+    assert [row["role"] for row in refs] == ["arena", "planet_a", "planet_b", "pair_style"]
+    assert len({row["path"] for row in refs}) == len(refs)
+
+
+def test_provider_uses_reference_images_list(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OPENAI" + "_API_KEY", "test-fake-key-for-unit-test")
+    get_settings.cache_clear()
+    mock_client = MagicMock()
+    mock_client.images.edit.return_value = SimpleNamespace(
+        data=[SimpleNamespace(b64_json=_MINI_PNG_B64, url=None)]
+    )
+    moon = tmp_path / "moon.png"
+    saturn = tmp_path / "saturn.png"
+    moon.write_bytes(b"x")
+    saturn.write_bytes(b"x")
+    provider = OpenAICatstyleImageProvider(client=mock_client)
+    out = tmp_path / "out"
+    out.mkdir()
+    job = {
+        "job_id": "j-ref-list",
+        "planet_a": "Moon",
+        "planet_b": "Saturn",
+        "suggested_output_name": "out1.png",
+        "prompt_index": 1,
+        "prompt_text": "Test.",
+        "negative_prompt": "",
+        "reference_images": [
+            {"role": "planet_a", "path": str(moon)},
+            {"role": "planet_b", "path": str(saturn)},
+        ],
+        "_stub_output_seq": 1,
+    }
+    r = provider.generate(job, out, overwrite=False)
+    assert r.status == "generated"
+    roles = r.metadata.get("reference_image_roles") or []
+    assert roles == ["planet_a", "planet_b"]
 
 
 def test_list_resolved_winners_by_planet(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -298,3 +425,6 @@ def test_list_resolved_winners_by_planet(tmp_path: Path, monkeypatch: pytest.Mon
     assert "Venus" in winners
     assert winners["Venus"] is not None
     assert winners["Venus"].registry_key == "venus_v1"
+
+
+

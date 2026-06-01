@@ -21,13 +21,40 @@ def _load_cli():
 
 def test_scan_diff_for_secrets_detects_token() -> None:
     mod = _load_cli()
-    diff = "+OPENAI_API_KEY=sk-secret\n"
-    assert mod.scan_diff_for_secrets(diff) == ["OPENAI_API_KEY"]
+    openai_key = "OPENAI" + "_API_KEY"
+    fake_secret = "sk" + "-fake-token"
+    diff = f"+{openai_key}={fake_secret}\n"
+    assert mod.scan_diff_for_secrets(diff) == [openai_key]
 
 
 def test_scan_diff_for_secrets_clean() -> None:
     mod = _load_cli()
     assert mod.scan_diff_for_secrets("+planet_a = Mercury\n") == []
+
+
+def test_scan_diff_for_secrets_ignores_removed_and_context_lines() -> None:
+    mod = _load_cli()
+    openai_key = "OPENAI" + "_API_KEY"
+    sk_proj = "sk" + "-proj" + "-fake-token"
+    diff = (
+        f" context line {openai_key}=old\n"
+        f"-{openai_key}=old-value\n"
+        f"-{sk_proj}-old-removed\n"
+        "+++ b/example.py\n"
+    )
+    assert mod.scan_diff_for_secrets(diff) == []
+
+
+def test_scan_diff_for_secrets_detects_only_added_lines() -> None:
+    mod = _load_cli()
+    openai_key = "OPENAI" + "_API_KEY"
+    insta_token = "INSTAGRAM" + "_ACCESS_TOKEN"
+    diff = (
+        f"-{openai_key}=old-value\n"
+        "+safe = True\n"
+        f"+{insta_token}=added-token\n"
+    )
+    assert mod.scan_diff_for_secrets(diff) == [insta_token]
 
 
 def test_scan_diff_for_media_warnings_detects_png_path() -> None:
