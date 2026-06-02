@@ -46,6 +46,14 @@ from astro_content_agent.content.catstyle.approved_arena_reference_registry impo
 from astro_content_agent.content.catstyle.catstyle_approved_arena_reference_v1 import (
     apply_approved_arena_reference_to_prompt_pack,
 )
+from astro_content_agent.content.catstyle.catstyle_approved_planet_reference_v1 import (
+    apply_approved_planet_reference_lock_to_prompt_pack,
+    planet_references_active_for_job,
+    resolve_planet_references_for_pair,
+    sanitize_core_tension_and_constructive_for_planet_refs,
+    sanitize_scene_beat_for_planet_refs,
+    sanitize_visual_metaphor_for_planet_refs,
+)
 from astro_content_agent.content.catstyle.banner_glyph_reference_v1 import (
     BANNER_ONLY_GLYPH_DISCIPLINE_BLOCK,
     BANNER_ONLY_GLYPH_NEGATIVE_EXTRAS,
@@ -67,12 +75,45 @@ from astro_content_agent.content.catstyle.cosmic_zodiac_arena_premium_environmen
 from astro_content_agent.content.catstyle.zodiac_arena_floor_lock_v1 import (
     ZODIAC_ARENA_FLOOR_LOCK_BLOCK,
     ZODIAC_ARENA_FLOOR_NEGATIVE_EXTRAS,
+    ZODIAC_FLOOR_SCALE_FRAMING_BLOCK,
+    ZODIAC_FLOOR_SCALE_NEGATIVE_EXTRAS,
 )
 from astro_content_agent.content.catstyle.catstyle_global_quality_lock_v1 import (
     CATSTYLE_GLOBAL_QUALITY_LOCK_BLOCK,
     CATSTYLE_GLOBAL_QUALITY_LOCK_CG_BLOCK,
     CATSTYLE_GLOBAL_QUALITY_NEGATIVE_CG_EXTRAS,
     CATSTYLE_GLOBAL_QUALITY_NEGATIVE_EXTRAS,
+)
+from astro_content_agent.content.catstyle.catstyle_aspect_staging_locks_v1 import (
+    ARENA_SCALE_NEGATIVE_EXTRAS,
+    BANNER_GLYPH_SWAP_NEGATIVE_EXTRAS,
+    CGI_RENDER_NEGATIVE_EXTRAS,
+    build_aspect_staging_lock_layer,
+    build_planet_banner_glyph_lock_block,
+    build_reference_role_declaration_block,
+)
+from astro_content_agent.content.catstyle.catstyle_clean_refs_v1 import (
+    generate_catstyle_clean_refs_prompt_pack,
+    is_catstyle_clean_refs_mode,
+)
+from astro_content_agent.content.catstyle.catstyle_planet_reference_identity_lock_v1 import (
+    PLANET_REFERENCE_IDENTITY_NEGATIVE_EXTRAS,
+    URANUS_FEATURE_NEGATIVE_EXTRAS,
+    build_planet_reference_identity_hardlock_layer,
+    pair_includes_uranus,
+)
+from astro_content_agent.content.catstyle.catstyle_square_conflict_law_v1 import (
+    SQUARE_CONFLICT_LAW_NEGATIVE_EXTRAS,
+    is_square_conflict_aspect,
+)
+from astro_content_agent.content.catstyle.catstyle_tense_aspect_choreography_v1 import (
+    TENSE_ASPECT_NEGATIVE_EXTRAS,
+    build_tense_aspect_choreography_layer,
+    is_tense_hard_aspect,
+)
+from astro_content_agent.content.catstyle.catstyle_true_premium_cgi_render_hardlock_v1 import (
+    TRUE_PREMIUM_CGI_RENDER_HARDLOCK_BLOCK,
+    TRUE_PREMIUM_CGI_RENDER_NEGATIVE_EXTRAS,
 )
 from astro_content_agent.content.catstyle.mars_pluto_square_tension_canon_v1 import (
     MARS_PLUTO_SQUARE_TENSION_NEGATIVE_EXTRAS,
@@ -469,7 +510,7 @@ def _epic_arena_showdown_block(req: CatstylePromptRequest, pa: str, pb: str) -> 
     )
 
 
-_IMAGE_PROMPT_SAFE_MAX_CHARS = 31_600
+_IMAGE_PROMPT_SAFE_MAX_CHARS = 38_000
 
 # Phrases trim_negative_prompt_to_max must never drop (style / safety contracts).
 _NEGATIVE_PROMPT_CONTRACT_MUST_KEEP: tuple[str, ...] = (
@@ -482,6 +523,8 @@ _NEGATIVE_PROMPT_CONTRACT_MUST_KEEP: tuple[str, ...] = (
     "fake zodiac symbols",
     "underexposed overall scene",
     "muddy crushed shadows",
+    "bland mascot pose",
+    "sticker-like",
     "horror",
     "gore",
     "explicit horror",
@@ -494,6 +537,7 @@ _NEGATIVE_PROMPT_CONTRACT_MUST_KEEP: tuple[str, ...] = (
 _V2_POSTER_FORBIDDEN_LINES: tuple[str, ...] = (
     "childish nursery / kawaii / chibi mascot look",
     "sticker mascot center-float posing",
+    "sticker-like centered character floating in empty space",
     "flat vector / cheap icon / mobile-game icon look — cluttered architecture detail spam — weak bland composition with disconnected characters",
 )
 
@@ -524,6 +568,8 @@ def _negative_contract_merge_extras(
     extras = list(_NEGATIVE_PROMPT_CONTRACT_MUST_KEEP)
     if (render_style_key or "").strip() == "premium_comic_poster_v2":
         extras.extend(_V2_POSTER_FORBIDDEN_LINES)
+    if (render_style_key or "").strip() == "premium_cg_keyart_v1":
+        extras.extend(("gouache", "gouache painting look"))
     if planet_a and planet_b and is_sun_uranus_conjunction_tension(
         planet_a, planet_b, aspect_type or "", mode or ""
     ):
@@ -553,13 +599,21 @@ _PROTECTED_PROMPT_MARKERS: tuple[str, ...] = (
     "[STYLE HARDLOCK CG v1 - key art mandate]",
     "[STYLE HARDLOCK v2 - premium poster mandate]",
     "[CATSTYLE GLOBAL QUALITY LOCK CG v1]",
+    "[CATSTYLE VISUAL COMPOSITION HARDLOCK v1]",
+    "[CATSTYLE PLANET REFERENCE IDENTITY HARDLOCK v1]",
+    "[NEPTUNE ANTI-GENERIC IDENTITY v1]",
+    "[PLANET BANNER GLYPH LOCK v2]",
+    "[WORLD TEMPLATE v1 - high-priority setting direction]",
+    "[SCENE TEMPLATE v1 - high-priority frame direction]",
+    "[SHOT/COMPOSITION PROFILE",
     "[SUN-URANUS HARD ART-DIRECTION OVERRIDE v3",
     "[SUN-URANUS CONJUNCTION TENSION VISUAL CANON v1]",
     "[MOON-SATURN SQUARE TENSION VISUAL CANON v1]",
     "[MOON-SATURN SATURN IDENTITY HARD LOCK v1]",
     "[MOON-SATURN ARENA PAIR LOCK v1]",
     "[CATSTYLE APPROVED ARENA REFERENCE v1]",
-    "[APPROVED PLANET REFERENCE LOCK v1]",
+    "[CATSTYLE PLANET REFERENCE OVERRIDE v2]",
+    "[CG MATERIAL FINISH HARDLOCK v2]",
     "[COSMIC ZODIAC ARENA PREMIUM ENVIRONMENT v1]",
     "[SUN CATPLANET BODY LOCK v3]",
 )
@@ -584,6 +638,34 @@ _PROTECTED_BLOCK_END_ANCHORS: dict[str, tuple[str, ...]] = {
         "[ZODIAC ARENA FLOOR LOCK v1]",
         "[RENDER STYLE v1 - high-priority visual finish]",
         "Aspect type:",
+    ),
+    "[CATSTYLE VISUAL COMPOSITION HARDLOCK v1]": (
+        "[CATSTYLE PLANET REFERENCE IDENTITY HARDLOCK v1]",
+        "[PLANET BANNER GLYPH LOCK v2]",
+        "Aspect type:",
+    ),
+    "[CATSTYLE PLANET REFERENCE IDENTITY HARDLOCK v1]": (
+        "[PLANET A IDENTITY HARDLOCK",
+        "[PLANET B IDENTITY HARDLOCK",
+        "[NEPTUNE ANTI-GENERIC IDENTITY v1]",
+        "[PLANET BANNER GLYPH LOCK v2]",
+        "Aspect type:",
+    ),
+    "[PLANET BANNER GLYPH LOCK v2]": (
+        "[CATSTYLE PAIR FLAG GLYPH SYSTEM v1]",
+        "[REFERENCE ROLE DECLARATION v1]",
+        "Aspect type:",
+    ),
+    "[WORLD TEMPLATE v1 - high-priority setting direction]": (
+        "[SCENE TEMPLATE v1 - high-priority frame direction]",
+        "Aspect type:",
+    ),
+    "[SCENE TEMPLATE v1 - high-priority frame direction]": (
+        "Aspect type:",
+    ),
+    "[SHOT/COMPOSITION PROFILE": (
+        "Aspect type:",
+        "Scene beat:",
     ),
     "[SUN CATPLANET BODY LOCK v3]": (
         "[SUN-URANUS HARD ART-DIRECTION OVERRIDE v3",
@@ -759,7 +841,7 @@ def _compact_prompt_to_budget(prompt: str, safe_max: int = _IMAGE_PROMPT_SAFE_MA
 
     protected_len = sum(end - start for start, end, _ in spans)
     join_spaces = len(spans) + 1
-    gap_budget = max(safe_max - protected_len - join_spaces, int(safe_max * 0.25))
+    gap_budget = max(safe_max - protected_len - join_spaces, int(safe_max * 0.32))
 
     gaps: list[str] = []
     cursor = 0
@@ -927,7 +1009,29 @@ def _validate_skins_for_pair(pa: str, pb: str, skin_a: str | None, skin_b: str |
         get_character_skin(pb, skin_b)
 
 
-def _planet_cat_line(planet: str, canon: PlanetCatCanon, skin_key: str | None) -> str:
+def _planet_cat_line(
+    planet: str,
+    canon: PlanetCatCanon,
+    skin_key: str | None,
+    *,
+    planet_ref_active: bool = False,
+) -> str:
+    if planet_ref_active:
+        base = (
+            f"{planet} planet-cat [SYMBOLIC CANON ONLY — secondary to approved planet reference]: "
+            f"Archetype symbolism: {canon.role_archetype} "
+            f"Emotional tone symbolism: {canon.emotional_tone}. "
+            f"Do NOT force text-canon costumes, props, face types, body proportions, or palettes over the "
+            f"approved image reference."
+        )
+        sk_raw = _strip_optional_skin(skin_key)
+        if not sk_raw:
+            return base
+        sk = get_character_skin(planet, sk_raw)
+        return (
+            f"{base} Optional skin **{sk.display_name}** is costume overlay only — preserve referenced "
+            f"planet-cat identity from approved image."
+        )
     sk_raw = _strip_optional_skin(skin_key)
     marker = get_planet_identity_marker_profile(planet)
     marker_block = format_identity_markers_prompt_block(
@@ -996,6 +1100,16 @@ def _global_quality_negative_extras_for_request(req: CatstylePromptRequest) -> l
         extras.extend(CATSTYLE_GLOBAL_QUALITY_NEGATIVE_CG_EXTRAS)
     else:
         extras.extend(CATSTYLE_GLOBAL_QUALITY_NEGATIVE_EXTRAS)
+    if is_tense_hard_aspect(req.aspect_type, req.mode):
+        extras.extend(TENSE_ASPECT_NEGATIVE_EXTRAS)
+    if is_square_conflict_aspect(req.aspect_type, req.mode):
+        extras.extend(SQUARE_CONFLICT_LAW_NEGATIVE_EXTRAS)
+    if _is_cg_keyart_request(req):
+        extras.extend(TRUE_PREMIUM_CGI_RENDER_NEGATIVE_EXTRAS)
+    extras.extend(ARENA_SCALE_NEGATIVE_EXTRAS)
+    extras.extend(ZODIAC_FLOOR_SCALE_NEGATIVE_EXTRAS)
+    extras.extend(BANNER_GLYPH_SWAP_NEGATIVE_EXTRAS)
+    extras.extend(CGI_RENDER_NEGATIVE_EXTRAS)
     if applies_cosmic_zodiac_arena_premium_environment(
         world_template_key=req.world_template_key,
         premium_art_direction=req.premium_art_direction,
@@ -1024,13 +1138,20 @@ def _pair_specific_visual_guards(pa: str, pb: str, aspect_type: str, mode: str) 
 
 
 def _prompt_choreography_middleware(
-    req: CatstylePromptRequest, pa: str, pb: str, pair_guard: str
+    req: CatstylePromptRequest,
+    pa: str,
+    pb: str,
+    pair_guard: str,
+    *,
+    planet_refs_active: bool = False,
+    planet_references_meta: dict | None = None,
 ) -> str:
     """Aspect choreography + global quality lock + pair flags + Mars scene decouple; pair-specific guards."""
     blocks: list[str] = [
         _global_quality_lock_for_request(req),
         catplanet_core_body_blocks(),
         ZODIAC_ARENA_FLOOR_LOCK_BLOCK,
+        ZODIAC_FLOOR_SCALE_FRAMING_BLOCK,
     ]
     if applies_cosmic_zodiac_arena_premium_environment(
         world_template_key=req.world_template_key,
@@ -1043,16 +1164,67 @@ def _prompt_choreography_middleware(
     if (req.mode or "").strip().lower() == "flow":
         blocks.append(_catstyle_flow_mode_visual_lock(req))
         blocks.append(_mercury_jupiter_flow_planetary_being_lock(req, pa, pb))
+    meta = planet_references_meta
+    if meta is None and (planet_refs_active or req.use_planet_reference_auto):
+        meta = resolve_planet_references_for_pair(pa, pb)
+    refs_active = (
+        planet_references_active_for_job(meta) if meta else planet_refs_active
+    )
+    arena_ref_present = False
+    if not req.disable_arena_reference_auto or req.arena_reference_image_path:
+        arena_path, _arena_meta = resolve_arena_reference(
+            explicit_path=req.arena_reference_image_path,
+            disable_arena_reference_auto=req.disable_arena_reference_auto,
+            use_arena_reference_auto=req.use_arena_reference_auto,
+        )
+        arena_ref_present = bool(arena_path)
+    pair_style_ref_present = not req.disable_approved_reference_prompt_lock
+    blocks.append(
+        build_aspect_staging_lock_layer(
+            pa,
+            pb,
+            planet_refs_active=refs_active,
+            arena_ref_present=arena_ref_present,
+            pair_style_ref_present=pair_style_ref_present,
+        )
+    )
+    if _is_cg_keyart_request(req):
+        blocks.append(TRUE_PREMIUM_CGI_RENDER_HARDLOCK_BLOCK)
+    if refs_active and meta:
+        identity_layer = build_planet_reference_identity_hardlock_layer(pa, pb, meta)
+        if identity_layer:
+            blocks.append(identity_layer)
+    blocks.append(build_planet_banner_glyph_lock_block(pa, pb))
+    ref_decl = build_reference_role_declaration_block(
+        pa,
+        pb,
+        planet_refs_active=refs_active,
+        arena_ref_present=arena_ref_present,
+        pair_style_ref_present=pair_style_ref_present,
+    )
+    if ref_decl:
+        blocks.append(ref_decl)
     blocks.append(
         resolved_pair_flag_glyph_system_block(pa, pb, req.aspect_type, req.mode)
     )
     blocks.append(FLAG_GLYPH_FIDELITY_LOCK_BLOCK)
     blocks.append(BANNER_ONLY_GLYPH_DISCIPLINE_BLOCK)
     blocks.append(BANNER_ONLY_NO_CHEST_BADGE_BLOCK)
+    tense_layer = build_tense_aspect_choreography_layer(
+        req.aspect_type,
+        req.mode,
+        pa,
+        pb,
+        planet_refs_active=refs_active,
+    )
+    pair_action = ""
+    if not is_tense_hard_aspect(req.aspect_type, req.mode):
+        pair_action = _planet_pair_action_language(pa, pb, req.aspect_type, req.mode)
     blocks.extend(
         [
             _aspect_choreography_block(req.aspect_type, req.mode),
-            _planet_pair_action_language(pa, pb, req.aspect_type, req.mode),
+            tense_layer,
+            pair_action,
             _arena_composition_boost_block(req),
             _epic_arena_showdown_block(req, pa, pb),
             _mars_heavy_scene_style_decouple_block(req, pa, pb),
@@ -1100,16 +1272,27 @@ def _pack_from_deep(
     template_middle: str = "",
     render_middle: str = "",
     render_negative_additions: list[str] | None = None,
+    planet_refs_active: bool = False,
 ) -> CatstylePromptPack:
     tension_scenes = list(aspect_ix.scene_ideas)
     comp_scenes = list(aspect_ix.compensation_scene_ideas)
     n = req.variants_count
     shot_roles = shot_roles_for_variant_indices(n, req.shot_mode)
-    line_a = _planet_cat_line(pa, canon_a, skin_a)
-    line_b = _planet_cat_line(pb, canon_b, skin_b)
+    line_a = _planet_cat_line(pa, canon_a, skin_a, planet_ref_active=planet_refs_active)
+    line_b = _planet_cat_line(pb, canon_b, skin_b, planet_ref_active=planet_refs_active)
     pair_guard = _pair_specific_visual_guards(pa, pb, req.aspect_type, req.mode)
-    choreo_block = _prompt_choreography_middleware(req, pa, pb, pair_guard)
+    choreo_block = _prompt_choreography_middleware(
+        req, pa, pb, pair_guard, planet_refs_active=planet_refs_active
+    )
     anim_skin = _skin_animation_suffix(pa, pb, skin_a, skin_b)
+    core_tension, constructive_channel = sanitize_core_tension_and_constructive_for_planet_refs(
+        aspect_ix.core_tension,
+        aspect_ix.constructive_channel,
+        planet_a=pa,
+        planet_b=pb,
+        aspect_type=req.aspect_type,
+        refs_active=planet_refs_active,
+    )
 
     image_prompts: list[str] = []
     for i in range(n):
@@ -1118,10 +1301,11 @@ def _pack_from_deep(
         elif req.mode in ("compensation", "flow"):
             base_scene = comp_scenes[i % len(comp_scenes)]
             if i >= len(comp_scenes):
-                base_scene = f"{base_scene} Constructive channel: {aspect_ix.constructive_channel}"
+                base_scene = f"{base_scene} Constructive channel: {constructive_channel}"
         else:
             pool = tension_scenes + comp_scenes
             base_scene = pool[i % len(pool)]
+        base_scene = sanitize_scene_beat_for_planet_refs(base_scene, refs_active=planet_refs_active)
 
         shot_blk = format_hero_shot_prompt_block(
             shot_roles[i], flow_mode=(req.mode or "").strip().lower() == "flow"
@@ -1138,8 +1322,8 @@ def _pack_from_deep(
             f"{template_middle}"
             f"{shot_middle}"
             f"Scene beat: {base_scene} "
-            f"Story tension (cartoon metaphor): {aspect_ix.core_tension} "
-            f"Constructive undertone available: {aspect_ix.constructive_channel}"
+            f"Story tension (cartoon metaphor): {core_tension} "
+            f"Constructive undertone available: {constructive_channel}"
         ).strip()
         image_prompts.append(prompt)
 
@@ -1151,7 +1335,7 @@ def _pack_from_deep(
     carousel_idea = (
         f"Carousel outline (cover + {n} art slides): cover shows {pa}+{pb} round cats under stars with clear "
         f"{req.aspect_type} read; slides rotate through the variant scene beats without on-image text; "
-        f"final slide leans into constructive channel: {aspect_ix.constructive_channel} "
+        f"final slide leans into constructive channel: {constructive_channel} "
         f"(props and poses only, catstyle rules unchanged).{_skin_carousel_suffix(skin_a, skin_b)}"
     ).strip()
 
@@ -1178,15 +1362,32 @@ def _pack_from_seed(
     template_middle: str = "",
     render_middle: str = "",
     render_negative_additions: list[str] | None = None,
+    planet_refs_active: bool = False,
 ) -> CatstylePromptPack:
     tension_scenes = list(seed.suggested_scene_angles)
-    comp_scenes = [seed.constructive_channel, seed.visual_metaphor]
+    core_tension, constructive_channel = sanitize_core_tension_and_constructive_for_planet_refs(
+        seed.core_tension,
+        seed.constructive_channel,
+        planet_a=pa,
+        planet_b=pb,
+        aspect_type=req.aspect_type,
+        refs_active=planet_refs_active,
+    )
+    visual_metaphor = sanitize_visual_metaphor_for_planet_refs(
+        seed.visual_metaphor,
+        planet_a=pa,
+        planet_b=pb,
+        refs_active=planet_refs_active,
+    )
+    comp_scenes = [constructive_channel, visual_metaphor]
     n = req.variants_count
     shot_roles = shot_roles_for_variant_indices(n, req.shot_mode)
-    line_a = _planet_cat_line(pa, canon_a, skin_a)
-    line_b = _planet_cat_line(pb, canon_b, skin_b)
+    line_a = _planet_cat_line(pa, canon_a, skin_a, planet_ref_active=planet_refs_active)
+    line_b = _planet_cat_line(pb, canon_b, skin_b, planet_ref_active=planet_refs_active)
     pair_guard = _pair_specific_visual_guards(pa, pb, req.aspect_type, req.mode)
-    choreo_block = _prompt_choreography_middleware(req, pa, pb, pair_guard)
+    choreo_block = _prompt_choreography_middleware(
+        req, pa, pb, pair_guard, planet_refs_active=planet_refs_active
+    )
     anim_skin = _skin_animation_suffix(pa, pb, skin_a, skin_b)
 
     image_prompts: list[str] = []
@@ -1196,10 +1397,11 @@ def _pack_from_seed(
         elif req.mode in ("compensation", "flow"):
             base_scene = comp_scenes[i % len(comp_scenes)]
             if i >= len(comp_scenes):
-                base_scene = f"{base_scene} Constructive channel: {seed.constructive_channel}"
+                base_scene = f"{base_scene} Constructive channel: {constructive_channel}"
         else:
             pool = tension_scenes + comp_scenes
             base_scene = pool[i % len(pool)]
+        base_scene = sanitize_scene_beat_for_planet_refs(base_scene, refs_active=planet_refs_active)
 
         shot_blk = format_hero_shot_prompt_block(
             shot_roles[i], flow_mode=(req.mode or "").strip().lower() == "flow"
@@ -1216,9 +1418,9 @@ def _pack_from_seed(
             f"{template_middle}"
             f"{shot_middle}"
             f"Scene beat: {base_scene} "
-            f"Story tension (cartoon metaphor): {seed.core_tension} "
-            f"Constructive undertone available: {seed.constructive_channel} "
-            f"Visual metaphor: {seed.visual_metaphor}"
+            f"Story tension (cartoon metaphor): {core_tension} "
+            f"Constructive undertone available: {constructive_channel} "
+            f"Visual metaphor: {visual_metaphor}"
         ).strip()
         image_prompts.append(prompt)
 
@@ -1230,7 +1432,7 @@ def _pack_from_seed(
     carousel_idea = (
         f"Carousel outline (cover + {n} art slides): cover shows {pa}+{pb} round cats under stars with clear "
         f"{req.aspect_type} read; slides rotate through transit seed v0 scene angles without on-image text; "
-        f"final slide leans into constructive channel: {seed.constructive_channel} "
+        f"final slide leans into constructive channel: {constructive_channel} "
         f"(props and poses only, catstyle rules unchanged).{_skin_carousel_suffix(skin_a, skin_b)}"
     ).strip()
 
@@ -1258,6 +1460,7 @@ def _pack_from_fallback(
     template_middle: str = "",
     render_middle: str = "",
     render_negative_additions: list[str] | None = None,
+    planet_refs_active: bool = False,
 ) -> CatstylePromptPack:
     core = f"{outer} social rhythm meets {personal} everyday stakes—generic transit beat v0 (seed TBD)."
     constructive = f"Shared constructive beat: {outer} and {personal} negotiate one clear cartoon gesture."
@@ -1272,10 +1475,12 @@ def _pack_from_fallback(
     avoid = ["gore", "real weapons", "readable text in frame", "photorealistic violence"]
     n = req.variants_count
     shot_roles = shot_roles_for_variant_indices(n, req.shot_mode)
-    line_a = _planet_cat_line(pa, canon_a, skin_a)
-    line_b = _planet_cat_line(pb, canon_b, skin_b)
+    line_a = _planet_cat_line(pa, canon_a, skin_a, planet_ref_active=planet_refs_active)
+    line_b = _planet_cat_line(pb, canon_b, skin_b, planet_ref_active=planet_refs_active)
     pair_guard = _pair_specific_visual_guards(pa, pb, req.aspect_type, req.mode)
-    choreo_block = _prompt_choreography_middleware(req, pa, pb, pair_guard)
+    choreo_block = _prompt_choreography_middleware(
+        req, pa, pb, pair_guard, planet_refs_active=planet_refs_active
+    )
     anim_skin = _skin_animation_suffix(pa, pb, skin_a, skin_b)
 
     image_prompts: list[str] = []
@@ -1289,6 +1494,7 @@ def _pack_from_fallback(
         else:
             pool = tension_scenes + comp_scenes
             base_scene = pool[i % len(pool)]
+        base_scene = sanitize_scene_beat_for_planet_refs(base_scene, refs_active=planet_refs_active)
 
         shot_blk = format_hero_shot_prompt_block(
             shot_roles[i], flow_mode=(req.mode or "").strip().lower() == "flow"
@@ -1332,6 +1538,10 @@ def _pack_from_fallback(
 
 def generate_catstyle_prompt_pack(req: CatstylePromptRequest) -> CatstylePromptPack:
     """Build prompts from deep aspect library, transit pair seeds, or generic outer-to-personal fallback."""
+    if is_catstyle_clean_refs_mode(
+        req.render_style_profile_key, clean_refs_mode=req.clean_refs_mode
+    ):
+        return generate_catstyle_clean_refs_prompt_pack(req)
     pa = normalize_planet_name(req.planet_a)
     pb = normalize_planet_name(req.planet_b)
     canon_a = get_planet_canon(pa)
@@ -1345,6 +1555,12 @@ def generate_catstyle_prompt_pack(req: CatstylePromptRequest) -> CatstylePromptP
 
     render_prof, render_prof_dict, render_middle = _resolve_render_style(req)
     render_neg = list(render_prof.negative_prompt_additions)
+
+    planet_refs_meta: dict[str, Any] | None = None
+    planet_refs_active = False
+    if req.use_planet_reference_auto:
+        planet_refs_meta = resolve_planet_references_for_pair(pa, pb)
+        planet_refs_active = planet_references_active_for_job(planet_refs_meta)
 
     aspect_ix = get_aspect_interaction(pa, pb)
     if aspect_ix is not None:
@@ -1361,6 +1577,7 @@ def generate_catstyle_prompt_pack(req: CatstylePromptRequest) -> CatstylePromptP
             template_middle=template_middle,
             render_middle=render_middle,
             render_negative_additions=render_neg,
+            planet_refs_active=planet_refs_active,
         )
     else:
         oriented = orient_outer_personal(pa, pb)
@@ -1385,6 +1602,7 @@ def generate_catstyle_prompt_pack(req: CatstylePromptRequest) -> CatstylePromptP
                 template_middle=template_middle,
                 render_middle=render_middle,
                 render_negative_additions=render_neg,
+                planet_refs_active=planet_refs_active,
             )
         else:
             pack = _pack_from_fallback(
@@ -1401,6 +1619,7 @@ def generate_catstyle_prompt_pack(req: CatstylePromptRequest) -> CatstylePromptP
                 template_middle=template_middle,
                 render_middle=render_middle,
                 render_negative_additions=render_neg,
+                planet_refs_active=planet_refs_active,
             )
 
     # Prompt budget guard: compact any over-budget image prompts deterministically before returning.
@@ -1457,7 +1676,14 @@ def generate_catstyle_prompt_pack(req: CatstylePromptRequest) -> CatstylePromptP
             "microtexture noise — tiny crack noise — excess particles clutter",
         )
     if render_prof.key == "premium_cg_keyart_v1":
-        keep_neg = keep_neg + ("fuzzy brush texture dominance",)
+        keep_neg = keep_neg + (
+            "gouache",
+            "gouache painting look",
+            "fuzzy brush texture dominance",
+            "digital painting look",
+            "painted fantasy illustration",
+            "non-3d illustration",
+        )
     if is_sun_uranus_conjunction_tension(pa, pb, req.aspect_type, req.mode):
         keep_neg = keep_neg + (
             "losing approved reference visual DNA",
@@ -1510,6 +1736,44 @@ def generate_catstyle_prompt_pack(req: CatstylePromptRequest) -> CatstylePromptP
     )
     if capped_neg != pack.negative_prompt:
         pack = pack.model_copy(update={"negative_prompt": capped_neg})
+    if _is_cg_keyart_request(req):
+        merged_cg_neg = _merge_negative_prompt(
+            list(TRUE_PREMIUM_CGI_RENDER_NEGATIVE_EXTRAS),
+            [pack.negative_prompt] if pack.negative_prompt else [],
+        )
+        pack = pack.model_copy(
+            update={
+                "negative_prompt": trim_negative_prompt_to_max(
+                    merged_cg_neg,
+                    must_keep=_final_trim_must_keep(keep_neg, render_style_key=render_prof.key),
+                    drop_from="back_first",
+                )
+            }
+        )
+    if planet_refs_meta and planet_references_active_for_job(planet_refs_meta):
+        keep_neg = keep_neg + PLANET_REFERENCE_IDENTITY_NEGATIVE_EXTRAS
+        if pair_includes_uranus(pa, pb):
+            keep_neg = keep_neg + URANUS_FEATURE_NEGATIVE_EXTRAS
+            pack = pack.model_copy(
+                update={
+                    "negative_prompt": _merge_negative_prompt(
+                        [pack.negative_prompt] if pack.negative_prompt else [],
+                        list(URANUS_FEATURE_NEGATIVE_EXTRAS),
+                    )
+                }
+            )
+        pack = apply_approved_planet_reference_lock_to_prompt_pack(
+            pack,
+            pa,
+            pb,
+            planet_refs_meta,
+            render_style_key=render_prof.key,
+            aspect_type=req.aspect_type,
+        )
+        data_pr = pack.model_dump(mode="json")
+        prompts_pr = [str(p) for p in (data_pr.get("image_prompts") or [])]
+        data_pr["image_prompts"] = [_compact_prompt_to_budget(p) for p in prompts_pr]
+        pack = CatstylePromptPack.model_validate(data_pr)
     return _apply_banner_only_full_prompt_sanitize(pack)
 
 

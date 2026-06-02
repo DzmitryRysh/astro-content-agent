@@ -244,6 +244,35 @@ class CatstylePromptRequest(BaseModel):
         default=False,
         description="When True, skip [CATSTYLE APPROVED ARENA REFERENCE v1] prompt injection.",
     )
+    use_planet_reference_auto: bool = Field(
+        default=False,
+        description=(
+            "When True, resolve approved per-planet references and demote old text canon to symbolic-only "
+            "guidance with [CATSTYLE PLANET REFERENCE OVERRIDE v2]. Image job builds enable this by default."
+        ),
+    )
+    clean_refs_mode: bool = Field(
+        default=False,
+        description=(
+            "When True, build minimal reference-first prompts (catstyle_clean_refs_v1) and bypass the full "
+            "legacy canon/hardlock stack regardless of render_style_profile_key."
+        ),
+    )
+    arena_pool_key: str | None = Field(
+        default=None,
+        description="Optional arena pool key for deterministic environment plate selection.",
+    )
+    arena_pool_selection: str = Field(
+        default="stable_by_pair",
+        description="Arena pool selection mode (default stable_by_pair).",
+    )
+    arena_environment_reference_attached: bool = Field(
+        default=False,
+        description=(
+            "When True, an arena/environment reference image will be attached (pool or explicit); "
+            "clean refs adjust reference-role wording for environment-only plates."
+        ),
+    )
 
 
 class CatstylePromptPack(BaseModel):

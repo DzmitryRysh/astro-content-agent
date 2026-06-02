@@ -1,0 +1,37 @@
+{
+  "version": "catstyle-arena-pool-v1",
+  "entries": [
+    {
+      "pool_key": "premium_cosmic_zodiac_arena_v2",
+      "candidate_key": "premium_cosmic_zodiac_arena_v2_01",
+      "image_path": "references/arena_pool/premium_cosmic_zodiac_arena_v2/arena_v2_01_grand_floorcrop_empty_banners.png",
+      "label": "Grand floor crop",
+      "notes": "empty banners, monumental zodiac floor crop",
+      "active": true
+    },
+    {
+      "pool_key": "premium_cosmic_zodiac_arena_v2",
+      "candidate_key": "premium_cosmic_zodiac_arena_v2_02",
+      "image_path": "references/arena_pool/premium_cosmic_zodiac_arena_v2/arena_v2_02_deep_coliseum_empty_banners.png",
+      "label": "Deep coliseum",
+      "notes": "empty banners, deep tiered coliseum",
+      "active": true
+    },
+    {
+      "pool_key": "premium_cosmic_zodiac_arena_v2",
+      "candidate_key": "premium_cosmic_zodiac_arena_v2_03",
+      "image_path": "references/arena_pool/premium_cosmic_zodiac_arena_v2/arena_v2_03_wide_zodiac_floor_empty_banners.png",
+      "label": "Wide zodiac floor",
+      "notes": "empty banners, wide monumental zodiac floor",
+      "active": true
+    },
+    {
+      "pool_key": "premium_cosmic_zodiac_arena_v2",
+      "candidate_key": "premium_cosmic_zodiac_arena_v2_04",
+      "image_path": "references/arena_pool/premium_cosmic_zodiac_arena_v2/arena_v2_04_statue_torch_coliseum_empty_banners.png",
+      "label": "Statue torch coliseum",
+      "notes": "empty banners, statue and torch coliseum depth",
+      "active": true
+    }
+  ]
+}

@@ -302,6 +302,7 @@ RENDER_STYLE_PROFILES: dict[str, CatstyleRenderStyleProfile] = {
         negative_prompt_additions=[
             "watercolor illustration",
             "watercolor wash dominance",
+            "gouache",
             "gouache painting look",
             "soft painterly illustration dominance",
             "hand-painted storybook illustration",
@@ -404,6 +405,44 @@ RENDER_STYLE_PROFILES: dict[str, CatstyleRenderStyleProfile] = {
         short_prompt_line=(
             "Clean cel cartoon action finish - smooth shading, bold outlines, cinematic staging minus gritty noise."
         ),
+    ),
+    "catstyle_clean_refs_v1": CatstyleRenderStyleProfile(
+        key="catstyle_clean_refs_v1",
+        label="Clean refs v1",
+        description=(
+            "Minimal reference-driven prompts: approved planet + arena images carry identity; "
+            "short text sections only (no legacy canon or hardlock stacks)."
+        ),
+        image_prompt_opening_line=(
+            "Reference-driven premium cinematic CGI cat-planet key art (short prompt; identity from attached references)."
+        ),
+        style_core_line="Premium cinematic CGI / high-end 3D key art with crisp surfaces and sculpted forms.",
+        composition_line="Wide coliseum framing; planet-cats readable with arena environment from reference.",
+        linework_line="Clean CG edges; no hand-ink comic dominance.",
+        shading_line="Physically based material shading; not painterly wash.",
+        lighting_line="Volumetric cinematic light with clean specular response.",
+        environment_line="Grand cosmic zodiac coliseum from approved arena reference.",
+        detail_line="Reference-locked planet identity; minimal text override.",
+        color_line="Honor reference palettes; no cross-planet palette substitution.",
+        facial_expression_line="Honor reference face morphology; no generic house-cat face.",
+        must_have_lines=[
+            "Planet A and Planet B identities from approved references.",
+            "Arena scale from approved arena reference.",
+            "Short premium CGI finish instruction only.",
+        ],
+        avoid_lines=[
+            "Legacy canon costume or archetype override.",
+            "Long repeated hardlock prompt stacks.",
+            "Pair/style reference overriding planet identity.",
+        ],
+        negative_prompt_additions=[
+            "painterly illustration dominance",
+            "watercolor storybook softness",
+            "hand-painted fantasy illustration",
+            "wrong planet archetype substitution",
+        ],
+        short_prompt_line="Clean reference-first mode — short prompt, references carry identity.",
+        style_hardlock_block=None,
     ),
 }
 

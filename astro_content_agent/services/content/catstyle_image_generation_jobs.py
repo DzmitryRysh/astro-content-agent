@@ -15,10 +15,16 @@ from astro_content_agent.content.catstyle.approved_arena_reference_registry impo
 from astro_content_agent.content.catstyle.catstyle_approved_arena_reference_v1 import (
     apply_approved_arena_reference_to_prompt_pack,
 )
+from astro_content_agent.content.catstyle.catstyle_clean_refs_v1 import (
+    CATSTYLE_CLEAN_REFS_PROFILE_KEY,
+    is_catstyle_clean_refs_mode,
+)
 from astro_content_agent.content.catstyle.catstyle_approved_planet_reference_v1 import (
+    APPROVED_PLANET_REFERENCE_LOCK_MARKER,
     active_planet_reference_paths_from_meta,
     apply_approved_planet_reference_lock_to_prompt_pack,
     build_job_reference_images,
+    list_active_planet_references_grouped,
     planet_references_active_for_job,
     resolve_planet_references_for_pair,
 )
@@ -94,7 +100,7 @@ class CatstyleImageGenJob(BaseModel):
     reference_images: list[dict[str, str]] = Field(
         default_factory=list,
         description=(
-            "Ordered image-conditioning references for providers: arena, planet_a, planet_b, "
+            "Ordered image-conditioning references for providers: planet_a, planet_b, arena, "
             "optional pair_style (deduped paths)."
         ),
     )
@@ -278,6 +284,8 @@ def _merge_planet_reference_lock_into_prompt_pack_dict(
     planet_a: str,
     planet_b: str,
     planet_references_meta: dict[str, Any],
+    *,
+    aspect_type: str | None = None,
 ) -> dict[str, Any]:
     """Ensure pack prompts include planet reference lock when registry refs resolved."""
     if not planet_references_active_for_job(planet_references_meta):
@@ -285,21 +293,72 @@ def _merge_planet_reference_lock_into_prompt_pack_dict(
     if pp.get("planet_reference_assist"):
         return pp
     first = str((pp.get("image_prompts") or [""])[0])
-    if "[APPROVED PLANET REFERENCE LOCK v1]" in first:
+    if APPROVED_PLANET_REFERENCE_LOCK_MARKER in first:
         return pp
+    rs_prof = pp.get("render_style_profile")
+    render_style_key: str | None = None
+    if isinstance(rs_prof, dict) and rs_prof.get("key"):
+        render_style_key = str(rs_prof["key"])
     pack = apply_approved_planet_reference_lock_to_prompt_pack(
         CatstylePromptPack.model_validate(pp),
         planet_a,
         planet_b,
         planet_references_meta,
+        render_style_key=render_style_key,
+        aspect_type=aspect_type,
     )
     return dict(pack.model_dump(mode="json"))
+
+
+_CLEAN_REFS_ARENA_META: dict[str, Any] = {
+    "arena_reference_used": False,
+    "clean_refs_text_only_arena": True,
+    "note": "Clean refs: planet reference images only; colosseum scale from prompt text.",
+}
+
+
+def _resolve_arena_reference_for_jobs(
+    *,
+    clean_refs: bool,
+    explicit_path: str | None,
+    arena_pool_key: str | None,
+    arena_pool_selection: str,
+    planet_a: str,
+    planet_b: str,
+    aspect_type: str,
+    mode: str,
+    disable_arena_reference_auto: bool,
+    use_arena_reference_auto: bool,
+) -> tuple[str | None, dict[str, Any] | None]:
+    """Clean refs: text-only arena unless explicit path or arena pool key is set."""
+    pool_key = (arena_pool_key or "").strip() or None
+    if clean_refs and not explicit_path and not pool_key:
+        return None, dict(_CLEAN_REFS_ARENA_META)
+    return resolve_arena_reference(
+        explicit_path=explicit_path,
+        arena_pool_key=pool_key,
+        arena_pool_selection=arena_pool_selection,
+        planet_a=planet_a,
+        planet_b=planet_b,
+        aspect_type=aspect_type,
+        mode=mode,
+        disable_arena_reference_auto=disable_arena_reference_auto if not clean_refs else True,
+        use_arena_reference_auto=use_arena_reference_auto if not clean_refs else False,
+    )
 
 
 def _arena_reference_log_lines(meta: dict[str, Any]) -> list[str]:
     lines: list[str] = []
     if meta.get("arena_reference_used"):
         lines.append("arena_reference_used: true")
+    if meta.get("arena_pool_key"):
+        lines.append(f"arena_pool_key: {meta.get('arena_pool_key')}")
+    if meta.get("selected_arena_pool_candidate_key"):
+        lines.append(f"selected_arena_pool_candidate_key: {meta.get('selected_arena_pool_candidate_key')}")
+    if meta.get("arena_selection_mode"):
+        lines.append(f"arena_selection_mode: {meta.get('arena_selection_mode')}")
+    if meta.get("selected_arena_reference_path"):
+        lines.append(f"selected_arena_reference_path: {meta.get('selected_arena_reference_path')}")
     if meta.get("arena_reference_registry_key"):
         lines.append(f"arena_reference_registry_key: {meta.get('arena_reference_registry_key')}")
     if meta.get("arena_reference_image_path"):
@@ -336,6 +395,7 @@ def _resolve_final_style_reference(
 
 def _planet_reference_log_lines(meta: dict[str, Any]) -> list[str]:
     lines: list[str] = []
+    registered = {k.lower() for k in list_active_planet_references_grouped().keys()}
     for slot in ("planet_a", "planet_b"):
         row = meta.get(slot) if isinstance(meta.get(slot), dict) else None
         if not row:
@@ -346,6 +406,11 @@ def _planet_reference_log_lines(meta: dict[str, Any]) -> list[str]:
             )
         else:
             lines.append(f"{slot}: missing ({row.get('missing_reason') or row.get('source')})")
+            planet_name = str(row.get("planet") or "").strip().lower()
+            if planet_name in registered:
+                lines.append(
+                    f"WARNING: missing approved planet reference for registered planet {row.get('planet')} (abnormal)."
+                )
     return lines
 
 
@@ -360,6 +425,7 @@ def _manifest_summary_text(
     manual_aspect_override: dict[str, Any] | None = None,
     style_reference: dict[str, Any] | None = None,
     planet_references: dict[str, Any] | None = None,
+    arena_reference: dict[str, Any] | None = None,
 ) -> str:
     lines: list[str] = [
         f"Catstyle image generation jobs v0 — {date}",
@@ -407,6 +473,25 @@ def _manifest_summary_text(
     if planet_references:
         lines.extend(["## Planet references (v1)"])
         lines.extend(_planet_reference_log_lines(planet_references))
+        lines.append("")
+    if arena_reference:
+        lines.extend(["## Arena reference"])
+        if arena_reference.get("arena_pool_key"):
+            lines.append(f"arena_pool_key: {arena_reference.get('arena_pool_key')}")
+        if arena_reference.get("selected_arena_pool_candidate_key"):
+            lines.append(
+                f"selected_arena_pool_candidate: {arena_reference.get('selected_arena_pool_candidate_key')}"
+            )
+        if arena_reference.get("arena_selection_mode"):
+            lines.append(f"arena_selection_mode: {arena_reference.get('arena_selection_mode')}")
+        if arena_reference.get("selected_arena_reference_path"):
+            lines.append(f"selected_arena_reference_path: {arena_reference.get('selected_arena_reference_path')}")
+        elif arena_reference.get("arena_reference_image_path"):
+            lines.append(f"arena_reference_image_path: {arena_reference.get('arena_reference_image_path')}")
+        if arena_reference.get("clean_refs_text_only_arena"):
+            lines.append("clean_refs_text_only_arena: true")
+        for log_line in arena_reference.get("log_lines") or []:
+            lines.append(str(log_line))
         lines.append("")
     if manual_aspect_override:
         lines.extend(
@@ -469,12 +554,15 @@ def build_catstyle_image_generation_jobs(
     arena_reference_image_path: str | None = None,
     use_arena_reference_auto: bool = True,
     disable_arena_reference_auto: bool = False,
+    arena_pool_key: str | None = None,
+    arena_pool_selection: str = "stable_by_pair",
     planet_a_override: str | None = None,
     planet_b_override: str | None = None,
     aspect_type_override: str | None = None,
     mode_override: str | None = None,
     disable_approved_reference_auto: bool = False,
-    use_planet_reference_auto: bool = False,
+    use_planet_reference_auto: bool = True,
+    clean_refs_mode: bool = False,
     jobs_count: int | None = None,
     *,
     compute_positions_fn: Callable[..., dict[str, PlanetPosition]] | None = None,
@@ -510,6 +598,12 @@ def build_catstyle_image_generation_jobs(
     render_k = str(render_style_profile_key).strip() if render_style_profile_key else None
     if render_k == "":
         render_k = None
+    clean_refs = is_catstyle_clean_refs_mode(render_k, clean_refs_mode=clean_refs_mode)
+    if clean_refs:
+        render_k = CATSTYLE_CLEAN_REFS_PROFILE_KEY
+        disable_approved_reference_auto = True
+        world_k = None
+        scene_k = None
 
     shot_m = str(shot_mode).strip().lower() if shot_mode else None
     if shot_m == "":
@@ -520,6 +614,10 @@ def build_catstyle_image_generation_jobs(
     arena_ref_cli = str(arena_reference_image_path).strip() if arena_reference_image_path else None
     if arena_ref_cli == "":
         arena_ref_cli = None
+    arena_pool_k = str(arena_pool_key).strip() if arena_pool_key else None
+    if arena_pool_k == "":
+        arena_pool_k = None
+    arena_pool_sel = (arena_pool_selection or "stable_by_pair").strip() or "stable_by_pair"
 
     override_quad = parse_manual_aspect_override_fields(
         planet_a_override,
@@ -549,16 +647,32 @@ def build_catstyle_image_generation_jobs(
         iso = day.isoformat()
         manual_block = _manual_aspect_override_manifest_block(pa_n, pb_n, o_asp, o_mode)
         primary = _synthetic_primary_manual_override(pa_n, pb_n, o_asp, o_mode)
-        final_ref, style_reference_meta = _resolve_final_style_reference(
-            explicit_path=style_ref_cli,
-            disable_approved_reference_auto=disable_approved_reference_auto,
+        if clean_refs:
+            final_ref = style_ref_cli
+            style_reference_meta = {
+                "source": "explicit" if style_ref_cli else "none",
+                "path": style_ref_cli,
+                "clean_refs_mode": True,
+                "pair_style_reference_skipped": not bool(style_ref_cli),
+            }
+        else:
+            final_ref, style_reference_meta = _resolve_final_style_reference(
+                explicit_path=style_ref_cli,
+                disable_approved_reference_auto=disable_approved_reference_auto,
+                planet_a=pa_n,
+                planet_b=pb_n,
+                aspect_type=o_asp,
+                mode=o_mode,
+            )
+        final_arena_ref, arena_reference_meta = _resolve_arena_reference_for_jobs(
+            clean_refs=clean_refs,
+            explicit_path=arena_ref_cli,
+            arena_pool_key=arena_pool_k,
+            arena_pool_selection=arena_pool_sel,
             planet_a=pa_n,
             planet_b=pb_n,
             aspect_type=o_asp,
             mode=o_mode,
-        )
-        final_arena_ref, arena_reference_meta = resolve_arena_reference(
-            explicit_path=arena_ref_cli,
             disable_arena_reference_auto=disable_arena_reference_auto,
             use_arena_reference_auto=use_arena_reference_auto,
         )
@@ -583,7 +697,21 @@ def build_catstyle_image_generation_jobs(
         req_kw["arena_reference_image_path"] = arena_ref_cli
         req_kw["use_arena_reference_auto"] = use_arena_reference_auto
         req_kw["disable_arena_reference_auto"] = disable_arena_reference_auto
-        if final_ref:
+        req_kw["use_planet_reference_auto"] = use_planet_reference_auto
+        if clean_refs:
+            req_kw["clean_refs_mode"] = True
+            req_kw["render_style_profile_key"] = CATSTYLE_CLEAN_REFS_PROFILE_KEY
+            req_kw["premium_art_direction"] = False
+            req_kw["disable_approved_reference_prompt_lock"] = True
+            req_kw["disable_arena_reference_prompt_block"] = True
+            req_kw["disable_arena_reference_auto"] = True
+            req_kw["use_planet_reference_auto"] = True
+            req_kw["arena_environment_reference_attached"] = bool(final_arena_ref)
+            if arena_pool_k:
+                req_kw["arena_pool_key"] = arena_pool_k
+            req_kw.pop("world_template_key", None)
+            req_kw.pop("scene_template_key", None)
+        elif final_ref:
             pa_chk = pa_n.lower()
             pb_chk = pb_n.lower()
             if "mars" not in {pa_chk, pb_chk}:
@@ -594,7 +722,7 @@ def build_catstyle_image_generation_jobs(
         except ValueError as e:
             raise ValueError(f"Cannot build prompts for manual aspect override: {e}") from e
         pp = dict(pack_obj.model_dump(mode="json"))
-        if final_arena_ref and arena_reference_meta:
+        if final_arena_ref and arena_reference_meta and not clean_refs:
             pp = _merge_arena_reference_into_prompt_pack_dict(
                 pp, arena_path=final_arena_ref, arena_meta=arena_reference_meta
             )
@@ -662,21 +790,62 @@ def build_catstyle_image_generation_jobs(
         pb_sel = normalize_planet_name(str(primary["planet_b"]))
         asp_sel = str(primary["aspect_type"])
         mode_sel = str(primary["mode_recommendation"])
-        final_ref, style_reference_meta = _resolve_final_style_reference(
-            explicit_path=style_ref_cli,
-            disable_approved_reference_auto=disable_approved_reference_auto,
+        if clean_refs:
+            final_ref = style_ref_cli
+            style_reference_meta = {
+                "source": "explicit" if style_ref_cli else "none",
+                "path": style_ref_cli,
+                "clean_refs_mode": True,
+                "pair_style_reference_skipped": not bool(style_ref_cli),
+            }
+        else:
+            final_ref, style_reference_meta = _resolve_final_style_reference(
+                explicit_path=style_ref_cli,
+                disable_approved_reference_auto=disable_approved_reference_auto,
+                planet_a=pa_sel,
+                planet_b=pb_sel,
+                aspect_type=asp_sel,
+                mode=mode_sel,
+            )
+        final_arena_ref, arena_reference_meta = _resolve_arena_reference_for_jobs(
+            clean_refs=clean_refs,
+            explicit_path=arena_ref_cli,
+            arena_pool_key=arena_pool_k,
+            arena_pool_selection=arena_pool_sel,
             planet_a=pa_sel,
             planet_b=pb_sel,
             aspect_type=asp_sel,
             mode=mode_sel,
-        )
-        final_arena_ref, arena_reference_meta = resolve_arena_reference(
-            explicit_path=arena_ref_cli,
             disable_arena_reference_auto=disable_arena_reference_auto,
             use_arena_reference_auto=use_arena_reference_auto,
         )
 
-        if final_ref:
+        if clean_refs:
+            vc_clean = jobs_count if jobs_count is not None else max(1, len(pp.get("image_prompts") or []))
+            req_clean: dict[str, Any] = dict(
+                planet_a=pa_sel,
+                planet_b=pb_sel,
+                aspect_type=asp_sel,
+                mode=mode_sel,
+                variants_count=vc_clean,
+                skin_a=skin_a_c,
+                skin_b=skin_b_c,
+                editorial_profile=profile,
+                clean_refs_mode=True,
+                render_style_profile_key=CATSTYLE_CLEAN_REFS_PROFILE_KEY,
+                premium_art_direction=False,
+                disable_approved_reference_prompt_lock=True,
+                disable_arena_reference_prompt_block=True,
+                use_planet_reference_auto=use_planet_reference_auto,
+                disable_arena_reference_auto=True,
+                arena_environment_reference_attached=bool(final_arena_ref),
+            )
+            if arena_pool_k:
+                req_clean["arena_pool_key"] = arena_pool_k
+            if shot_m is not None:
+                req_clean["shot_mode"] = shot_m
+            pp = generate_catstyle_prompt_pack(CatstylePromptRequest(**req_clean)).model_dump(mode="json")
+        elif final_ref:
             pa_chk = pa_sel.lower()
             pb_chk = pb_sel.lower()
             if "mars" not in {pa_chk, pb_chk}:
@@ -703,11 +872,12 @@ def build_catstyle_image_generation_jobs(
                 req_kw_refresh["arena_reference_image_path"] = arena_ref_cli
                 req_kw_refresh["use_arena_reference_auto"] = use_arena_reference_auto
                 req_kw_refresh["disable_arena_reference_auto"] = disable_arena_reference_auto
+                req_kw_refresh["use_planet_reference_auto"] = use_planet_reference_auto
                 pp = generate_catstyle_prompt_pack(CatstylePromptRequest(**req_kw_refresh)).model_dump(
                     mode="json"
                 )
 
-    if final_arena_ref and arena_reference_meta:
+    if final_arena_ref and arena_reference_meta and not clean_refs:
         pp = _merge_arena_reference_into_prompt_pack_dict(
             pp, arena_path=final_arena_ref, arena_meta=arena_reference_meta
         )
@@ -775,8 +945,11 @@ def build_catstyle_image_generation_jobs(
         planet_a_ref_path, planet_b_ref_path = active_planet_reference_paths_from_meta(
             planet_references_meta
         )
-        pp = _merge_planet_reference_lock_into_prompt_pack_dict(pp, pa, pb, planet_references_meta)
-        image_prompts = [str(p) for p in (pp.get("image_prompts") or [])]
+        if not clean_refs:
+            pp = _merge_planet_reference_lock_into_prompt_pack_dict(
+                pp, pa, pb, planet_references_meta, aspect_type=aspect
+            )
+            image_prompts = [str(p) for p in (pp.get("image_prompts") or [])]
         if jobs_count is not None:
             if len(image_prompts) < jobs_count:
                 raise ValueError(
@@ -791,6 +964,7 @@ def build_catstyle_image_generation_jobs(
         planet_a_reference_image_path=planet_a_ref_path,
         planet_b_reference_image_path=planet_b_ref_path,
         style_reference_image_path=final_ref,
+        include_pair_style=not clean_refs,
     )
     source = str(primary.get("source", ""))
     total_score = int(primary["total_score"])
@@ -885,6 +1059,7 @@ def build_catstyle_image_generation_jobs(
             "version": "catstyle-image-generation-jobs-v0",
             "date": iso,
             "editorial_profile": profile,
+            "clean_refs_mode": clean_refs,
             "sky_scan_mode": manifest_sky_scan_mode,
             "sky_scan_step_hours_utc": manifest_sky_scan_step,
             "selected_candidate": primary,
@@ -931,6 +1106,7 @@ def build_catstyle_image_generation_jobs(
             manual_aspect_override=manual_block,
             style_reference=style_reference_meta,
             planet_references=planet_references_meta,
+            arena_reference=arena_reference_meta,
         )
         _write_utf8_text(out / "manifest_summary.txt", summary)
         files_written.append("manifest_summary.txt")

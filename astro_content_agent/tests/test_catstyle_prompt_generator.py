@@ -1,6 +1,8 @@
 """Tests for Catstyle v0 prompt generator (no image APIs)."""
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from astro_content_agent.content.catstyle.aspect_library_v0 import ASPECT_CAT_INTERACTIONS
@@ -192,6 +194,66 @@ def test_saturn_venus_includes_hat_watch_and_design_compensation() -> None:
     )
     cblob = " ".join(comp_pack.image_prompts).lower()
     assert "design" in cblob or "studio" in cblob or "jewelry" in cblob or "architecture" in cblob or "business" in cblob
+
+
+def test_saturn_venus_planet_reference_mode_omits_business_meeting_story_language(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from astro_content_agent.content.catstyle.catstyle_approved_planet_reference_v1 import (
+        APPROVED_PLANET_REFERENCE_LOCK_MARKER,
+        ApprovedPlanetReferenceEntry,
+        write_planet_registry_entries,
+    )
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    reg = tmp_path / "approved_planet_references.json"
+    saturn_png = tmp_path / "saturn.png"
+    venus_png = tmp_path / "venus.png"
+    saturn_png.write_bytes(b"s")
+    venus_png.write_bytes(b"v")
+    write_planet_registry_entries(
+        reg,
+        [
+            ApprovedPlanetReferenceEntry(
+                registry_key="saturn_v1",
+                planet="Saturn",
+                image_path=str(saturn_png),
+                priority=100,
+                active=True,
+            ),
+            ApprovedPlanetReferenceEntry(
+                registry_key="venus_v1",
+                planet="Venus",
+                image_path=str(venus_png),
+                priority=100,
+                active=True,
+            ),
+        ],
+    )
+    monkeypatch.setattr(
+        "astro_content_agent.content.catstyle.catstyle_approved_planet_reference_v1.approved_planet_references_json_path",
+        lambda: reg,
+    )
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Saturn",
+            planet_b="Venus",
+            aspect_type="square",
+            mode="tension",
+            use_planet_reference_auto=True,
+            render_style_profile_key="premium_cg_keyart_v1",
+        )
+    )
+    blob = " ".join(pack.image_prompts)
+    low = blob.lower()
+    assert "business meeting" not in low
+    assert "fashion sketches" not in low
+    assert "jewelry or watch layout" not in low
+    assert "preserve [CANON v1 base]" not in blob
+    assert "preserve approved planet reference identity" in blob
+    assert APPROVED_PLANET_REFERENCE_LOCK_MARKER in blob
+    assert "[CG MATERIAL FINISH HARDLOCK v2]" in blob
+    assert "gravity fields" in low or "spatial pressure" in low
 
 
 def test_jupiter_mercury_teacher_vs_analyst_theme() -> None:
@@ -837,7 +899,7 @@ def test_epic_arena_showdown_profile_includes_environment_scale_and_readable_sub
     assert "[catstyle approved reference anchor v1 - moon/saturn square+tension]" in blob
     assert "registry_key=moon_saturn_square_tension_v1" in blob
     assert "[moon-saturn epic arena action staging v5 - balanced lock]" in blob
-    assert all(29000 <= len(p) <= 31800 for p in pack.image_prompts)
+    assert all(29_000 <= len(p) <= 38_500 for p in pack.image_prompts)
     assert "premium cinematic comic-poster illustration" in blob
     assert "high-drama heroic comic-cover battle splash" in blob
     assert "polished 2d/2.5d comic" in blob
@@ -1135,6 +1197,192 @@ def test_aspect_choreography_square_vs_trine_tone() -> None:
     assert "playful cooperation" in sex_blob or "coordinated exchange" in sex_blob
 
 
+def test_tense_square_includes_active_battle_choreography_v2() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Mars",
+            planet_b="Uranus",
+            aspect_type="square",
+            mode="tension",
+            premium_art_direction=False,
+        )
+    )
+    blob = " ".join(pack.image_prompts).lower()
+    assert "[tense aspect choreography v2 - square]" in blob
+    assert "explosive" in blob or "impact" in blob or "counterattack" in blob
+    assert "[tense aspect anti-static v1]" in blob
+    assert "do not show characters simply standing" in blob
+    assert "[tense aspect premium cg style lock v1]" in blob
+    assert "watercolor" in blob and "painterly" in blob
+    assert "[planetary combat lexicon v2 - mars]" in blob
+    assert "[planetary combat lexicon v2 - uranus]" in blob
+
+
+def test_tense_opposition_includes_active_polarity_clash_v2() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Sun",
+            planet_b="Pluto",
+            aspect_type="opposition",
+            mode="tension",
+            premium_art_direction=False,
+        )
+    )
+    blob = " ".join(pack.image_prompts).lower()
+    assert "[tense aspect choreography v2 - opposition]" in blob
+    assert "polarity clash" in blob or "force clash" in blob or "beam clash" in blob
+    assert "[tense aspect anti-static v1]" in blob
+    assert "combat already in progress" in blob
+    assert "[planetary combat lexicon v2 - sun]" in blob
+    assert "[planetary combat lexicon v2 - pluto]" in blob
+
+
+def test_tense_square_flow_mode_skips_battle_v2_layer() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Mars",
+            planet_b="Uranus",
+            aspect_type="square",
+            mode="flow",
+            premium_art_direction=False,
+        )
+    )
+    blob = " ".join(pack.image_prompts).lower()
+    assert "[tense aspect choreography v2 - square]" not in blob
+    assert "[tense aspect anti-static v1]" not in blob
+    assert "[catstyle flow mode v1" in blob
+
+
+def test_tense_trine_does_not_include_battle_v2_layer() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Venus",
+            planet_b="Neptune",
+            aspect_type="trine",
+            mode="tension",
+            premium_art_direction=False,
+        )
+    )
+    blob = " ".join(pack.image_prompts).lower()
+    assert "[tense aspect choreography v2" not in blob
+    assert "[tense aspect anti-static v1]" not in blob
+
+
+def test_mars_uranus_square_includes_arena_glyph_and_battle_staging() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Mars",
+            planet_b="Uranus",
+            aspect_type="square",
+            mode="tension",
+            premium_art_direction=False,
+        )
+    )
+    blob = " ".join(pack.image_prompts)
+    low = blob.lower()
+    assert "[catstyle visual composition hardlock v1]" in low
+    assert "[catstyle arena scale lock v2]" in low
+    assert "three visible tiers" in low or "at least three visible tiers" in low
+    assert "[catstyle camera / framing lock v1]" in low
+    assert "[catstyle premium cgi render lock v1]" in low
+    assert "[catstyle environment dominance v1]" in low
+    assert "painterly" in low and "watercolor" in low
+    assert "[planet banner glyph lock v2]" in low
+    assert "left/port banner" in low and "mars glyph" in low and "♂" in blob
+    assert "right/starboard banner" in low and "uranus glyph" in low and "♅" in blob
+    assert "[tense aspect anti-static v1]" in low
+    assert "active collision" in low or "counterattack" in low
+    assert "do not crop away arena scale" in low
+
+
+def test_saturn_venus_square_planet_refs_includes_glyph_lock_and_override(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from astro_content_agent.content.catstyle.catstyle_approved_planet_reference_v1 import (
+        APPROVED_PLANET_REFERENCE_LOCK_MARKER,
+        ApprovedPlanetReferenceEntry,
+        write_planet_registry_entries,
+    )
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    reg = tmp_path / "approved_planet_references.json"
+    saturn_png = tmp_path / "saturn.png"
+    venus_png = tmp_path / "venus.png"
+    saturn_png.write_bytes(b"s")
+    venus_png.write_bytes(b"v")
+    write_planet_registry_entries(
+        reg,
+        [
+            ApprovedPlanetReferenceEntry(
+                registry_key="saturn_v1",
+                planet="Saturn",
+                image_path=str(saturn_png),
+                priority=100,
+                active=True,
+            ),
+            ApprovedPlanetReferenceEntry(
+                registry_key="venus_v1",
+                planet="Venus",
+                image_path=str(venus_png),
+                priority=100,
+                active=True,
+            ),
+        ],
+    )
+    monkeypatch.setattr(
+        "astro_content_agent.content.catstyle.catstyle_approved_planet_reference_v1.approved_planet_references_json_path",
+        lambda: reg,
+    )
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Saturn",
+            planet_b="Venus",
+            aspect_type="square",
+            mode="tension",
+            use_planet_reference_auto=True,
+            premium_art_direction=False,
+        )
+    )
+    blob = " ".join(pack.image_prompts)
+    low = blob.lower()
+    assert "[planet banner glyph lock v2]" in low
+    assert "saturn glyph" in low and "♄" in blob
+    assert "venus glyph" in low and "♀" in blob
+    assert "do not use venus glyph for mars" in low
+    assert APPROVED_PLANET_REFERENCE_LOCK_MARKER in blob
+    assert "[reference role declaration v1]" in low
+    assert "[planet-cat body material intensity v1]" in low
+
+
+def test_opposition_includes_equal_force_duel_language() -> None:
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Sun",
+            planet_b="Pluto",
+            aspect_type="opposition",
+            mode="tension",
+            premium_art_direction=False,
+        )
+    )
+    low = " ".join(pack.image_prompts).lower()
+    assert "[tense aspect choreography v2 - opposition]" in low
+    assert "equal-force duel" in low or "central axis" in low
+    assert "polarity clash" in low or "force clash" in low or "beam clash" in low
+    assert "passive face-off" in low
+
+
 def test_mercury_jupiter_sextile_flow_avoids_battle_language_keeps_premium_poster() -> None:
     """Flow mode must not inherit v2 battle-poster vocabulary; still reads as premium comic poster."""
     from astro_content_agent.content.catstyle.models import CatstylePromptRequest
@@ -1350,4 +1598,295 @@ def test_v2_negative_prompt_is_deduped_compact_and_keeps_forbidden_categories() 
     assert "flat vector" in low
     assert "architecture" in low
     assert "weak bland composition" in low
+
+
+def test_mercury_neptune_clean_refs_mode_short_prompt_without_legacy_hardlocks(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from astro_content_agent.content.catstyle.catstyle_approved_planet_reference_v1 import (
+        ApprovedPlanetReferenceEntry,
+        write_planet_registry_entries,
+    )
+    from astro_content_agent.content.catstyle.catstyle_clean_refs_v1 import (
+        CATSTYLE_CLEAN_REFS_PROFILE_KEY,
+        CLEAN_REFERENCE_ROLES_BLOCK,
+    )
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    reg = tmp_path / "approved_planet_references.json"
+    neptune_png = tmp_path / "neptune.png"
+    mercury_png = tmp_path / "mercury.png"
+    neptune_png.write_bytes(b"n")
+    mercury_png.write_bytes(b"m")
+    write_planet_registry_entries(
+        reg,
+        [
+            ApprovedPlanetReferenceEntry(
+                registry_key="neptune_v1",
+                planet="Neptune",
+                image_path=str(neptune_png),
+                priority=100,
+                active=True,
+            ),
+            ApprovedPlanetReferenceEntry(
+                registry_key="mercury_v1",
+                planet="Mercury",
+                image_path=str(mercury_png),
+                priority=100,
+                active=True,
+            ),
+        ],
+    )
+    monkeypatch.setattr(
+        "astro_content_agent.content.catstyle.catstyle_approved_planet_reference_v1.approved_planet_references_json_path",
+        lambda: reg,
+    )
+    clean = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Mercury",
+            planet_b="Neptune",
+            aspect_type="square",
+            mode="tension",
+            variants_count=1,
+            use_planet_reference_auto=True,
+            render_style_profile_key="premium_cg_keyart_v1",
+            clean_refs_mode=True,
+            premium_art_direction=False,
+            disable_approved_reference_prompt_lock=True,
+        )
+    )
+    full = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Mercury",
+            planet_b="Neptune",
+            aspect_type="square",
+            mode="tension",
+            variants_count=1,
+            use_planet_reference_auto=True,
+            render_style_profile_key="premium_cg_keyart_v1",
+        )
+    )
+    clean_blob = clean.image_prompts[0]
+    full_blob = full.image_prompts[0]
+    clean_low = clean_blob.lower()
+    assert CLEAN_REFERENCE_ROLES_BLOCK.split("]")[0] + "]" in clean_blob
+    assert "mercury" in clean_low
+    assert "neptune" in clean_low
+    assert "square" in clean_low
+    assert "[arena opulence hardlock v1]" in clean_low
+    assert "[true premium cgi render hardlock v1]" in clean_low
+    assert "high-end cinematic 3d cgi key art" in clean_low
+    assert "central clash" in clean_low or "central rupture" in clean_low
+    assert "tide/mist" in clean_low or "dissolving wave-force" in clean_low
+    assert "[catstyle planet reference identity hardlock" not in clean_low
+    assert "[catstyle visual composition hardlock" not in clean_low
+    assert "[tense aspect choreography v2" not in clean_low
+    assert "canon v1 base" not in clean_low
+    assert "sun-uranus" not in clean_low
+    assert "corona flare" not in clean_low
+    assert "lightning zig" not in clean_low
+    assert "do not turn mercury into sun" in clean_low
+    assert "flat monochrome blue fur" in clean_low or "water-elemental" in clean_low
+    assert len(clean_blob) < len(full_blob) * 0.35
+    from astro_content_agent.content.catstyle.catstyle_clean_refs_v1 import CLEAN_PROMPT_MAX_CHARS
+
+    assert len(clean_blob) <= CLEAN_PROMPT_MAX_CHARS
+
+
+def test_mercury_neptune_clean_prompt_includes_contrast_block_under_budget() -> None:
+    from astro_content_agent.content.catstyle.catstyle_clean_refs_v1 import (
+        CLEAN_PROMPT_MAX_CHARS,
+        build_clean_refs_image_prompt,
+    )
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    prompt = build_clean_refs_image_prompt("Mercury", "Neptune", "square", "tension")
+    low = prompt.lower()
+    assert "sibling blue-gray mage cats" in low or "not sibling" in low
+    assert "[mercury vs neptune contrast]" in low
+    assert "[neptune scale / presence]" in low
+    assert "not smaller than mercury" in low
+    assert "equal/larger presence" in low or "equal or slightly larger" in low
+    assert "oceanic aura" in low
+    assert "vast" in low and "mythic" in low
+    assert "visible central rupture" in low or "central clash" in low
+    assert "polite magical exchange" in low
+    assert "signal" in low and "tide" in low and "mist" in low
+    assert "generic blue cat" in low or "generic blue neptune" in low or "blue-mascot neptune" in low
+    assert "[arena opulence hardlock v1]" in low
+    assert "[arena lighting richness v1]" in low
+    assert "[arena scale dominance v3]" in low
+    assert "warm golden torchlight" in low
+    assert "monumental" in low
+    assert "[true premium cgi render hardlock v1]" in low
+    assert "high-end cinematic 3d cgi key art" in low
+    assert "physically based rendering" in low
+    assert "pbr" in low
+    assert "[zodiac floor hardlock v2]" in low
+    assert "only real zodiac glyphs" in low
+    assert "aries through pisces" in low
+    assert "35–65%" in low
+    assert "extends beyond" in low
+    assert "not small magic disc" in low or "not a small" in low
+    assert "[neptune material fidelity]" in low
+    assert "flat solid-blue water mascot" in low
+    assert "no arena or full-scene image refs" in low
+    assert len(prompt) <= CLEAN_PROMPT_MAX_CHARS
+    assert "style hardlock cg" not in low
+    assert "catstyle visual composition hardlock" not in low
+    assert "tense aspect choreography" not in low
+
+    pack = generate_catstyle_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Mercury",
+            planet_b="Neptune",
+            aspect_type="square",
+            mode="tension",
+            variants_count=1,
+            clean_refs_mode=True,
+            use_planet_reference_auto=False,
+        )
+    )
+    assert len(pack.image_prompts[0]) <= CLEAN_PROMPT_MAX_CHARS
+    neg = pack.negative_prompt.lower()
+    assert "tiny neptune" in neg
+    assert "neptune smaller than mercury" in neg
+    assert "sidekick neptune" in neg
+    assert "small blue cat" in neg
+
+
+def test_clean_refs_text_only_arena_blocks_without_arena_image() -> None:
+    from astro_content_agent.content.catstyle.catstyle_clean_refs_v1 import (
+        CLEAN_PROMPT_MAX_CHARS,
+        build_clean_refs_image_prompt,
+        generate_catstyle_clean_refs_prompt_pack,
+    )
+    from astro_content_agent.content.catstyle.models import CatstylePromptRequest
+
+    prompt = build_clean_refs_image_prompt("Saturn", "Venus", "square", "tension")
+    low = prompt.lower()
+    assert "[arena opulence hardlock v1]" in low
+    assert "[arena scale dominance v3]" in low
+    assert "[true premium cgi render hardlock v1]" in low
+    assert "[zodiac floor hardlock v2]" in low
+    assert "35–65%" in low
+    assert len(prompt) <= CLEAN_PROMPT_MAX_CHARS
+
+    pack = generate_catstyle_clean_refs_prompt_pack(
+        CatstylePromptRequest(
+            planet_a="Saturn",
+            planet_b="Venus",
+            aspect_type="square",
+            mode="tension",
+            variants_count=1,
+            disable_arena_reference_auto=True,
+        )
+    )
+    assert "[arena opulence hardlock v1]" in pack.image_prompts[0].lower()
+
+
+def test_build_jobs_clean_refs_mode_reference_order_without_pair_style(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from datetime import date
+    import json
+
+    from astro_content_agent.content.catstyle.catstyle_clean_refs_v1 import CLEAN_PROMPT_MAX_CHARS
+    from astro_content_agent.content.catstyle.catstyle_approved_planet_reference_v1 import (
+        APPROVED_PLANET_REFERENCE_LOCK_MARKER,
+        ApprovedPlanetReferenceEntry,
+        write_planet_registry_entries,
+    )
+    from astro_content_agent.services.content.catstyle_image_generation_jobs import (
+        build_catstyle_image_generation_jobs,
+    )
+
+    reg = tmp_path / "approved_planet_references.json"
+    mercury_png = tmp_path / "mercury.png"
+    neptune_png = tmp_path / "neptune.png"
+    pair_png = tmp_path / "pair.png"
+    for p in (mercury_png, neptune_png, pair_png):
+        p.write_bytes(b"x")
+    write_planet_registry_entries(
+        reg,
+        [
+            ApprovedPlanetReferenceEntry(
+                registry_key="mercury_v1",
+                planet="Mercury",
+                image_path=str(mercury_png),
+                priority=100,
+                active=True,
+            ),
+            ApprovedPlanetReferenceEntry(
+                registry_key="neptune_v1",
+                planet="Neptune",
+                image_path=str(neptune_png),
+                priority=100,
+                active=True,
+            ),
+        ],
+    )
+    monkeypatch.setattr(
+        "astro_content_agent.content.catstyle.catstyle_approved_planet_reference_v1.approved_planet_references_json_path",
+        lambda: reg,
+    )
+    monkeypatch.setattr(
+        "astro_content_agent.services.content.catstyle_image_generation_jobs._resolve_final_style_reference",
+        lambda **kwargs: (str(pair_png.resolve()), {"source": "explicit"}),
+    )
+    out = tmp_path / "jobs"
+    r = build_catstyle_image_generation_jobs(
+        date(2026, 6, 1),
+        output_dir=out,
+        planet_a_override="Mercury",
+        planet_b_override="Neptune",
+        aspect_type_override="square",
+        mode_override="tension",
+        render_style_profile_key="premium_cg_keyart_v1",
+        shot_mode="epic_arena_showdown",
+        clean_refs_mode=True,
+        use_planet_reference_auto=True,
+        jobs_count=1,
+    )
+    job = r.jobs[0]
+    prompt_file = (out / "job_01_prompt.txt").read_text(encoding="utf-8").strip()
+    assert prompt_file == job.prompt_text.strip()
+    low = prompt_file.lower()
+    assert len(prompt_file) <= CLEAN_PROMPT_MAX_CHARS
+    assert "[arena opulence hardlock v1]" in low
+    assert "[arena lighting richness v1]" in low
+    assert "[true premium cgi render hardlock v1]" in low
+    assert "[zodiac floor hardlock v2]" in low
+    assert "only real zodiac glyphs" in low
+    assert "35–65%" in low
+    assert "extends beyond" in low
+    assert "[square conflict law v1]" in low
+    assert "central clash" in low or "central rupture" in low
+    assert "polite magical exchange" in low
+    assert "tide/mist" in low or "dissolving wave-force" in low
+    assert "sibling blue-gray mage cats" in low or "not sibling" in low
+    assert "signal" in low and "tide" in low and "mist" in low
+    assert "[REFERENCE ROLES]" in prompt_file
+    assert "mercury" in low
+    assert "neptune" in low
+    assert APPROVED_PLANET_REFERENCE_LOCK_MARKER not in prompt_file
+    assert "style hardlock cg" not in low
+    assert "render style v1" not in low
+    assert "catstyle approved arena reference" not in low
+    assert "catplanet body identity" not in low
+    assert "cosmic zodiac arena premium environment" not in low
+    assert "catstyle visual composition hardlock" not in low
+    assert "tense aspect choreography" not in low
+    assert "world template" not in low
+    assert "scene beat" not in low
+    assert "catstyle global quality lock" not in low
+    assert "catstyle planet reference override" not in low
+    assert "pair/style reference is active" not in low
+    assert [row["role"] for row in job.reference_images] == ["planet_a", "planet_b"]
+    assert job.arena_reference_image_path is None
+    assert job.render_style_profile_key == "catstyle_clean_refs_v1"
+    manifest = json.loads((out / "image_generation_jobs.json").read_text(encoding="utf-8"))
+    assert manifest["clean_refs_mode"] is True
+    assert manifest.get("arena_reference", {}).get("clean_refs_text_only_arena") is True
+    assert manifest.get("arena_reference", {}).get("arena_reference_used") is False
 

@@ -61,6 +61,7 @@ CATSTYLE_GLOBAL_QUALITY_LOCK_CG_BLOCK: Final[str] = (
 CATSTYLE_GLOBAL_QUALITY_NEGATIVE_CG_EXTRAS: Final[tuple[str, ...]] = (
     "watercolor illustration",
     "watercolor wash dominance",
+    "gouache",
     "gouache painting look",
     "soft painterly illustration dominance",
     "hand-painted storybook illustration",

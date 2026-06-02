@@ -2,25 +2,137 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, Field
 
 from astro_content_agent.content.catstyle.approved_reference_registry import catstyle_repo_root
+from astro_content_agent.content.catstyle.catstyle_aspect_staging_locks_v1 import (
+    REFERENCE_ROLE_DECLARATION_MARKER,
+    build_reference_role_declaration_block,
+)
+from astro_content_agent.content.catstyle.catstyle_planet_reference_identity_lock_v1 import (
+    PLANET_REFERENCE_IDENTITY_HARDLOCK_MARKER,
+    build_planet_reference_identity_hardlock_layer,
+)
 from astro_content_agent.content.catstyle.planet_canon_v1 import normalize_planet_name
 from astro_content_agent.content.catstyle.models import CatstylePromptPack
 
 
-APPROVED_PLANET_REFERENCE_LOCK_MARKER: str = "[APPROVED PLANET REFERENCE LOCK v1]"
+APPROVED_PLANET_REFERENCE_LOCK_MARKER: str = "[CATSTYLE PLANET REFERENCE OVERRIDE v2]"
 
 APPROVED_PLANET_REFERENCE_LOCK_BODY: str = (
-    "Treat approved per-planet references as primary character identity anchors. "
-    "Preserve each referenced planet-cat's face style, body proportions, planetary body material, "
-    "silhouette, palette, costume logic, aura, and main accessories. "
-    "Do not revert to old text-only canon when image references are present. "
-    "Text canon may clarify symbolism, but image reference controls visual identity. "
-    "Preserve planet-cat anatomy and planetary surface material over ordinary fur-cat styling."
+    "Approved per-planet image references are the primary visual source of truth for character appearance. "
+    "For registered planets, attached planet references override old text canon. "
+    "Preserve referenced face style, body proportions, silhouette, planetary body material, palette, aura, "
+    "costume logic, and main accessories. "
+    "Old planet canon is symbolic only and must not force old costumes, old props, old face types, "
+    "old body proportions, old color palettes, old cute/noir/fighter archetypes, or old pair-scene clichés. "
+    "Aspect choreography may change pose/action, but must not replace referenced character identity. "
+    "Render living planet-cat bodies first; costume/props second."
+)
+
+_SYMBOLIC_CANON_STUB = (
+    "[SYMBOLIC CANON ONLY — secondary to approved planet reference]: "
+    "Use attached reference for visual identity; text canon is symbolic/semantic guidance only."
+)
+
+_OLD_VISUAL_CANON_PHRASES: tuple[str, ...] = (
+    "Stoic pinstripe round cat",
+    "Plush rose-cheek round cat",
+    "rose stem + short pearls",
+    "rose stem, one short pearl strand",
+    "wide-brim hat, blank wristwatch, ruler, skeleton key",
+    "wide-brim hat and ring-hoop belt",
+    "pinstripe suit silhouette with wide-brim hat",
+)
+
+_OLD_CHOREO_VISUAL_MARKERS: tuple[str, ...] = (
+    "moon may hold, brace, swing, or strike with pillow energy",
+    "saturn may use chain/control as saturnian restraint",
+)
+
+_OLD_PAIR_STORY_MARKERS: tuple[str, ...] = (
+    "business meeting",
+    "deadline-heavy business",
+    "pleasure under audit",
+    "design studio collaboration",
+    "design studio teamwork",
+    "architecture models",
+    "architecture sketch",
+    "fashion sketches",
+    "fashion collab",
+    "jewelry or watch layout",
+    "watch layout",
+    "moodboard",
+    "blank contract",
+    "fabric bolt",
+    "mannequin",
+    "clipboard tallies",
+    "pleasure units",
+    "real-estate tabletop",
+    "co-sketch a watch face",
+    "joint jewelry layout",
+)
+
+PLANET_REF_IDENTITY_PRESERVE: str = (
+    "preserve approved planet reference identity; symbolic canon remains secondary"
+)
+
+_CANON_PRESERVE_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
+    (
+        re.compile(
+            r"preserve\s+\[CANON v1 base\]\s*\+\s*\[IDENTITY MARKERS v1\]",
+            re.IGNORECASE,
+        ),
+        PLANET_REF_IDENTITY_PRESERVE,
+    ),
+    (
+        re.compile(
+            r"preserve the full \[CANON v1 base\].*?\[IDENTITY MARKERS v1\]",
+            re.IGNORECASE | re.DOTALL,
+        ),
+        PLANET_REF_IDENTITY_PRESERVE,
+    ),
+    (
+        re.compile(
+            r"preserve this entire marker block alongside \[CANON v1 base\]",
+            re.IGNORECASE,
+        ),
+        PLANET_REF_IDENTITY_PRESERVE,
+    ),
+)
+
+_OLD_PAIR_SCENE_VISUAL_MARKERS: tuple[str, ...] = (
+    "pinstripe and hat slides a blank contract",
+    "saturn cat in pinstripe and hat",
+    "venus cat with single rose and moodboard",
+    "single rose and moodboard",
+    "slides a blank contract across",
+    "clipboard tallies 'pleasure units'",
+)
+
+_CANON_V1_BLOCK_RE = re.compile(
+    r"(\w+) planet-cat \[CANON v1 base\]:.*?"
+    r"(?=\s+\w+ planet-cat \[CANON v1 base\]:|\s+\[PLANET CANON v1|\s+Aspect type:|\s+\[CATSTYLE|\s+\[WORLD|\s+\[SCENE|\s+\[RENDER|\s+\[SHOT|\s+Scene beat:|\Z)",
+    re.IGNORECASE | re.DOTALL,
+)
+
+_PLANET_CANON_V1_BLOCK_RE = re.compile(
+    r"\[PLANET CANON v1 - [^\]]+\]:.*?(?=\s+\[PLANET CANON v1|\s+Aspect type:|\s+\[CATSTYLE|\s+Scene beat:|\Z)",
+    re.IGNORECASE | re.DOTALL,
+)
+
+CG_MATERIAL_FINISH_HARDLOCK_BLOCK: str = (
+    "[CG MATERIAL FINISH HARDLOCK v2] "
+    "Final image must read as polished premium CG key art / 2.5D-3D hybrid game splash art. "
+    "Use crisp surface modeling, clean specular highlights, glossy/translucent material separation, "
+    "volumetric rim light, cinematic depth, sharp silhouette edges, high-resolution 3D-render-like polish. "
+    "Reject dry painted fantasy illustration, matte brush strokes, watercolor, gouache, storybook softness, "
+    "painterly canvas texture, hand-painted poster dryness, muddy airbrush, sketch texture. "
+    "Planet-cat bodies must have luminous material surfaces, not ordinary fur painted with brush texture."
 )
 
 
@@ -45,11 +157,11 @@ def build_approved_planet_reference_lock_block(
         )
     if pa_row.get("used") and pa_norm.lower() == "saturn":
         extras.append(
-            "Saturn must not soften into generic dark cat if a Saturn planet reference is attached."
+            "Saturn must not soften into generic dark boss cat if a Saturn planet reference is attached."
         )
     if pb_row.get("used") and pb_norm.lower() == "saturn":
         extras.append(
-            "Saturn must not soften into generic dark cat if a Saturn planet reference is attached."
+            "Saturn must not soften into generic dark boss cat if a Saturn planet reference is attached."
         )
     body = APPROVED_PLANET_REFERENCE_LOCK_BODY
     if extras:
@@ -57,21 +169,254 @@ def build_approved_planet_reference_lock_block(
     return f"{APPROVED_PLANET_REFERENCE_LOCK_MARKER} {body}"
 
 
-def inject_approved_planet_reference_lock_block(prompt: str, block: str) -> str:
-    """Append planet lock after arena/style opener region when possible."""
-    block = block.strip()
-    if not block or APPROVED_PLANET_REFERENCE_LOCK_MARKER.lower() in prompt.lower():
-        return prompt
-    for anchor in (
-        APPROVED_PLANET_REFERENCE_LOCK_MARKER,
-        "[CATSTYLE APPROVED ARENA REFERENCE v1]",
-        "Aspect type:",
-        "[WORLD TEMPLATE v1",
-    ):
-        idx = prompt.find(anchor)
-        if idx > 0:
-            return f"{prompt[:idx].rstrip()} {block} {prompt[idx:].lstrip()}"
-    return f"{prompt.rstrip()} {block}"
+def _planet_ref_used(meta: dict[str, Any], slot: str) -> bool:
+    row = meta.get(slot) if isinstance(meta.get(slot), dict) else {}
+    return bool(row.get("used") and row.get("image_path"))
+
+
+def sanitize_scene_beat_for_planet_refs(scene: str, *, refs_active: bool) -> str:
+    """Replace hardcoded visual pair-scene clichés when planet refs are authoritative."""
+    if not refs_active:
+        return scene
+    low = str(scene or "").lower()
+    if any(marker in low for marker in _OLD_PAIR_SCENE_VISUAL_MARKERS):
+        return (
+            "Aspect choreography: symbolic tension and negotiation — preserve approved planet-reference "
+            "identity for both characters; staging may change pose/action but not costumes, props, or "
+            "face/body from image refs."
+        )
+    return scene
+
+
+def _story_line_is_leaky(text: str) -> bool:
+    low = str(text or "").lower()
+    return any(m in low for m in _OLD_PAIR_STORY_MARKERS)
+
+
+def neutral_aspect_choreography_for_pair(
+    planet_a: str,
+    planet_b: str,
+    aspect_type: str | None = None,
+) -> tuple[str, str] | None:
+    """Neutral story fields for pairs whose legacy text canon leaks visual clichés."""
+    pa = normalize_planet_name(planet_a).lower()
+    pb = normalize_planet_name(planet_b).lower()
+    if {pa, pb} != {"saturn", "venus"}:
+        return None
+    core = (
+        "Beauty, value, pleasure, attraction, and desire meet time, boundary, gravity, pressure, and consequence. "
+        "Show visual tension through spatial pressure, gravity fields, chain/boundary motifs, and Venusian "
+        "glow/value-field resisting compression."
+    )
+    constructive = (
+        "Aspect choreography may reshape pose and staging, but must preserve approved planet-reference identity. "
+        "Do not force old costumes, props, business-meeting jokes, contract scenes, or fashion-studio staging."
+    )
+    return core, constructive
+
+
+def sanitize_core_tension_and_constructive_for_planet_refs(
+    core_tension: str,
+    constructive_channel: str,
+    *,
+    planet_a: str,
+    planet_b: str,
+    aspect_type: str | None = None,
+    refs_active: bool,
+) -> tuple[str, str]:
+    """Rewrite leaky pair story lines when approved planet references are authoritative."""
+    if not refs_active:
+        return core_tension, constructive_channel
+    leaky = _story_line_is_leaky(core_tension) or _story_line_is_leaky(constructive_channel)
+    if not leaky:
+        return core_tension, constructive_channel
+    neutral = neutral_aspect_choreography_for_pair(planet_a, planet_b, aspect_type)
+    if neutral:
+        return neutral
+    generic_core = (
+        "Symbolic aspect tension — preserve approved planet-reference identity; "
+        "express pressure and negotiation without legacy prop-specific staging."
+    )
+    generic_cons = (
+        "Neutral aspect choreography only — no forced costumes, props, business-meeting jokes, "
+        "contract scenes, or fashion-studio staging."
+    )
+    return generic_core, generic_cons
+
+
+def sanitize_visual_metaphor_for_planet_refs(
+    visual_metaphor: str,
+    *,
+    planet_a: str,
+    planet_b: str,
+    refs_active: bool,
+) -> str:
+    if not refs_active or not _story_line_is_leaky(visual_metaphor):
+        return visual_metaphor
+    neutral = neutral_aspect_choreography_for_pair(planet_a, planet_b)
+    if neutral:
+        return neutral[0]
+    return (
+        "Symbolic spatial tension between the two planet-cats — preserve approved references; "
+        "no legacy prop staging."
+    )
+
+
+def _replace_canon_preserve_phrases(out: str) -> str:
+    for pattern, replacement in _CANON_PRESERVE_PATTERNS:
+        out = pattern.sub(replacement, out)
+    return out
+
+
+def _rewrite_prompt_story_sections(
+    out: str,
+    *,
+    planet_a: str,
+    planet_b: str,
+    aspect_type: str | None = None,
+) -> str:
+    if not _story_line_is_leaky(out):
+        return out
+    neutral = neutral_aspect_choreography_for_pair(planet_a, planet_b, aspect_type)
+    if neutral:
+        core, cons = neutral
+    else:
+        core = (
+            "Symbolic aspect tension — preserve approved planet-reference identity; "
+            "express pressure and negotiation without legacy prop-specific staging."
+        )
+        cons = (
+            "Neutral aspect choreography only — no forced costumes, props, business-meeting jokes, "
+            "contract scenes, or fashion-studio staging."
+        )
+    out = re.sub(
+        r"Story tension \(cartoon metaphor\):\s*.*?(?=\s+Constructive undertone available:)",
+        f"Story tension (cartoon metaphor): {core} ",
+        out,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    out = re.sub(
+        r"Constructive undertone available:\s*.*?(?=\s+Visual metaphor:|\s+\[CATSTYLE|\s+\[PREMIUM|\Z)",
+        f"Constructive undertone available: {cons} ",
+        out,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    return out
+
+
+def sanitize_prompt_for_planet_reference_override(
+    prompt: str,
+    *,
+    planet_a: str | None = None,
+    planet_b: str | None = None,
+    aspect_type: str | None = None,
+) -> str:
+    """Demote old text canon and strip hardcoded visual clichés when planet refs are active."""
+    out = str(prompt or "")
+
+    def _replace_canon_block(match: re.Match[str]) -> str:
+        planet = match.group(1)
+        return f"{planet} planet-cat {_SYMBOLIC_CANON_STUB}"
+
+    out = _CANON_V1_BLOCK_RE.sub(_replace_canon_block, out)
+    out = _PLANET_CANON_V1_BLOCK_RE.sub("", out)
+
+    low = out.lower()
+    for phrase in _OLD_VISUAL_CANON_PHRASES:
+        idx = low.find(phrase.lower())
+        while idx >= 0:
+            out = out[:idx] + out[idx + len(phrase) :]
+            low = out.lower()
+            idx = low.find(phrase.lower())
+
+    for phrase in _OLD_CHOREO_VISUAL_MARKERS:
+        idx = low.find(phrase.lower())
+        while idx >= 0:
+            out = out[:idx] + out[idx + len(phrase) :]
+            low = out.lower()
+            idx = low.find(phrase.lower())
+
+    scene_match = re.search(r"Scene beat:\s*[^.]+\.", out, flags=re.IGNORECASE)
+    if scene_match:
+        scene_text = scene_match.group(0)
+        if any(m in scene_text.lower() for m in _OLD_PAIR_SCENE_VISUAL_MARKERS):
+            replacement = (
+                "Scene beat: Aspect choreography — symbolic tension only; follow approved planet references "
+                "for character appearance."
+            )
+            out = out[: scene_match.start()] + replacement + out[scene_match.end() :]
+
+    out = _replace_canon_preserve_phrases(out)
+    if planet_a and planet_b:
+        out = _rewrite_prompt_story_sections(
+            out, planet_a=planet_a, planet_b=planet_b, aspect_type=aspect_type
+        )
+
+    low = out.lower()
+    for phrase in _OLD_PAIR_STORY_MARKERS:
+        idx = low.find(phrase.lower())
+        while idx >= 0:
+            out = out[:idx] + out[idx + len(phrase) :]
+            low = out.lower()
+            idx = low.find(phrase.lower())
+
+    return " ".join(out.split())
+
+
+def append_planet_reference_override_at_end(
+    prompt: str,
+    lock_block: str,
+    *,
+    render_style_key: str | None = None,
+) -> str:
+    """Append override + optional CG hardlock near the end of the prompt."""
+    out = str(prompt or "").rstrip()
+    if APPROVED_PLANET_REFERENCE_LOCK_MARKER not in out:
+        out = f"{out} {lock_block.strip()}"
+    if render_style_key == "premium_cg_keyart_v1" and "[CG MATERIAL FINISH HARDLOCK v2]" not in out:
+        out = f"{out} {CG_MATERIAL_FINISH_HARDLOCK_BLOCK}"
+    return out.strip()
+
+
+def _ensure_planet_ref_support_blocks(
+    prompt: str,
+    ref_decl: str,
+    *,
+    planet_a: str,
+    planet_b: str,
+    planet_references_meta: dict[str, Any],
+) -> str:
+    """Ensure identity hardlock, reference-role, and body-material blocks exist before override append."""
+    out = str(prompt or "")
+    identity = build_planet_reference_identity_hardlock_layer(
+        planet_a, planet_b, planet_references_meta
+    )
+    if identity and PLANET_REFERENCE_IDENTITY_HARDLOCK_MARKER not in out:
+        out = f"{out} {identity}".strip()
+    if ref_decl and REFERENCE_ROLE_DECLARATION_MARKER not in out:
+        out = f"{out} {ref_decl}".strip()
+    return out
+
+
+def inject_approved_planet_reference_lock_block(
+    prompt: str,
+    block: str,
+    *,
+    render_style_key: str | None = None,
+    planet_a: str | None = None,
+    planet_b: str | None = None,
+    aspect_type: str | None = None,
+) -> str:
+    """Sanitize and append planet override blocks near prompt end."""
+    sanitized = sanitize_prompt_for_planet_reference_override(
+        prompt,
+        planet_a=planet_a,
+        planet_b=planet_b,
+        aspect_type=aspect_type,
+    )
+    return append_planet_reference_override_at_end(
+        sanitized, block, render_style_key=render_style_key
+    )
 
 
 def apply_approved_planet_reference_lock_to_prompt_pack(
@@ -79,21 +424,45 @@ def apply_approved_planet_reference_lock_to_prompt_pack(
     planet_a: str,
     planet_b: str,
     planet_references_meta: dict[str, Any],
+    *,
+    render_style_key: str | None = None,
+    aspect_type: str | None = None,
 ) -> CatstylePromptPack:
-    """Inject planet reference lock into the first image prompt."""
+    """Sanitize prompts and inject planet reference override blocks."""
     if not planet_references_active_for_job(planet_references_meta):
         return pack
     block = build_approved_planet_reference_lock_block(planet_a, planet_b, planet_references_meta)
+    ref_decl = build_reference_role_declaration_block(
+        planet_a, planet_b, planet_refs_active=True
+    )
     data = pack.model_dump(mode="json")
     prompts = [str(p) for p in (data.get("image_prompts") or [])]
     if prompts:
-        prompts[0] = inject_approved_planet_reference_lock_block(prompts[0], block)
-        data["image_prompts"] = prompts
+        data["image_prompts"] = [
+            inject_approved_planet_reference_lock_block(
+                _ensure_planet_ref_support_blocks(
+                    p,
+                    ref_decl,
+                    planet_a=planet_a,
+                    planet_b=planet_b,
+                    planet_references_meta=planet_references_meta,
+                ),
+                block,
+                render_style_key=render_style_key,
+                planet_a=planet_a,
+                planet_b=planet_b,
+                aspect_type=aspect_type,
+            )
+            for p in prompts
+        ]
+    full_block = block
+    if render_style_key == "premium_cg_keyart_v1":
+        full_block = f"{block} {CG_MATERIAL_FINISH_HARDLOCK_BLOCK}"
     data["planet_reference_assist"] = {
         "planet_a": planet_references_meta.get("planet_a"),
         "planet_b": planet_references_meta.get("planet_b"),
         "any_used": planet_references_meta.get("any_used"),
-        "prompt_block": block,
+        "prompt_block": full_block,
     }
     return CatstylePromptPack.model_validate(data)
 
@@ -104,20 +473,23 @@ def build_job_reference_images(
     planet_a_reference_image_path: str | None = None,
     planet_b_reference_image_path: str | None = None,
     style_reference_image_path: str | None = None,
+    include_pair_style: bool = True,
 ) -> list[dict[str, str]]:
     """
     Ordered deduped reference list for job manifests and providers.
 
-    Order: arena → planet_a → planet_b → optional pair_style.
+    Order: planet_a → planet_b → arena → optional pair_style.
     """
     out: list[dict[str, str]] = []
     seen: set[str] = set()
-    for role, raw in (
-        ("arena", arena_reference_image_path),
+    roles: tuple[tuple[str, str | None], ...] = (
         ("planet_a", planet_a_reference_image_path),
         ("planet_b", planet_b_reference_image_path),
-        ("pair_style", style_reference_image_path),
-    ):
+        ("arena", arena_reference_image_path),
+    )
+    if include_pair_style:
+        roles = roles + (("pair_style", style_reference_image_path),)
+    for role, raw in roles:
         path_str = str(raw or "").strip()
         if not path_str:
             continue
@@ -445,6 +817,7 @@ __all__ = [
     "PlanetReferenceResolveResult",
     "ResolvedPlanetReference",
     "active_planet_reference_paths_from_meta",
+    "append_planet_reference_override_at_end",
     "apply_approved_planet_reference_lock_to_prompt_pack",
     "approved_planet_references_json_path",
     "build_approved_planet_reference_lock_block",
@@ -454,11 +827,16 @@ __all__ = [
     "list_active_planet_references_grouped",
     "list_resolved_winners_by_planet",
     "load_approved_planet_reference_registry",
+    "neutral_aspect_choreography_for_pair",
     "planet_reference_target_relpath",
     "planet_references_active_for_job",
     "read_planet_registry_entries",
     "resolve_approved_planet_reference",
     "resolve_planet_reference",
     "resolve_planet_references_for_pair",
+    "sanitize_core_tension_and_constructive_for_planet_refs",
+    "sanitize_prompt_for_planet_reference_override",
+    "sanitize_scene_beat_for_planet_refs",
+    "sanitize_visual_metaphor_for_planet_refs",
     "write_planet_registry_entries",
 ]

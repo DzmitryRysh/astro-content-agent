@@ -144,6 +144,7 @@ def test_build_jobs_two_prompts_all_pending(tmp_path: Path) -> None:
             editorial_profile="charged",
             output_dir=tmp_path / "jobs",
             disable_arena_reference_auto=True,
+            use_planet_reference_auto=False,
         )
     assert isinstance(r, CatstyleImageGenerationJobsResult)
     assert len(r.jobs) == 2
@@ -185,6 +186,7 @@ def test_build_jobs_jobs_count_one_daily_pack(tmp_path: Path) -> None:
             output_dir=tmp_path / "jobs1",
             jobs_count=1,
             disable_arena_reference_auto=True,
+            use_planet_reference_auto=False,
         )
     assert len(r.jobs) == 1
     assert r.jobs[0].prompt_index == 1
@@ -239,7 +241,7 @@ def test_output_writes_manifest_and_prompt_files(tmp_path: Path) -> None:
         return_value=_fake_pack_one_primary(),
     ):
         r = build_catstyle_image_generation_jobs(
-            date(2026, 5, 2), output_dir=out, disable_arena_reference_auto=True
+            date(2026, 5, 2), output_dir=out, disable_arena_reference_auto=True, use_planet_reference_auto=False
         )
     assert (out / "image_generation_jobs.json").is_file()
     assert (out / "job_01_prompt.txt").read_text(encoding="utf-8").strip() == "prompt line one"
@@ -343,9 +345,9 @@ def test_build_jobs_with_planet_reference_auto_attaches_refs_and_lock(
     assert job.planet_a_reference_image_path == str(jupiter_png.resolve())
     assert job.planet_b_reference_image_path == str(mars_png.resolve())
     assert [row["role"] for row in job.reference_images] == [
-        "arena",
         "planet_a",
         "planet_b",
+        "arena",
         "pair_style",
     ]
     assert len({row["path"] for row in job.reference_images}) == len(job.reference_images)

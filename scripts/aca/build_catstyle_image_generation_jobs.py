@@ -80,6 +80,15 @@ def main() -> int:
         help="Optional Catstyle render style profile key v1 passed into daily pack prompts.",
     )
     ap.add_argument(
+        "--clean-refs-mode",
+        action="store_true",
+        dest="clean_refs_mode",
+        help=(
+            "Minimal reference-first prompts (catstyle_clean_refs_v1): planet + arena refs only, "
+            "no legacy canon/hardlock stacks; pair/style reference off unless --style-reference-image set."
+        ),
+    )
+    ap.add_argument(
         "--shot-mode",
         choices=("hero_pair", "epic_arena_showdown", "standard"),
         default=None,
@@ -111,8 +120,24 @@ def main() -> int:
         help="Do not auto-pick the default approved arena reference from the arena registry.",
     )
     ap.add_argument(
+        "--arena-pool-key",
+        default=None,
+        dest="arena_pool_key",
+        help=(
+            "Select arena/environment reference from a registered pool (deterministic stable_by_pair). "
+            "Ignored when --arena-reference-image is set."
+        ),
+    )
+    ap.add_argument(
+        "--arena-pool-selection",
+        default="stable_by_pair",
+        dest="arena_pool_selection",
+        help="Arena pool selection mode (default: stable_by_pair).",
+    )
+    ap.add_argument(
         "--use-planet-reference-auto",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
+        default=True,
         dest="use_planet_reference_auto",
         help="Attach approved per-planet character references to jobs and inject planet reference lock.",
     )
@@ -166,11 +191,14 @@ def main() -> int:
             render_style_profile_key=args.render_style_profile,
             shot_mode=args.shot_mode,
             style_reference_image_path=args.style_reference_image,
-        disable_approved_reference_auto=args.disable_approved_reference_auto,
-        arena_reference_image_path=args.arena_reference_image,
-        disable_arena_reference_auto=args.disable_arena_reference_auto,
-        use_planet_reference_auto=args.use_planet_reference_auto,
-        planet_a_override=args.planet_a_override,
+            disable_approved_reference_auto=args.disable_approved_reference_auto,
+            arena_reference_image_path=args.arena_reference_image,
+            disable_arena_reference_auto=args.disable_arena_reference_auto,
+            arena_pool_key=args.arena_pool_key,
+            arena_pool_selection=args.arena_pool_selection,
+            use_planet_reference_auto=args.use_planet_reference_auto,
+            clean_refs_mode=args.clean_refs_mode,
+            planet_a_override=args.planet_a_override,
             planet_b_override=args.planet_b_override,
             aspect_type_override=args.aspect_type_override,
             mode_override=args.mode_override,
@@ -203,8 +231,16 @@ def main() -> int:
     arena_meta = result.arena_reference_meta or {}
     if arena_meta.get("arena_reference_used") and arena_meta.get("arena_reference_image_path"):
         print(f"  arena reference:   {arena_meta.get('arena_reference_image_path')}")
+        if arena_meta.get("arena_pool_key"):
+            print(f"  arena pool key:    {arena_meta.get('arena_pool_key')}")
+        if arena_meta.get("selected_arena_pool_candidate_key"):
+            print(f"  arena pool pick:   {arena_meta.get('selected_arena_pool_candidate_key')}")
+        if arena_meta.get("arena_selection_mode"):
+            print(f"  arena selection:   {arena_meta.get('arena_selection_mode')}")
         if arena_meta.get("arena_reference_registry_key"):
             print(f"  arena registry key: {arena_meta.get('arena_reference_registry_key')}")
+    elif arena_meta.get("clean_refs_text_only_arena"):
+        print("  arena reference:   clean refs text-only colosseum (no arena image)")
     else:
         print("  arena reference:   no arena reference selected")
     if result.manual_aspect_override:

@@ -18,7 +18,8 @@ def test_registry_contains_required_profiles() -> None:
     assert "premium_comic_poster_v2" in RENDER_STYLE_PROFILES
     assert "premium_cg_keyart_v1" in RENDER_STYLE_PROFILES
     assert "clean_cartoon_action_v1" in RENDER_STYLE_PROFILES
-    assert len(RENDER_STYLE_PROFILES) >= 4
+    assert "catstyle_clean_refs_v1" in RENDER_STYLE_PROFILES
+    assert len(RENDER_STYLE_PROFILES) >= 5
 
 
 def test_default_key_constant() -> None:

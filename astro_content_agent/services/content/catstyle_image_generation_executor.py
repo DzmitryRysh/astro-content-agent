@@ -24,6 +24,8 @@ class StubJobOutputRecord(BaseModel):
     final_prompt_length: int | None = None
     reference_used: bool | None = None
     reference_path: str | None = None
+    reference_image_paths: list[str] = Field(default_factory=list)
+    reference_image_roles: list[str] = Field(default_factory=list)
     reference_skip_reason: str | None = None
     generation_mode: str | None = None
 
@@ -107,6 +109,8 @@ def _provider_result_to_stub_record(
         reference_path=str(res.metadata["reference_path"])
         if isinstance(res.metadata.get("reference_path"), str)
         else None,
+        reference_image_paths=list(res.metadata.get("reference_image_paths") or []),
+        reference_image_roles=list(res.metadata.get("reference_image_roles") or []),
         reference_skip_reason=str(res.metadata["reference_skip_reason"])
         if isinstance(res.metadata.get("reference_skip_reason"), str)
         else None,
@@ -132,6 +136,19 @@ def _emit_reference_logs(data: dict[str, Any], job_row: dict[str, Any]) -> list[
         lines.append(
             f"Using explicit style reference image: {job_row.get('style_reference_image_path')}"
         )
+    ref_images = job_row.get("reference_images")
+    if isinstance(ref_images, list):
+        for item in ref_images:
+            if not isinstance(item, dict):
+                continue
+            role = str(item.get("role") or "").strip()
+            path = str(item.get("path") or "").strip()
+            if not path:
+                continue
+            label = role or "reference"
+            line = f"Using job reference image [{label}]: {path}"
+            if line not in lines:
+                lines.append(line)
     return lines
 
 
