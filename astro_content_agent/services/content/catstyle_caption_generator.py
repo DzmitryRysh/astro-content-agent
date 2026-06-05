@@ -33,6 +33,12 @@ from astro_content_agent.services.content.catstyle_compensation_copy import (
     format_compensation_package_block,
     format_public_compensation_paragraph,
 )
+from astro_content_agent.content.money_weather.money_behavior_overlay_v1 import (
+    build_money_weather_caption_ru,
+    is_money_content_angle,
+    resolve_money_behavior_overlay,
+    validate_money_caption_safety,
+)
 
 _PROMPTS_ROOT = Path(__file__).resolve().parents[1] / "ai" / "prompts"
 _CAPTION_INSTRUCTIONS_PATH = _PROMPTS_ROOT / "ru" / "catstyle_caption_writer.md"
@@ -144,6 +150,35 @@ def _stacked_background_compensation_sentence(bg: dict[str, Any]) -> str | None:
     )
 
 
+def _uses_money_weather_overlay(ctx: CatstyleCaptionContext) -> bool:
+    if is_money_content_angle(ctx.content_angle):
+        return True
+    return (ctx.caption_overlay or "").strip().lower() == "money_weather"
+
+
+def build_money_weather_fallback_caption(ctx: CatstyleCaptionContext) -> CatstyleCaptionResult:
+    """Deterministic Russian money-weather caption from structured overlay."""
+    overlay = resolve_money_behavior_overlay(ctx.planet_a, ctx.planet_b, ctx.aspect_type)
+    caption = build_money_weather_caption_ru(
+        overlay,
+        ctx.planet_a,
+        ctx.planet_b,
+        ctx.aspect_type,
+    )
+    if validate_money_caption_safety(caption):
+        raise ValueError("money weather caption failed safety guard")
+    caption = _sanitize_text(caption)
+    hook = caption.split("\n\n", 1)[0][:240]
+    comp = _sanitize_text(overlay.compensation_action)
+    polished = polish_caption_for_package(caption, ctx)
+    return CatstyleCaptionResult(
+        hook=hook,
+        caption=polished,
+        compensation=comp,
+        source="fallback",
+    )
+
+
 def build_stacked_fallback_caption(ctx: CatstyleCaptionContext) -> CatstyleCaptionResult:
     """Deterministic stacked caption: primary flash + background pressure + combine + compensation."""
     bg = ctx.background_aspect
@@ -212,6 +247,8 @@ def build_stacked_fallback_caption(ctx: CatstyleCaptionContext) -> CatstyleCapti
 
 def build_fallback_caption(ctx: CatstyleCaptionContext) -> CatstyleCaptionResult:
     """Deterministic caption when LLM is unavailable (same structure as LLM target)."""
+    if _uses_money_weather_overlay(ctx):
+        return build_money_weather_fallback_caption(ctx)
     if ctx.background_aspect:
         return build_stacked_fallback_caption(ctx)
 
@@ -324,6 +361,8 @@ def generate_catstyle_caption(
     """
     Generate caption via LLM when enabled and configured; otherwise structured fallback.
     """
+    if _uses_money_weather_overlay(ctx):
+        return build_money_weather_fallback_caption(ctx)
     if not _llm_caption_enabled(use_llm):
         return build_fallback_caption(ctx)
     gen = generator
@@ -348,6 +387,7 @@ __all__ = [
     "CatstyleCaptionResult",
     "OpenAICatstyleCaptionGenerator",
     "build_fallback_caption",
+    "build_money_weather_fallback_caption",
     "build_stacked_fallback_caption",
     "_DRY_TEXTBOOK_OPENING_MARKERS",
     "generate_catstyle_caption",

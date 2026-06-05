@@ -49,6 +49,19 @@ def main() -> int:
         help="Write package here (default: catstyle_post_packages/<manifest date>)",
     )
     ap.add_argument("--overwrite", action="store_true", help="Overwrite existing package files")
+    ap.add_argument(
+        "--content-angle",
+        default=None,
+        dest="content_angle",
+        choices=("money",),
+        help="Optional editorial angle (money = financial behavior / money-weather overlay).",
+    )
+    ap.add_argument(
+        "--caption-overlay",
+        default=None,
+        dest="caption_overlay",
+        help="Optional caption overlay key (e.g. money_weather).",
+    )
     args = ap.parse_args()
 
     try:
@@ -65,6 +78,8 @@ def main() -> int:
             args.manifest,
             generated_images_dir=args.generated_images_dir,
             use_llm_caption=use_llm,
+            content_angle=args.content_angle,
+            caption_overlay=args.caption_overlay,
         )
         out_dir = args.output_dir
         if out_dir is None:

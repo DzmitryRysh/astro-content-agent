@@ -613,6 +613,8 @@ def build_catstyle_post_package(
     generated_images_dir: Path | str | None = None,
     use_llm_caption: bool | None = None,
     caption_generator: CatstyleCaptionGenerator | None = None,
+    content_angle: str | None = None,
+    caption_overlay: str | None = None,
 ) -> CatstylePostPackage:
     mp = Path(manifest_path).expanduser().resolve()
     raw = load_catstyle_image_generation_manifest(mp)
@@ -691,6 +693,8 @@ def build_catstyle_post_package(
         planet_b=pb_e,
         aspect_type=asp_e,
         mode=mode_e,
+        content_angle=content_angle,
+        caption_overlay=caption_overlay,
     )
     cap_result = generate_catstyle_caption(
         caption_ctx,

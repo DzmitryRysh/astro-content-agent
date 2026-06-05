@@ -32,6 +32,11 @@ from astro_content_agent.services.content.catstyle_caption_planet_policy import 
 from astro_content_agent.services.content.catstyle_compensation_copy import (
     format_compensation_package_block,
 )
+from astro_content_agent.content.money_weather.money_behavior_overlay_v1 import (
+    is_money_content_angle,
+    overlay_to_context_dict,
+    resolve_money_behavior_overlay,
+)
 
 _CAPTION_BANNED_PHRASES: tuple[str, ...] = (
     "лови пару и тип аспекта",
@@ -71,6 +76,8 @@ class CatstyleCaptionContext:
     stack_compensation_focus: str | None = None
     aspect_source: str = "manual_editorial"
     sky_timing_mode: str | None = None
+    content_angle: str | None = None
+    caption_overlay: str | None = None
 
 
 def caption_banned_phrases() -> tuple[str, ...]:
@@ -181,6 +188,8 @@ def build_catstyle_caption_context(
     planet_b: str | None = None,
     aspect_type: str | None = None,
     mode: str | None = None,
+    content_angle: str | None = None,
+    caption_overlay: str | None = None,
 ) -> CatstyleCaptionContext:
     row = _row_from_manifest(manifest)
     def _safe_planet(raw: str) -> str:
@@ -243,6 +252,17 @@ def build_catstyle_caption_context(
         if isinstance(bgs, list) and bgs and isinstance(bgs[0], dict):
             bg_aspect = bgs[0]
 
+    resolved_content_angle = (
+        content_angle
+        or str(manifest.get("content_angle") or "").strip()
+        or None
+    )
+    resolved_caption_overlay = (
+        caption_overlay
+        or str(manifest.get("caption_overlay") or "").strip()
+        or None
+    )
+
     return CatstyleCaptionContext(
         planet_a=pa,
         planet_b=pb,
@@ -270,6 +290,8 @@ def build_catstyle_caption_context(
         stack_compensation_focus=str(stack.get("compensation_focus") or "") if stack else None,
         aspect_source=aspect_source,
         sky_timing_mode=sky_timing_mode,
+        content_angle=resolved_content_angle,
+        caption_overlay=resolved_caption_overlay,
     )
 
 
@@ -365,6 +387,29 @@ def context_to_llm_payload(ctx: CatstyleCaptionContext) -> dict[str, Any]:
                 "one_concrete_action_today",
             ]
             if ctx.background_aspect
+            else None
+        ),
+        "content_angle": ctx.content_angle,
+        "caption_overlay": ctx.caption_overlay,
+        "money_behavior_overlay": (
+            overlay_to_context_dict(
+                resolve_money_behavior_overlay(ctx.planet_a, ctx.planet_b, ctx.aspect_type)
+            )
+            if is_money_content_angle(ctx.content_angle)
+            or (ctx.caption_overlay or "").strip().lower() == "money_weather"
+            else None
+        ),
+        "money_caption_structure": (
+            [
+                "life_hook_money_feeling",
+                "aspect_explanation_planet_meanings",
+                "money_behavior_pattern",
+                "shadow_risk_not_investment_advice",
+                "compensation_reflective_action",
+                "money_compass_cta_bridge",
+            ]
+            if is_money_content_angle(ctx.content_angle)
+            or (ctx.caption_overlay or "").strip().lower() == "money_weather"
             else None
         ),
     }

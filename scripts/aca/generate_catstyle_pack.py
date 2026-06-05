@@ -30,6 +30,7 @@ def _artifact_dict(
     world_template_key: str | None,
     scene_template_key: str | None,
     render_style_profile_key: str | None,
+    content_angle: str | None = None,
 ) -> dict:
     blob: dict = {
         "planet_a": planet_a,
@@ -57,6 +58,8 @@ def _artifact_dict(
         blob["render_style_profile_key"] = render_style_profile_key
     if pack.render_style_profile is not None:
         blob["render_style_profile"] = pack.render_style_profile
+    if content_angle:
+        blob["content_angle"] = content_angle
     return blob
 
 
@@ -144,6 +147,13 @@ def main() -> int:
         ),
     )
     ap.add_argument("--output", type=Path, default=None, help="Write JSON artifact to this path")
+    ap.add_argument(
+        "--content-angle",
+        default=None,
+        dest="content_angle",
+        choices=("money",),
+        help="Optional editorial angle for downstream caption/post generation.",
+    )
     args = ap.parse_args()
 
     skin_a = str(args.skin_a).strip() if args.skin_a else None
@@ -198,6 +208,7 @@ def main() -> int:
             world_template_key=world_template,
             scene_template_key=scene_template,
             render_style_profile_key=render_style,
+            content_angle=args.content_angle,
         )
         out_path.write_text(json.dumps(blob, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         print(f"Wrote artifact: {out_path}")
